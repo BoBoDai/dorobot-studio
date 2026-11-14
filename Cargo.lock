@@ -325,7 +325,7 @@ version = "56.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3aa9e59c611ebc291c28582077ef25c97f1975383f1479b12f3b9ffee2ffabe"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "serde",
  "serde_json",
 ]
@@ -682,7 +682,7 @@ version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "cexpr",
  "clang-sys",
  "itertools 0.10.5",
@@ -716,13 +716,13 @@ source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef
 [[package]]
 name = "bitflags"
 version = "2.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
+source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef17e51a3dba0e04c25a33"
 
 [[package]]
 name = "bitflags"
-version = "2.10.0"
-source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef17e51a3dba0e04c25a33"
+version = "2.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 
 [[package]]
 name = "bitstream-io"
@@ -1192,7 +1192,7 @@ version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8b9f2e4c67f833b660cdb0a3523065869fb35570177239812ed4c905aeff87b"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "crossterm_winapi",
  "document-features",
  "parking_lot",
@@ -1935,7 +1935,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89a09f22a6c6069a18470eb92d2298acf25463f14256d24778e1230d789a2aec"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "block2",
  "libc",
  "objc2",
@@ -2001,6 +2001,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "urdf-rs",
 ]
 
 [[package]]
@@ -2169,20 +2170,20 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "ffmpeg-next"
-version = "8.0.0"
+version = "8.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d658424d233cbd993a972dd73a66ca733acd12a494c68995c9ac32ae1fe65b40"
+checksum = "f7c4bd5ab1ac61f29c634df1175d350ded29cf74c3c6d4f7030431a5ae3c7d5d"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "ffmpeg-sys-next",
  "libc",
 ]
 
 [[package]]
 name = "ffmpeg-sys-next"
-version = "8.0.1"
+version = "8.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bca20aa4ee774fe384c2490096c122b0b23cf524a9910add0686691003d797b"
+checksum = "a314bc0e022a33a99567ed4bd2576bd58ffd8fcff7891c29194cfecc26a62547"
 dependencies = [
  "bindgen",
  "cc",
@@ -2223,7 +2224,7 @@ version = "25.12.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35f6839d7b3b98adde531effaf34f0c2badc6f4735d26fe74709d8e513a96ef3"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "rustc_version",
 ]
 
@@ -3027,7 +3028,7 @@ version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d0b95e02c851351f877147b7deea7b1afb1df71b63aa5f8270716e0c5720616"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "libc",
 ]
 
@@ -3344,7 +3345,7 @@ version = "2.0.0"
 source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef17e51a3dba0e04c25a33"
 dependencies = [
  "ash",
- "bitflags 2.10.0 (git+https://github.com/makepad/makepad?branch=dev)",
+ "bitflags 2.10.0",
  "ctrlc",
  "hilog-sys",
  "makepad-android-state",
@@ -3431,7 +3432,7 @@ name = "makepad-studio-protocol"
 version = "0.1.0"
 source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef17e51a3dba0e04c25a33"
 dependencies = [
- "bitflags 2.10.0 (git+https://github.com/makepad/makepad?branch=dev)",
+ "bitflags 2.10.0",
  "makepad-error-log",
  "makepad-live-id",
  "makepad-micro-serde",
@@ -3694,7 +3695,7 @@ source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef
 dependencies = [
  "arrayvec 0.7.6 (git+https://github.com/makepad/makepad?branch=dev)",
  "bit-set",
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "cfg-if 1.0.4 (git+https://github.com/makepad/makepad?branch=dev)",
  "cfg_aliases 0.2.1 (git+https://github.com/makepad/makepad?branch=dev)",
  "hashbrown 0.16.1 (git+https://github.com/makepad/makepad?branch=dev)",
@@ -3744,7 +3745,7 @@ version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad5a3bbb2ae61f345b8c11776f2e79fc2bb71d1901af9a5f81f03c9238a05d86"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "ctor",
  "napi-sys-ohos",
  "once_cell 1.21.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3786,7 +3787,7 @@ version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "225e7cfe711e0ba79a68baeddb2982723e4235247aefce1482f2f16c27865b66"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "cfg-if 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg_aliases 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc",
@@ -3933,7 +3934,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d49e936b501e5c5bf01fda3a9452ff86dc3ea98ad5f283e1455153142d97518c"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "block2",
  "objc2",
  "objc2-foundation",
@@ -3945,7 +3946,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2a180dd8642fa45cdb7dd721cd4c11b1cadd4929ce112ebd8b9f5803cc79d536"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "dispatch2",
  "objc2",
 ]
@@ -3962,7 +3963,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3e0adef53c21f888deb4fa59fc59f7eb17404926ee8a6f59f5df0fd7f9f3272"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "objc2",
  "objc2-core-foundation",
 ]
@@ -4421,7 +4422,7 @@ name = "pulldown-cmark"
 version = "0.12.2"
 source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef17e51a3dba0e04c25a33"
 dependencies = [
- "bitflags 2.10.0 (git+https://github.com/makepad/makepad?branch=dev)",
+ "bitflags 2.10.0",
  "memchr 2.7.6 (git+https://github.com/makepad/makepad?branch=dev)",
  "unicase 2.9.0 (git+https://github.com/makepad/makepad?branch=dev)",
 ]
@@ -5303,7 +5304,7 @@ version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
 ]
 
 [[package]]
@@ -5487,7 +5488,7 @@ version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "146c9e247ccc180c1f61615433868c99f3de3ae256a30a43b49f67c2d9171f34"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "errno",
  "libc",
  "linux-raw-sys",
@@ -5552,7 +5553,7 @@ name = "rustybuzz"
 version = "0.18.0"
 source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef17e51a3dba0e04c25a33"
 dependencies = [
- "bitflags 2.10.0 (git+https://github.com/makepad/makepad?branch=dev)",
+ "bitflags 2.10.0",
  "bytemuck 1.25.0",
  "makepad-error-log",
  "smallvec 1.15.1 (git+https://github.com/makepad/makepad?branch=dev)",
@@ -5651,7 +5652,7 @@ version = "3.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3297343eaf830f66ede390ea39da1d462b6b0c1b000f420d0a83f898bbbe6ef"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "core-foundation",
  "core-foundation-sys",
  "libc",
@@ -5858,7 +5859,7 @@ name = "spirv"
 version = "0.3.0+sdk-1.3.268.0"
 source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef17e51a3dba0e04c25a33"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
 ]
 
 [[package]]
@@ -6270,7 +6271,7 @@ version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4e6559d53cc268e5031cd8429d05415bc4cb4aefc4aa5d6cc35fbf5b924a1f8"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "bytes",
  "http",
  "pin-project-lite",
@@ -6676,7 +6677,7 @@ version = "0.31.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8e6faa537fbb6c186cb9f1d41f2f811a4120d1b57ec61f50da451a0c5122bec"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "rustix",
  "wayland-backend 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "wayland-scanner",
@@ -6687,7 +6688,7 @@ name = "wayland-client"
 version = "0.31.12"
 source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef17e51a3dba0e04c25a33"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "libc",
  "wayland-backend 0.3.12 (git+https://github.com/makepad/makepad?branch=dev)",
 ]
@@ -6707,7 +6708,7 @@ version = "0.32.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baeda9ffbcfc8cd6ddaade385eaf2393bd2115a69523c735f12242353c3df4f3"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "wayland-backend 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "wayland-client 0.31.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "wayland-scanner",
@@ -6718,7 +6719,7 @@ name = "wayland-protocols"
 version = "0.32.10"
 source = "git+https://github.com/makepad/makepad?branch=dev#ed3eb88d4a135590fcef17e51a3dba0e04c25a33"
 dependencies = [
- "bitflags 2.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 2.13.1",
  "wayland-backend 0.3.12 (git+https://github.com/makepad/makepad?branch=dev)",
  "wayland-client 0.31.12 (git+https://github.com/makepad/makepad?branch=dev)",
 ]

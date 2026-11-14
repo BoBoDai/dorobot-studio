@@ -568,9 +568,9 @@ pub fn toggle_light_mode() -> f64 {
 /// press delivers FingerDown and FingerUp in the same batch — so matching on
 /// that first action never sees the release. Scan them all instead.
 pub fn view_clicked(actions: &Actions, uid: WidgetUid) -> bool {
-    actions.filter_widget_actions(uid).any(|a| {
-        matches!(a.cast::<ViewAction>(), ViewAction::FingerUp(fe) if fe.is_over)
-    })
+    actions
+        .filter_widget_actions(uid)
+        .any(|a| matches!(a.cast::<ViewAction>(), ViewAction::FingerUp(fe) if fe.is_over))
 }
 
 /// Which draws on a widget carry the `light` instance.
@@ -642,7 +642,12 @@ pub fn theme_chrome(cx: &mut Cx, ui: &WidgetRef, light: f64) {
         if item.is_empty() {
             continue;
         }
-        apply_light(cx, &item, &[(ids!(glyph), Themed::Bg), (ids!(caption), Themed::Text)], light);
+        apply_light(
+            cx,
+            &item,
+            &[(ids!(glyph), Themed::Bg), (ids!(caption), Themed::Text)],
+            light,
+        );
     }
 }
 

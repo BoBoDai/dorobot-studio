@@ -270,6 +270,7 @@ script_mod! {
                         text_style: mod.widgets.ux.TEXT_BODY{}
                     }
                 }
+                btn_open := Button{ text: "Open folder…" }
                 btn_pull := Button{
                     text: "Pull from Hub"
                     padding: Inset{left: 18. right: 18. top: 11. bottom: 11.}
@@ -423,12 +424,21 @@ impl LibraryScreenRef {
     /// flow — find the port, check the motors, calibrate, add cameras, save the
     /// profile — so the link goes there rather than opening a dialog of its own.
     pub fn clicked_setup(&self, cx: &mut Cx, actions: &Actions) -> bool {
-        let Some(mut inner) = self.borrow_mut() else { return false };
-        let link = inner.view.widget(cx, ids!(hardware_rail.hw_body.link_setup));
+        let Some(mut inner) = self.borrow_mut() else {
+            return false;
+        };
+        let link = inner
+            .view
+            .widget(cx, ids!(hardware_rail.hw_body.link_setup));
         !link.is_empty() && crate::ui::frame::view_clicked(actions, link.widget_uid())
     }
 
-    pub fn clicked_dataset(&self, cx: &mut Cx, actions: &Actions, state: &LibraryState) -> Option<String> {
+    pub fn clicked_dataset(
+        &self,
+        cx: &mut Cx,
+        actions: &Actions,
+        state: &LibraryState,
+    ) -> Option<String> {
         let mut inner = self.borrow_mut()?;
         for (slot, path) in CARD_IDS.iter().enumerate() {
             let d = state.datasets.get(slot)?;
@@ -446,22 +456,35 @@ impl LibraryScreenRef {
     /// Push a state snapshot into the view.
     pub fn sync(&self, cx: &mut Cx, state: &LibraryState) {
         let light = crate::ui::frame::light_mode();
-        let Some(mut inner) = self.borrow_mut() else { return };
+        let Some(mut inner) = self.borrow_mut() else {
+            return;
+        };
         let root = &mut inner.view;
 
         // Static chrome: page background, panels, headers, links.
         script_apply_eval!(cx, root, { draw_bg +: { light: #(light) } });
-        apply_light_in(cx, root, &[
-            (ids!(left_col.header.page_title), Themed::Text),
-            (ids!(left_col.header.btn_new), Themed::Both),
-            (ids!(left_col.header.btn_pull), Themed::Both),
-            (ids!(left_col.grid), Themed::Bg),
-            (ids!(left_col.recent), Themed::Bg),
-            (ids!(left_col.recent.rec_head.view_all), Themed::Text),
-            (ids!(hardware_rail), Themed::Bg),
-            (ids!(hardware_rail.hw_body.link_setup.setup_label), Themed::Text),
-        ], light);
-        for p in [ids!(left_col.recent.rec_head) as &[LiveId], ids!(hardware_rail.hw_head)] {
+        apply_light_in(
+            cx,
+            root,
+            &[
+                (ids!(left_col.header.page_title), Themed::Text),
+                (ids!(left_col.header.btn_new), Themed::Both),
+                (ids!(left_col.header.btn_pull), Themed::Both),
+                (ids!(left_col.grid), Themed::Bg),
+                (ids!(left_col.recent), Themed::Bg),
+                (ids!(left_col.recent.rec_head.view_all), Themed::Text),
+                (ids!(hardware_rail), Themed::Bg),
+                (
+                    ids!(hardware_rail.hw_body.link_setup.setup_label),
+                    Themed::Text,
+                ),
+            ],
+            light,
+        );
+        for p in [
+            ids!(left_col.recent.rec_head) as &[LiveId],
+            ids!(hardware_rail.hw_head),
+        ] {
             let head = root.widget(cx, p);
             theme_panel_head(cx, &head, light);
         }
@@ -480,13 +503,21 @@ impl LibraryScreenRef {
                     }
                     let head = card.widget(cx, ids!(head));
                     theme_panel_head(cx, &head, light);
-                    apply_light(cx, &card, &[
-                        (ids!(thumb), Themed::Bg),
-                        (ids!(body.name), Themed::Text),
-                        (ids!(body.meta), Themed::Text),
-                    ], light);
-                    for cp in [ids!(body.chips.chip_good) as &[LiveId],
-                               ids!(body.chips.chip_bad), ids!(body.chips.chip_sync)] {
+                    apply_light(
+                        cx,
+                        &card,
+                        &[
+                            (ids!(thumb), Themed::Bg),
+                            (ids!(body.name), Themed::Text),
+                            (ids!(body.meta), Themed::Text),
+                        ],
+                        light,
+                    );
+                    for cp in [
+                        ids!(body.chips.chip_good) as &[LiveId],
+                        ids!(body.chips.chip_bad),
+                        ids!(body.chips.chip_sync),
+                    ] {
                         let chip = card.widget(cx, cp);
                         theme_chip(cx, &chip, light);
                     }
@@ -501,7 +532,11 @@ impl LibraryScreenRef {
                         .set_text(cx, d.sync.label());
 
                     // "local only" reads as an accent chip, "synced" as neutral.
-                    let tone = if d.sync == SyncState::LocalOnly { 3.0 } else { 0.0 };
+                    let tone = if d.sync == SyncState::LocalOnly {
+                        3.0
+                    } else {
+                        0.0
+                    };
                     let mut chip = card.widget(cx, ids!(body.chips.chip_sync));
                     script_apply_eval!(cx, chip, {
                         draw_bg +: { tone: #(tone) }
@@ -523,15 +558,26 @@ impl LibraryScreenRef {
             match state.devices.get(slot) {
                 Some(dev) => {
                     row.set_visible(cx, true);
-                    apply_light(cx, &row, &[
-                        (ids!(icon), Themed::Bg),
-                        (ids!(text_col.dev_name), Themed::Text),
-                        (ids!(text_col.dev_detail), Themed::Text),
-                    ], light);
-                    row.label(cx, ids!(text_col.dev_name)).set_text(cx, &dev.name);
-                    row.label(cx, ids!(text_col.dev_detail)).set_text(cx, &dev.detail);
+                    apply_light(
+                        cx,
+                        &row,
+                        &[
+                            (ids!(icon), Themed::Bg),
+                            (ids!(text_col.dev_name), Themed::Text),
+                            (ids!(text_col.dev_detail), Themed::Text),
+                        ],
+                        light,
+                    );
+                    row.label(cx, ids!(text_col.dev_name))
+                        .set_text(cx, &dev.name);
+                    row.label(cx, ids!(text_col.dev_detail))
+                        .set_text(cx, &dev.detail);
                     let on = if dev.online { 1.0 } else { 0.0 };
-                    let kind = if dev.kind == DeviceKind::Camera { 1.0 } else { 0.0 };
+                    let kind = if dev.kind == DeviceKind::Camera {
+                        1.0
+                    } else {
+                        0.0
+                    };
                     let mut dot = row.widget(cx, ids!(status_dot));
                     script_apply_eval!(cx, dot, {
                         draw_bg +: { online: #(on) }
@@ -553,11 +599,16 @@ impl LibraryScreenRef {
             match state.sessions.get(slot) {
                 Some(s) => {
                     cell.set_visible(cx, true);
-                    apply_light(cx, &cell, &[
-                        (ids!(sthumb), Themed::Bg),
-                        (ids!(scol.stitle), Themed::Text),
-                        (ids!(scol.sdataset), Themed::Text),
-                    ], light);
+                    apply_light(
+                        cx,
+                        &cell,
+                        &[
+                            (ids!(sthumb), Themed::Bg),
+                            (ids!(scol.stitle), Themed::Text),
+                            (ids!(scol.sdataset), Themed::Text),
+                        ],
+                        light,
+                    );
                     let chip = cell.widget(cx, ids!(scol.sstate));
                     theme_chip(cx, &chip, light);
                     cell.label(cx, ids!(scol.stitle))
@@ -567,7 +618,11 @@ impl LibraryScreenRef {
                     cell.label(cx, ids!(scol.sstate.label))
                         .set_text(cx, s.outcome.label());
                     // in-progress reads amber (tone 4), completed green (tone 1)
-                    let tone = if s.outcome == SessionOutcome::InProgress { 4.0 } else { 1.0 };
+                    let tone = if s.outcome == SessionOutcome::InProgress {
+                        4.0
+                    } else {
+                        1.0
+                    };
                     let mut chip = cell.widget(cx, ids!(scol.sstate));
                     script_apply_eval!(cx, chip, {
                         draw_bg +: { tone: #(tone) }

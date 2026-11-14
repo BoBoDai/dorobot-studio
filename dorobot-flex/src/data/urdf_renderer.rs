@@ -6,20 +6,20 @@
 use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "urdf")]
-use std::path::Path;
-#[cfg(feature = "urdf")]
 use std::collections::HashMap;
+#[cfg(feature = "urdf")]
+use std::path::Path;
 
 #[cfg(feature = "urdf")]
 use kiss3d::camera::ArcBall;
 #[cfg(feature = "urdf")]
 use kiss3d::light::Light;
 #[cfg(feature = "urdf")]
-use kiss3d::window::Window;
+use kiss3d::nalgebra::{Isometry3, Point3, Translation3, UnitQuaternion, Vector3};
 #[cfg(feature = "urdf")]
 use kiss3d::scene::SceneNode;
 #[cfg(feature = "urdf")]
-use kiss3d::nalgebra::{Point3, Vector3, UnitQuaternion, Translation3, Isometry3};
+use kiss3d::window::Window;
 
 /// Camera control commands sent from UI to renderer
 #[derive(Clone, Debug)]
@@ -105,15 +105,18 @@ struct Robot {
 impl Robot {
     /// Load robot from URDF file
     fn from_urdf(window: &mut Window, urdf_path: &str) -> Result<Self, String> {
-
         let base_path = Path::new(urdf_path).parent().unwrap_or(Path::new("."));
 
         // Parse URDF
-        let urdf = urdf_rs::read_file(urdf_path)
-            .map_err(|e| format!("Failed to parse URDF: {}", e))?;
+        let urdf =
+            urdf_rs::read_file(urdf_path).map_err(|e| format!("Failed to parse URDF: {}", e))?;
 
-        log::info!("Loaded URDF: {} with {} links, {} joints",
-            urdf.name, urdf.links.len(), urdf.joints.len());
+        log::info!(
+            "Loaded URDF: {} with {} links, {} joints",
+            urdf.name,
+            urdf.links.len(),
+            urdf.joints.len()
+        );
 
         // Create root node
         let mut root = window.add_group();
@@ -132,14 +135,18 @@ impl Robot {
                         let mesh_path = base_path.join(filename);
                         log::debug!("Loading mesh: {:?}", mesh_path);
 
-                        let scale = scale.as_ref()
+                        let scale = scale
+                            .as_ref()
                             .map(|s| Vector3::new(s[0] as f32, s[1] as f32, s[2] as f32))
                             .unwrap_or(Vector3::new(1.0, 1.0, 1.0));
 
                         if let Ok(node) = Self::load_mesh(&mut link_node, &mesh_path, scale) {
                             node
                         } else {
-                            log::warn!("Failed to load mesh: {:?}, using cube placeholder", mesh_path);
+                            log::warn!(
+                                "Failed to load mesh: {:?}, using cube placeholder",
+                                mesh_path
+                            );
                             link_node.add_cube(0.02, 0.02, 0.02)
                         }
                     }
@@ -149,9 +156,7 @@ impl Robot {
                     urdf_rs::Geometry::Cylinder { radius, length } => {
                         link_node.add_cylinder(*radius as f32, *length as f32)
                     }
-                    urdf_rs::Geometry::Sphere { radius } => {
-                        link_node.add_sphere(*radius as f32)
-                    }
+                    urdf_rs::Geometry::Sphere { radius } => link_node.add_sphere(*radius as f32),
                     urdf_rs::Geometry::Capsule { radius, length } => {
                         link_node.add_cylinder(*radius as f32, *length as f32)
                     }
@@ -194,8 +199,13 @@ impl Robot {
             let parent_name = &joint.parent.link;
             let child_name = &joint.child.link;
 
-            log::debug!("Joint {}: {} -> {} (type: {:?})",
-                joint.name, parent_name, child_name, joint.joint_type);
+            log::debug!(
+                "Joint {}: {} -> {} (type: {:?})",
+                joint.name,
+                parent_name,
+                child_name,
+                joint.joint_type
+            );
 
             // Check parent exists, then get child node
             let parent_exists = link_nodes.contains_key(parent_name);
@@ -259,11 +269,16 @@ impl Robot {
     }
 
     /// Load STL mesh into scene
-    fn load_mesh(parent: &mut SceneNode, path: &Path, scale: Vector3<f32>) -> Result<SceneNode, String> {
+    fn load_mesh(
+        parent: &mut SceneNode,
+        path: &Path,
+        scale: Vector3<f32>,
+    ) -> Result<SceneNode, String> {
         use mesh_loader::Loader;
 
         let loader = Loader::default();
-        let scene = loader.load(path)
+        let scene = loader
+            .load(path)
             .map_err(|e| format!("Failed to load mesh: {}", e))?;
 
         if scene.meshes.is_empty() {
@@ -273,12 +288,16 @@ impl Robot {
         let mesh = &scene.meshes[0];
 
         // Convert vertices
-        let vertices: Vec<Point3<f32>> = mesh.vertices.iter()
+        let vertices: Vec<Point3<f32>> = mesh
+            .vertices
+            .iter()
             .map(|v| Point3::new(v[0] * scale.x, v[1] * scale.y, v[2] * scale.z))
             .collect();
 
         // Convert faces
-        let faces: Vec<Point3<u16>> = mesh.faces.iter()
+        let faces: Vec<Point3<u16>> = mesh
+            .faces
+            .iter()
             .filter_map(|f| {
                 if f.len() >= 3 {
                     Some(Point3::new(f[0] as u16, f[1] as u16, f[2] as u16))
@@ -295,7 +314,7 @@ impl Robot {
         let mesh = kiss3d::resource::Mesh::new(vertices, faces, None, None, false);
         let node = parent.add_mesh(
             std::rc::Rc::new(std::cell::RefCell::new(mesh)),
-            Vector3::new(1.0, 1.0, 1.0)
+            Vector3::new(1.0, 1.0, 1.0),
         );
 
         Ok(node)
@@ -310,18 +329,16 @@ impl Robot {
             joint.current_position = clamped;
 
             // Apply rotation around joint axis
-            let rotation = UnitQuaternion::from_axis_angle(
-                &na::Unit::new_normalize(joint.axis),
-                clamped,
-            );
+            let rotation =
+                UnitQuaternion::from_axis_angle(&na::Unit::new_normalize(joint.axis), clamped);
 
             // Combine with origin transform
-            let transform = joint.origin * Isometry3::from_parts(
-                Translation3::identity(),
-                rotation,
-            );
+            let transform =
+                joint.origin * Isometry3::from_parts(Translation3::identity(), rotation);
 
-            joint.scene_node.set_local_translation(Translation3::from(transform.translation.vector));
+            joint
+                .scene_node
+                .set_local_translation(Translation3::from(transform.translation.vector));
             joint.scene_node.set_local_rotation(transform.rotation);
         }
     }
@@ -434,14 +451,11 @@ fn run_renderer_loop(state: SharedRendererState) {
                         camera.set_at(Point3::new(
                             current_at.x + dx * 0.005,
                             current_at.y - dy * 0.005,
-                            current_at.z
+                            current_at.z,
                         ));
                     }
                     CameraCommand::Reset => {
-                        camera.look_at(
-                            Point3::new(0.3, 0.3, 0.5),
-                            Point3::new(0.0, 0.15, 0.0)
-                        );
+                        camera.look_at(Point3::new(0.3, 0.3, 0.5), Point3::new(0.0, 0.15, 0.0));
                     }
                 }
             }
@@ -472,7 +486,8 @@ fn run_renderer_loop(state: SharedRendererState) {
                 let height = size.y as usize;
 
                 // snap() returns RGB data, convert to RGBA
-                let rgba: Vec<u8> = pixels.chunks(3)
+                let rgba: Vec<u8> = pixels
+                    .chunks(3)
                     .flat_map(|rgb| [rgb[0], rgb[1], rgb[2], 255])
                     .collect();
 

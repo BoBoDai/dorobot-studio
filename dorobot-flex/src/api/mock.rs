@@ -16,7 +16,8 @@ fn wave(len: usize, freq: f32, phase: f32, amp: f32, bias: f32) -> Vec<f32> {
     (0..len)
         .map(|i| {
             let t = i as f32 / len as f32;
-            bias + amp * ((t * TAU * freq + phase).sin() + 0.28 * (t * TAU * freq * 2.7 + phase).sin())
+            bias + amp
+                * ((t * TAU * freq + phase).sin() + 0.28 * (t * TAU * freq * 2.7 + phase).sin())
         })
         .collect()
 }
@@ -71,6 +72,10 @@ impl Backend for MockBackend {
 
     fn dispatch(&mut self, intent: Intent) {
         match intent {
+            Intent::ConfigureRig(_)
+            | Intent::OpenFolder(_)
+            | Intent::UndoExclude
+            | Intent::HubTransfer { .. } => {}
             Intent::Navigate(s) => self.screen = s,
             Intent::TogglePlay => self.playback.is_playing = !self.playback.is_playing,
             Intent::Seek(t) => {
@@ -78,8 +83,8 @@ impl Backend for MockBackend {
             }
             Intent::StepFrames(n) => {
                 let fps = self.playback.stats.fps.max(1e-6);
-                self.playback.current_time =
-                    (self.playback.current_time + n as f64 / fps).clamp(0.0, self.playback.stats.duration_s);
+                self.playback.current_time = (self.playback.current_time + n as f64 / fps)
+                    .clamp(0.0, self.playback.stats.duration_s);
             }
             Intent::SetSpeed(v) => self.playback.speed = v.clamp(0.05, 8.0),
             Intent::NewRecordingSession => self.screen = Screen::Record,
@@ -124,7 +129,12 @@ impl Backend for MockBackend {
 
             Intent::SelectEpisode(idx) => self.playback.selected = Some(idx),
             Intent::TagEpisode { episode, tag } => {
-                if let Some(e) = self.playback.episodes.iter_mut().find(|e| e.index == episode) {
+                if let Some(e) = self
+                    .playback
+                    .episodes
+                    .iter_mut()
+                    .find(|e| e.index == episode)
+                {
                     e.tag = tag;
                 }
             }
@@ -173,11 +183,56 @@ fn library_fixture() -> LibraryState {
     LibraryState {
         datasets: vec![
             dataset("aimee-0720", 206, 10.0, "SO-101", 1.2, 184, 22, Synced),
-            dataset("so101-pickplace", 154, 30.0, "SO-101", 0.9, 132, 22, LocalOnly),
-            dataset("aloha-fold-towels", 276, 50.0, "ALOHA bimanual", 4.1, 238, 38, Synced),
-            dataset("pusht-demo", 198, 10.0, "PushT sim", 0.3, 168, 30, LocalOnly),
-            dataset("koch-stack-cubes", 247, 30.0, "Koch v1.1", 1.4, 208, 39, Synced),
-            dataset("so101-drawer-open", 89, 30.0, "SO-101", 0.6, 71, 18, LocalOnly),
+            dataset(
+                "so101-pickplace",
+                154,
+                30.0,
+                "SO-101",
+                0.9,
+                132,
+                22,
+                LocalOnly,
+            ),
+            dataset(
+                "aloha-fold-towels",
+                276,
+                50.0,
+                "ALOHA bimanual",
+                4.1,
+                238,
+                38,
+                Synced,
+            ),
+            dataset(
+                "pusht-demo",
+                198,
+                10.0,
+                "PushT sim",
+                0.3,
+                168,
+                30,
+                LocalOnly,
+            ),
+            dataset(
+                "koch-stack-cubes",
+                247,
+                30.0,
+                "Koch v1.1",
+                1.4,
+                208,
+                39,
+                Synced,
+            ),
+            dataset(
+                "so101-drawer-open",
+                89,
+                30.0,
+                "SO-101",
+                0.6,
+                71,
+                18,
+                LocalOnly,
+            ),
         ],
         devices: vec![
             DeviceStatus {
@@ -230,18 +285,18 @@ fn hardware_fixture() -> HardwareState {
         title: t.into(),
         state: s,
     };
-    let joint = |n: &str, lo: f32, hi: f32, cur: f32, swept: f32, p: JointProgress| {
-        JointCalibration {
+    let joint =
+        |n: &str, lo: f32, hi: f32, cur: f32, swept: f32, p: JointProgress| JointCalibration {
             name: n.into(),
             min_deg: lo,
             max_deg: hi,
             current_deg: cur,
             swept,
             progress: p,
-        }
-    };
+        };
 
     HardwareState {
+        can_advance: false,
         robot_label: "SO-101".into(),
         steps: vec![
             step("Find port", StepState::Done),
@@ -283,6 +338,10 @@ fn record_fixture() -> RecordState {
     let values = [0.123f32, -0.456, 1.234, -1.111, 0.789, 2.345];
 
     RecordState {
+        robot_urdf: None,
+        pose: Vec::new(),
+        previews: BTreeMap::new(),
+        busy: false,
         profile_label: "SO-101 · 2 cams · profile: bench-rig".into(),
         task: "Pick the lego block and place it in the box".into(),
         episode_index: 23,
@@ -355,7 +414,11 @@ fn playback_fixture() -> PlaybackState {
         drift_series: (0..161)
             .map(|i| {
                 let t = i as f64 / 160.0;
-                if t < 0.8 { 0.02 } else { (t - 0.8) * 3.0 }
+                if t < 0.8 {
+                    0.02
+                } else {
+                    (t - 0.8) * 3.0
+                }
             })
             .collect(),
         state_names: vec![
@@ -388,6 +451,7 @@ fn playback_fixture() -> PlaybackState {
         speed: 1.0,
         video_paths: BTreeMap::new(),
         video_frame_offset: 0,
+        video_frame_offsets: BTreeMap::new(),
         robot_urdf: None,
         joint_frames: Vec::new(),
     }
@@ -466,14 +530,24 @@ fn eval_fixture() -> EvalState {
         inference_ms: 18.0,
         joints,
         runs: vec![
-            RolloutRun { id: 7, success: true, duration_s: 14.2, note: None },
+            RolloutRun {
+                id: 7,
+                success: true,
+                duration_s: 14.2,
+                note: None,
+            },
             RolloutRun {
                 id: 6,
                 success: false,
                 duration_s: 0.0,
                 note: Some("timeout".into()),
             },
-            RolloutRun { id: 5, success: true, duration_s: 12.8, note: None },
+            RolloutRun {
+                id: 5,
+                success: true,
+                duration_s: 12.8,
+                note: None,
+            },
         ],
         session_success: 6,
         session_total: 8,
@@ -494,7 +568,10 @@ mod tests {
     fn fixtures_match_the_design_renders() {
         let b = MockBackend::new();
         assert_eq!(b.library().datasets.len(), 6);
-        assert_eq!(b.library().datasets[0].meta_line(), "206 ep · 10 fps · SO-101 · 1.2 GB");
+        assert_eq!(
+            b.library().datasets[0].meta_line(),
+            "206 ep · 10 fps · SO-101 · 1.2 GB"
+        );
         assert_eq!(b.hardware().joints_done(), 4);
         assert!(!b.hardware().can_continue());
         assert_eq!(b.record().counter_label(), "EP 23 / 50");
@@ -507,7 +584,10 @@ mod tests {
         let mut b = MockBackend::new();
         b.dispatch(Intent::Navigate(Screen::Record));
         assert_eq!(b.screen(), Screen::Record);
-        b.dispatch(Intent::TagEpisode { episode: 0, tag: Some(Tag::Bad) });
+        b.dispatch(Intent::TagEpisode {
+            episode: 0,
+            tag: Some(Tag::Bad),
+        });
         assert_eq!(b.playback().episodes[0].tag, Some(Tag::Bad));
         b.dispatch(Intent::DeleteEpisode(0));
         assert!(b.playback().episodes.iter().all(|e| e.index != 0));

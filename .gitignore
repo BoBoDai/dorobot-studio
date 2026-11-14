@@ -34,3 +34,24 @@ data/g1/meshes/
 
 # Tool caches
 **/.lafan1-cache/
+.venv-capture/
+
+# Private local configuration, credentials and generated data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+id_rsa*
+id_ed25519*
+*.local.json
+.venv*/
+__pycache__/
+*.pyc
+*.log
+/datasets/
+/recordings/
+/docs/completion-evidence/
+/docs/audit-*/
+/docs/verification-*.json

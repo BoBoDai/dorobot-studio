@@ -268,8 +268,8 @@ impl Widget for URDFViewer {
             self.camera_pitch = 0.3;
 
             // Load robot from URDF
-            let urdf_path = "/Users/yuechen/home/dorobot/examples/urdf-sample/so100.urdf";
-            let assets_dir = "/Users/yuechen/home/dorobot/examples/urdf-sample/assets";
+            let urdf_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../urdf-sample/so100.urdf");
+            let assets_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../urdf-sample/assets");
 
             match Robot::from_urdf(urdf_path, assets_dir) {
                 Ok(mut robot) => {

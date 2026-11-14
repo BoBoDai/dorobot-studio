@@ -158,28 +158,19 @@ impl RerunLogger {
             ImageEncoding::Rgb8 => {
                 self.rec.log(
                     entity_path,
-                    &rerun::Image::from_rgb24(
-                        image.data.as_slice(),
-                        [image.width, image.height],
-                    ),
+                    &rerun::Image::from_rgb24(image.data.as_slice(), [image.width, image.height]),
                 )?;
             }
             ImageEncoding::Rgba8 => {
                 self.rec.log(
                     entity_path,
-                    &rerun::Image::from_rgba32(
-                        image.data.as_slice(),
-                        [image.width, image.height],
-                    ),
+                    &rerun::Image::from_rgba32(image.data.as_slice(), [image.width, image.height]),
                 )?;
             }
             ImageEncoding::Mono8 => {
                 self.rec.log(
                     entity_path,
-                    &rerun::Image::from_l8(
-                        image.data.as_slice(),
-                        [image.width, image.height],
-                    ),
+                    &rerun::Image::from_l8(image.data.as_slice(), [image.width, image.height]),
                 )?;
             }
             _ => {
@@ -207,10 +198,7 @@ impl RerunLogger {
 
         self.rec.log(
             entity_path,
-            &rerun::DepthImage::from_gray16(
-                depth_u16,
-                [depth.width, depth.height],
-            ),
+            &rerun::DepthImage::from_gray16(depth_u16, [depth.width, depth.height]),
         )?;
 
         Ok(())
@@ -232,7 +220,11 @@ impl RerunLogger {
 
         let sizes: Vec<[f32; 3]> = detections.objects.iter().map(|o| o.size).collect();
 
-        let labels: Vec<&str> = detections.objects.iter().map(|o| o.label.as_str()).collect();
+        let labels: Vec<&str> = detections
+            .objects
+            .iter()
+            .map(|o| o.label.as_str())
+            .collect();
 
         // Color by confidence
         let colors: Vec<[u8; 3]> = detections
@@ -284,7 +276,8 @@ impl RerunLogger {
             status.memory_usage
         );
 
-        self.rec.log(entity_path, &rerun::TextLog::new(status_text))?;
+        self.rec
+            .log(entity_path, &rerun::TextLog::new(status_text))?;
 
         Ok(())
     }

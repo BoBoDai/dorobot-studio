@@ -4,9 +4,9 @@
 //! `makepad_urdf_player::RobotView` mounts once a rig profile supplies a URDF;
 //! until then it renders an empty viewport so the screen is still verifiable.
 
-use makepad_widgets::*;
 use makepad_app_shell::grid::panel_grid::PanelGridWidgetExt;
 use makepad_app_shell::grid::LayoutState;
+use makepad_widgets::*;
 
 use crate::api::{HardwareState, Intent, JointProgress, StepState};
 use crate::ui::frame::{apply_light, apply_light_in, theme_panel_head, Themed};
@@ -246,7 +246,7 @@ script_mod! {
                     calib := View{
                         width: 660 height: Fill
                         flow: Down
-        
+
                         banner := RoundedView{
                             width: Fill height: 84
                             margin: Inset{left: 12. right: 12. top: 12.}
@@ -312,7 +312,7 @@ script_mod! {
                                 }
                             }
                         }
-        
+
                         rows := View{
                             width: Fill height: Fit
                             flow: Down
@@ -324,9 +324,9 @@ script_mod! {
                             joint_4 := JointRow{}
                             joint_5 := JointRow{}
                         }
-        
+
                         Filler{}
-        
+
                         actions := View{
                             width: Fill height: Fit
                             flow: Right
@@ -425,8 +425,10 @@ impl Widget for HardwareScreen {
                 let mut layout = LayoutState::with_panel_count(2);
                 layout.row_assignments =
                     vec![vec!["panel_0".into(), "panel_1".into()], vec![], vec![]];
-                layout.visible_panels =
-                    ["panel_0", "panel_1"].iter().map(|s| s.to_string()).collect();
+                layout.visible_panels = ["panel_0", "panel_1"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
                 for (id, title) in [("panel_0", "live mirror"), ("panel_1", "Joint calibration")] {
                     layout.panel_titles.insert(id.into(), title.into());
                 }
@@ -464,7 +466,9 @@ const JOINT_IDS: [&[LiveId]; 6] = [
 impl HardwareScreenRef {
     pub fn sync(&self, cx: &mut Cx, state: &HardwareState) {
         let light = crate::ui::frame::light_mode();
-        let Some(mut inner) = self.borrow_mut() else { return };
+        let Some(mut inner) = self.borrow_mut() else {
+            return;
+        };
         let want = state.robot_urdf.clone();
         let need_load = inner.loaded_urdf != want;
         if need_load {
@@ -487,30 +491,48 @@ impl HardwareScreenRef {
             }
         }
         if !state.live_angles.is_empty() {
-            if let Some(mut rv) =
-                viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>()
+            if let Some(mut rv) = viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>()
             {
                 rv.set_joint_angles(cx, &state.live_angles);
             }
         }
 
         script_apply_eval!(cx, root, { draw_bg +: { light: #(light) } });
-        apply_light_in(cx, root, &[
-            (ids!(content.s1_2.content.calib.banner), Themed::Bg),
-            (ids!(content.s1_2.content.calib.banner.ring), Themed::Bg),
-            (ids!(content.s1_2.content.calib.banner.ring.ring_text), Themed::Text),
-            (ids!(content.s1_2.content.calib.banner.btext.instruction), Themed::Text),
-            (ids!(content.s1_2.content.calib.banner.btext.subline), Themed::Text),
-            (ids!(content.s1_2.content.calib.actions.btn_restart), Themed::Both),
-            (ids!(content.s1_2.content.calib.actions.btn_continue), Themed::Both),
-        ], light);
+        apply_light_in(
+            cx,
+            root,
+            &[
+                (ids!(content.s1_2.content.calib.banner), Themed::Bg),
+                (ids!(content.s1_2.content.calib.banner.ring), Themed::Bg),
+                (
+                    ids!(content.s1_2.content.calib.banner.ring.ring_text),
+                    Themed::Text,
+                ),
+                (
+                    ids!(content.s1_2.content.calib.banner.btext.instruction),
+                    Themed::Text,
+                ),
+                (
+                    ids!(content.s1_2.content.calib.banner.btext.subline),
+                    Themed::Text,
+                ),
+                (
+                    ids!(content.s1_2.content.calib.actions.btn_restart),
+                    Themed::Both,
+                ),
+                (
+                    ids!(content.s1_2.content.calib.actions.btn_continue),
+                    Themed::Both,
+                ),
+            ],
+            light,
+        );
         for p in LINE_IDS {
             let mut w = root.widget(cx, p);
             if !w.is_empty() {
                 script_apply_eval!(cx, w, { draw_bg +: { light: #(light) } });
             }
         }
-
 
         // ---- stepper -------------------------------------------------------
         for (i, path) in STEP_IDS.iter().enumerate() {
@@ -521,11 +543,16 @@ impl HardwareScreenRef {
             match state.steps.get(i) {
                 Some(step) => {
                     item.set_visible(cx, true);
-                    apply_light(cx, &item, &[
-                        (ids!(dot), Themed::Bg),
-                        (ids!(dot.num), Themed::Text),
-                        (ids!(caption), Themed::Text),
-                    ], light);
+                    apply_light(
+                        cx,
+                        &item,
+                        &[
+                            (ids!(dot), Themed::Bg),
+                            (ids!(dot.num), Themed::Text),
+                            (ids!(caption), Themed::Text),
+                        ],
+                        light,
+                    );
                     let s = match step.state {
                         StepState::Pending => 0.0,
                         StepState::Active => 1.0,
@@ -568,9 +595,16 @@ impl HardwareScreenRef {
         // ---- progress banner ----------------------------------------------
         let done_n = state.joints_done();
         let total = state.joints.len();
-        let frac = if total == 0 { 0.0 } else { done_n as f64 / total as f64 };
-        root.label(cx, ids!(content.s1_2.content.calib.banner.btext.instruction))
-            .set_text(cx, &state.instruction);
+        let frac = if total == 0 {
+            0.0
+        } else {
+            done_n as f64 / total as f64
+        };
+        root.label(
+            cx,
+            ids!(content.s1_2.content.calib.banner.btext.instruction),
+        )
+        .set_text(cx, &state.instruction);
         root.label(cx, ids!(content.s1_2.content.calib.banner.btext.subline))
             .set_text(cx, &format!("{}/{} joints complete", done_n, total));
         root.label(cx, ids!(content.s1_2.content.calib.banner.ring.ring_text))
@@ -591,13 +625,18 @@ impl HardwareScreenRef {
                         let mut r = row.clone();
                         script_apply_eval!(cx, r, { draw_bg +: { light: #(light) } });
                     }
-                    apply_light(cx, &row, &[
-                        (ids!(pip), Themed::Bg),
-                        (ids!(idx), Themed::Text),
-                        (ids!(jname), Themed::Text),
-                        (ids!(bar), Themed::Bg),
-                        (ids!(readout), Themed::Text),
-                    ], light);
+                    apply_light(
+                        cx,
+                        &row,
+                        &[
+                            (ids!(pip), Themed::Bg),
+                            (ids!(idx), Themed::Text),
+                            (ids!(jname), Themed::Text),
+                            (ids!(bar), Themed::Bg),
+                            (ids!(readout), Themed::Text),
+                        ],
+                        light,
+                    );
                     let done = j.progress == JointProgress::Done;
                     row.label(cx, ids!(idx)).set_text(cx, &format!("{}", i + 1));
                     row.label(cx, ids!(jname)).set_text(cx, &j.name);
@@ -641,10 +680,14 @@ impl HardwareScreenRef {
     pub fn wizard_intent(&self, cx: &mut Cx, actions: &Actions) -> Option<Intent> {
         let mut inner = self.borrow_mut()?;
         let v = &mut inner.view;
-        if v.button(cx, ids!(content.s1_2.content.calib.actions.btn_restart)).clicked(actions) {
+        if v.button(cx, ids!(content.s1_2.content.calib.actions.btn_restart))
+            .clicked(actions)
+        {
             return Some(Intent::WizardRestartStep);
         }
-        if v.button(cx, ids!(content.s1_2.content.calib.actions.btn_continue)).clicked(actions) {
+        if v.button(cx, ids!(content.s1_2.content.calib.actions.btn_continue))
+            .clicked(actions)
+        {
             return Some(Intent::WizardAdvance);
         }
         None

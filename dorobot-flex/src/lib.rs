@@ -9,14 +9,14 @@
 //! - Time series visualization
 //! - 3D robot viewer
 
-pub use makepad_widgets;
 pub use makepad_app_shell;
+pub use makepad_widgets;
 
 pub mod api;
-pub mod ui;
-pub mod shared;
-pub mod widgets;
 pub mod data;
+pub mod shared;
+pub mod ui;
+pub mod widgets;
 
 /// Still here because `ui`'s Play screen draws with it; the rest of the old
 /// viewer's app modules went with its binary.

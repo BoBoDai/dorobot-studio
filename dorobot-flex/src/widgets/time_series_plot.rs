@@ -1,8 +1,8 @@
 //! Time Series Plot Widget for observation.state and action visualization
 
-use makepad_widgets::*;
 use dorobot_ux::tokens::pal;
 use makepad_app_shell::theme::get_global_dark_mode;
+use makepad_widgets::*;
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -195,7 +195,7 @@ pub struct DrawPlotLine {
 #[derive(Clone, Debug)]
 pub struct TimeSeriesChannel {
     pub name: String,
-    pub data: Vec<(f64, f64)>,  // (timestamp, value)
+    pub data: Vec<(f64, f64)>, // (timestamp, value)
     pub color: Vec4f,
     /// 0 = solid. Above that the channel reuses a hue and this pattern is what
     /// tells the two apart.
@@ -225,11 +225,11 @@ pub struct TimeSeriesPlot {
 
     // Full data range (entire episode)
     #[rust]
-    data_time_range: (f64, f64),  // Full data range
+    data_time_range: (f64, f64), // Full data range
 
     // Visible time range (sliding window)
     #[rust]
-    time_range: (f64, f64),  // (start, end) in seconds - what's visible
+    time_range: (f64, f64), // (start, end) in seconds - what's visible
     #[rust((-1.0, 1.0))]
     value_range: (f64, f64), // (min, max) - default to -1..1 for normalized data
     #[rust(true)]
@@ -237,9 +237,9 @@ pub struct TimeSeriesPlot {
 
     // Sliding window settings
     #[rust]
-    window_size: f64,  // Window size in seconds (0 = show all)
+    window_size: f64, // Window size in seconds (0 = show all)
     #[rust]
-    follow_cursor: bool,  // Whether to follow cursor position
+    follow_cursor: bool, // Whether to follow cursor position
 
     // Cursor
     #[rust]
@@ -262,7 +262,8 @@ impl Widget for TimeSeriesPlot {
                 // Convert mouse X to time
                 let rect = self.view.area().rect(cx);
                 let rel_x = (fe.abs.x - rect.pos.x) / rect.size.x;
-                let time = self.time_range.0 + rel_x as f64 * (self.time_range.1 - self.time_range.0);
+                let time =
+                    self.time_range.0 + rel_x as f64 * (self.time_range.1 - self.time_range.0);
                 self.cursor_time = time.clamp(self.time_range.0, self.time_range.1);
                 self.show_cursor = true;
 
@@ -278,7 +279,8 @@ impl Widget for TimeSeriesPlot {
                 // Convert mouse X to time
                 let rect = self.view.area().rect(cx);
                 let rel_x = (fe.abs.x - rect.pos.x) / rect.size.x;
-                let time = self.time_range.0 + rel_x as f64 * (self.time_range.1 - self.time_range.0);
+                let time =
+                    self.time_range.0 + rel_x as f64 * (self.time_range.1 - self.time_range.0);
                 self.cursor_time = time.clamp(self.time_range.0, self.time_range.1);
                 self.show_cursor = true;
 
@@ -321,7 +323,8 @@ impl Widget for TimeSeriesPlot {
         self.plot_rect = plot_area.area().rect(cx);
 
         // Draw the waveforms on top of the plot area
-        if !self.channels.is_empty() && self.plot_rect.size.x > 10.0 && self.plot_rect.size.y > 10.0 {
+        if !self.channels.is_empty() && self.plot_rect.size.x > 10.0 && self.plot_rect.size.y > 10.0
+        {
             self.draw_waveforms(cx);
         }
 
@@ -345,7 +348,9 @@ impl TimeSeriesPlot {
 
     /// Set placeholder text
     pub fn set_placeholder_text(&mut self, cx: &mut Cx, text: &str) {
-        self.view.label(cx, ids!(plot_area.placeholder.placeholder_label)).set_text(cx, text);
+        self.view
+            .label(cx, ids!(plot_area.placeholder.placeholder_label))
+            .set_text(cx, text);
     }
 
     /// Set the full data time range (x-axis)
@@ -548,8 +553,12 @@ impl TimeSeriesPlot {
     fn update_y_axis_labels(&mut self, cx: &mut Cx) {
         let max_text = format!("{:.2}", self.value_range.1);
         let min_text = format!("{:.2}", self.value_range.0);
-        self.view.label(cx, ids!(content.y_axis.max_label)).set_text(cx, &max_text);
-        self.view.label(cx, ids!(content.y_axis.min_label)).set_text(cx, &min_text);
+        self.view
+            .label(cx, ids!(content.y_axis.max_label))
+            .set_text(cx, &max_text);
+        self.view
+            .label(cx, ids!(content.y_axis.min_label))
+            .set_text(cx, &min_text);
     }
 
     /// Draw waveforms for all visible channels
@@ -620,10 +629,9 @@ impl TimeSeriesPlot {
 
                     // Draw vertical bar
                     run += (x - px).abs().max(1.0);
-                    let gap = dash_period > 0.0
-                        && ((run / dash_period).floor() as i64) % 2 == 1;
+                    let gap = dash_period > 0.0 && ((run / dash_period).floor() as i64) % 2 == 1;
                     if !gap {
-    self.draw_line.draw_abs(
+                        self.draw_line.draw_abs(
                             cx,
                             Rect {
                                 pos: dvec2(px, min_y),

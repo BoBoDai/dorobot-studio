@@ -13,15 +13,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "dataset/synthetic-demo".to_string());
-    if std::path::Path::new(&root).exists() {
-        std::fs::remove_dir_all(&root)?;
-    }
-
-    let joints = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"];
+    let joints = [
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+        "gripper",
+    ];
     let spec = DatasetSpec {
         robot_type: "so101".into(),
         fps: 30.0,
-        camera_keys: vec!["observation.images.cam_high".into()],
+        camera_keys: vec![],
         joint_names: joints.iter().map(|s| s.to_string()).collect(),
     };
 
@@ -51,6 +54,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\nwrote {} — open with:", root);
-    println!("  cargo run --release -p dorobot-flex -- {root}");
+    println!("  cargo run --release -p dorobot-flex -- --dataset {root}");
     Ok(())
 }

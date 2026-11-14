@@ -27,9 +27,9 @@
 //! creating the texture. This burns the text into video pixels, guaranteeing it
 //! appears within video bounds regardless of aspect ratio.
 
-use makepad_widgets::*;
-use makepad_app_shell::theme::get_global_dark_mode;
 use crate::data::video_decoder::PlaceholderDecoder;
+use makepad_app_shell::theme::get_global_dark_mode;
+use makepad_widgets::*;
 
 #[cfg(feature = "video")]
 use crate::data::video_decoder::VideoDecoder;
@@ -145,28 +145,72 @@ const FONT_HEIGHT: usize = 7;
 
 fn get_char_bitmap(c: char) -> Option<[u8; 7]> {
     match c {
-        '0' => Some([0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110]),
-        '1' => Some([0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110]),
-        '2' => Some([0b01110, 0b10001, 0b00001, 0b00110, 0b01000, 0b10000, 0b11111]),
-        '3' => Some([0b01110, 0b10001, 0b00001, 0b00110, 0b00001, 0b10001, 0b01110]),
-        '4' => Some([0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010]),
-        '5' => Some([0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110]),
-        '6' => Some([0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110]),
-        '7' => Some([0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000]),
-        '8' => Some([0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110]),
-        '9' => Some([0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100]),
-        ' ' => Some([0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000]),
-        ':' => Some([0b00000, 0b00100, 0b00100, 0b00000, 0b00100, 0b00100, 0b00000]),
-        '/' => Some([0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000]),
-        '.' => Some([0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100]),
-        'f' => Some([0b00110, 0b01000, 0b01000, 0b11100, 0b01000, 0b01000, 0b01000]),
-        'p' => Some([0b00000, 0b00000, 0b11110, 0b10001, 0b11110, 0b10000, 0b10000]),
-        's' => Some([0b00000, 0b00000, 0b01111, 0b10000, 0b01110, 0b00001, 0b11110]),
-        'F' => Some([0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000]),
-        'r' => Some([0b00000, 0b00000, 0b10110, 0b11001, 0b10000, 0b10000, 0b10000]),
-        'a' => Some([0b00000, 0b00000, 0b01110, 0b00001, 0b01111, 0b10001, 0b01111]),
-        'm' => Some([0b00000, 0b00000, 0b11010, 0b10101, 0b10101, 0b10001, 0b10001]),
-        'e' => Some([0b00000, 0b00000, 0b01110, 0b10001, 0b11111, 0b10000, 0b01110]),
+        '0' => Some([
+            0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110,
+        ]),
+        '1' => Some([
+            0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110,
+        ]),
+        '2' => Some([
+            0b01110, 0b10001, 0b00001, 0b00110, 0b01000, 0b10000, 0b11111,
+        ]),
+        '3' => Some([
+            0b01110, 0b10001, 0b00001, 0b00110, 0b00001, 0b10001, 0b01110,
+        ]),
+        '4' => Some([
+            0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010,
+        ]),
+        '5' => Some([
+            0b11111, 0b10000, 0b11110, 0b00001, 0b00001, 0b10001, 0b01110,
+        ]),
+        '6' => Some([
+            0b00110, 0b01000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110,
+        ]),
+        '7' => Some([
+            0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000,
+        ]),
+        '8' => Some([
+            0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110,
+        ]),
+        '9' => Some([
+            0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00010, 0b01100,
+        ]),
+        ' ' => Some([
+            0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000,
+        ]),
+        ':' => Some([
+            0b00000, 0b00100, 0b00100, 0b00000, 0b00100, 0b00100, 0b00000,
+        ]),
+        '/' => Some([
+            0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000,
+        ]),
+        '.' => Some([
+            0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100,
+        ]),
+        'f' => Some([
+            0b00110, 0b01000, 0b01000, 0b11100, 0b01000, 0b01000, 0b01000,
+        ]),
+        'p' => Some([
+            0b00000, 0b00000, 0b11110, 0b10001, 0b11110, 0b10000, 0b10000,
+        ]),
+        's' => Some([
+            0b00000, 0b00000, 0b01111, 0b10000, 0b01110, 0b00001, 0b11110,
+        ]),
+        'F' => Some([
+            0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000,
+        ]),
+        'r' => Some([
+            0b00000, 0b00000, 0b10110, 0b11001, 0b10000, 0b10000, 0b10000,
+        ]),
+        'a' => Some([
+            0b00000, 0b00000, 0b01110, 0b00001, 0b01111, 0b10001, 0b01111,
+        ]),
+        'm' => Some([
+            0b00000, 0b00000, 0b11010, 0b10101, 0b10101, 0b10001, 0b10001,
+        ]),
+        'e' => Some([
+            0b00000, 0b00000, 0b01110, 0b10001, 0b11111, 0b10000, 0b01110,
+        ]),
         _ => None,
     }
 }
@@ -211,8 +255,12 @@ impl VideoPlayer {
     /// Show or hide placeholder
     pub fn set_has_video(&mut self, cx: &mut Cx, has_video: bool) {
         self.has_video = has_video;
-        self.view.view(cx, ids!(video_area.placeholder)).set_visible(cx, !has_video);
-        self.view.image(cx, ids!(video_area.frame_image)).set_visible(cx, has_video);
+        self.view
+            .view(cx, ids!(video_area.placeholder))
+            .set_visible(cx, !has_video);
+        self.view
+            .image(cx, ids!(video_area.frame_image))
+            .set_visible(cx, has_video);
         self.view.redraw(cx);
     }
 
@@ -227,21 +275,25 @@ impl VideoPlayer {
         // Clear texture by setting to None
         let image = self.view.image(cx, ids!(video_area.frame_image));
         image.set_texture(cx, None);
-        self.view.view(cx, ids!(video_area.placeholder)).set_visible(cx, true);
+        self.view
+            .view(cx, ids!(video_area.placeholder))
+            .set_visible(cx, true);
         image.set_visible(cx, false);
         self.view.redraw(cx);
     }
 
     /// Set placeholder text
     pub fn set_placeholder_text(&mut self, cx: &mut Cx, text: &str) {
-        self.view.label(cx, ids!(video_area.placeholder.placeholder_label)).set_text(cx, text);
+        self.view
+            .label(cx, ids!(video_area.placeholder.placeholder_label))
+            .set_text(cx, text);
     }
 
     /// Initialize with placeholder decoder for demo mode
     pub fn init_placeholder(&mut self, width: u32, height: u32, fps: f64, frame_count: u64) {
         self.placeholder_decoder = Some(PlaceholderDecoder::new(width, height, fps, frame_count));
         self.total_frames = frame_count;
-        self.fps = fps;  // Set fps for frame time calculations
+        self.fps = fps; // Set fps for frame time calculations
         self.has_video = true;
     }
 
@@ -255,7 +307,13 @@ impl VideoPlayer {
         static FRAME_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let count = FRAME_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if count % 100 == 0 {
-            ::log::trace!("[VideoPlayer] set_frame called: {}x{}, data_len={}, count={}", width, height, data.len(), count);
+            ::log::trace!(
+                "[VideoPlayer] set_frame called: {}x{}, data_len={}, count={}",
+                width,
+                height,
+                data.len(),
+                count
+            );
         }
 
         // Render overlay text onto frame buffer
@@ -268,12 +326,15 @@ impl VideoPlayer {
         let bgra_data = Self::rgb_to_bgra_u32(&frame_data);
 
         // Create texture from RGB data
-        let texture = Texture::new_with_format(cx, TextureFormat::VecBGRAu8_32 {
-            data: Some(bgra_data),
-            width,
-            height,
-            updated: TextureUpdated::Full,
-        });
+        let texture = Texture::new_with_format(
+            cx,
+            TextureFormat::VecBGRAu8_32 {
+                data: Some(bgra_data),
+                width,
+                height,
+                updated: TextureUpdated::Full,
+            },
+        );
 
         // Set texture on the image widget
         let image = self.view.image(cx, ids!(video_area.frame_image));
@@ -281,7 +342,9 @@ impl VideoPlayer {
 
         // Make frame visible and hide placeholder
         image.set_visible(cx, true);
-        self.view.view(cx, ids!(video_area.placeholder)).set_visible(cx, false);
+        self.view
+            .view(cx, ids!(video_area.placeholder))
+            .set_visible(cx, false);
 
         self.has_video = true;
         self.view.redraw(cx);
@@ -302,7 +365,8 @@ impl VideoPlayer {
     /// Internally, we add the episode frame offset to seek to the correct position.
     pub fn show_frame_at_time(&mut self, cx: &mut Cx, time: f64) {
         // Calculate absolute frame index in the video file
-        let episode_frame = (time * self.fps) as u64;
+        let episode_frame = ((time * self.fps).round().max(0.0) as u64)
+            .min(self.episode_frame_count.saturating_sub(1));
         let absolute_frame = self.episode_frame_offset + episode_frame;
         let absolute_time = absolute_frame as f64 / self.fps.max(1.0);
 
@@ -315,7 +379,7 @@ impl VideoPlayer {
         // Try real video decoder first (when feature enabled)
         #[cfg(feature = "video")]
         if let Some(decoder) = &mut self.video_decoder {
-            match decoder.get_frame_at_time(absolute_time) {
+            match decoder.get_frame(absolute_frame) {
                 Ok(frame) => {
                     self.current_frame = episode_frame;
                     self.set_frame(cx, frame.width as usize, frame.height as usize, &frame.data);
@@ -323,7 +387,12 @@ impl VideoPlayer {
                     return;
                 }
                 Err(e) => {
-                    ::log::warn!("[VideoPlayer] ERROR decoding frame at time {} (absolute: {}): {}", time, absolute_time, e);
+                    ::log::warn!(
+                        "[VideoPlayer] ERROR decoding frame at time {} (absolute: {}): {}",
+                        time,
+                        absolute_time,
+                        e
+                    );
                 }
             }
         }
@@ -345,7 +414,11 @@ impl VideoPlayer {
         match VideoDecoder::open(path) {
             Ok(decoder) => {
                 let video_fps = decoder.fps();
-                ::log::info!("[VideoPlayer] Successfully opened video: {} frames, {} fps", decoder.frame_count(), video_fps);
+                ::log::info!(
+                    "[VideoPlayer] Successfully opened video: {} frames, {} fps",
+                    decoder.frame_count(),
+                    video_fps
+                );
                 self.total_frames = decoder.frame_count();
                 self.fps = video_fps;
                 self.has_video = true;

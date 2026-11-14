@@ -7,13 +7,13 @@
 use makepad_widgets::*;
 
 use crate::api::{Intent, PlaybackState, Tag};
-use makepad_app_shell::grid::panel_grid::PanelGridWidgetExt;
-use makepad_app_shell::grid::LayoutState;
+use crate::playback_controls::PlaybackControlsWidgetExt;
 use crate::ui::frame::{apply_light, apply_light_in, theme_chip, theme_panel_head, Themed};
 use crate::widgets::time_series_plot::TimeSeriesPlotWidgetExt;
 use crate::widgets::timeline::TimelineWidgetExt;
 use crate::widgets::video_player::VideoPlayerWidgetExt;
-use crate::playback_controls::PlaybackControlsWidgetExt;
+use makepad_app_shell::grid::panel_grid::PanelGridWidgetExt;
+use makepad_app_shell::grid::LayoutState;
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -341,7 +341,7 @@ script_mod! {
                     }
                     btn_good := ActionBtn{ text: "Tag good"      draw_bg +: {tone: 1.0} draw_text +: {tone: 1.0} }
                     btn_bad := ActionBtn{ text: "Tag bad"        draw_bg +: {tone: 2.0} draw_text +: {tone: 2.0} margin: Inset{top: 8.} }
-                    btn_del := ActionBtn{ text: "Delete episode" margin: Inset{top: 8.} }
+                    btn_del := ActionBtn{ text: "Exclude episode" margin: Inset{top: 8.} }
                     btn_push := ActionBtn{ text: "Push to Hub"   draw_bg +: {tone: 3.0} draw_text +: {tone: 3.0} margin: Inset{top: 8.} }
                     Filler{}
                 }
@@ -528,6 +528,8 @@ pub struct PlayScreen {
     /// once per selection rather than on every sync.
     #[rust]
     loaded_episode: Option<u64>,
+    #[rust]
+    loaded_dataset: String,
     /// Footer height, dragged by its head.
     #[rust(372f64)]
     footer_h: f64,
@@ -556,8 +558,7 @@ impl Widget for PlayScreen {
                     // Dragging up grows the footer, so the grip follows the
                     // pointer rather than running away from it.
                     let screen_h = self.view.area().rect(cx).size.y.max(FOOTER_MIN * 2.0);
-                    let want = (h0 + (y0 - e.abs.y))
-                        .clamp(FOOTER_MIN, screen_h * FOOTER_MAX_FRAC);
+                    let want = (h0 + (y0 - e.abs.y)).clamp(FOOTER_MIN, screen_h * FOOTER_MAX_FRAC);
                     if (want - self.footer_h).abs() > 0.5 {
                         self.footer_h = want;
                         // Set the walk directly. Height is a Size, not a
@@ -614,24 +615,48 @@ const FOOTER_MAX_FRAC: f64 = 0.55;
 
 /// Footer lanes, one per joint.
 const LANE_IDS: [(&[LiveId], &[LiveId]); 6] = [
-    (ids!(timeline.tl_body.lanes.lane_0.plot_0), ids!(timeline.tl_body.lanes.lane_0.name_0)),
-    (ids!(timeline.tl_body.lanes.lane_1.plot_1), ids!(timeline.tl_body.lanes.lane_1.name_1)),
-    (ids!(timeline.tl_body.lanes.lane_2.plot_2), ids!(timeline.tl_body.lanes.lane_2.name_2)),
-    (ids!(timeline.tl_body.lanes.lane_3.plot_3), ids!(timeline.tl_body.lanes.lane_3.name_3)),
-    (ids!(timeline.tl_body.lanes.lane_4.plot_4), ids!(timeline.tl_body.lanes.lane_4.name_4)),
-    (ids!(timeline.tl_body.lanes.lane_5.plot_5), ids!(timeline.tl_body.lanes.lane_5.name_5)),
+    (
+        ids!(timeline.tl_body.lanes.lane_0.plot_0),
+        ids!(timeline.tl_body.lanes.lane_0.name_0),
+    ),
+    (
+        ids!(timeline.tl_body.lanes.lane_1.plot_1),
+        ids!(timeline.tl_body.lanes.lane_1.name_1),
+    ),
+    (
+        ids!(timeline.tl_body.lanes.lane_2.plot_2),
+        ids!(timeline.tl_body.lanes.lane_2.name_2),
+    ),
+    (
+        ids!(timeline.tl_body.lanes.lane_3.plot_3),
+        ids!(timeline.tl_body.lanes.lane_3.name_3),
+    ),
+    (
+        ids!(timeline.tl_body.lanes.lane_4.plot_4),
+        ids!(timeline.tl_body.lanes.lane_4.name_4),
+    ),
+    (
+        ids!(timeline.tl_body.lanes.lane_5.plot_5),
+        ids!(timeline.tl_body.lanes.lane_5.name_5),
+    ),
 ];
 
 /// Must track `EpisodeRow`'s height, so a wheel notch advances whole rows.
 const ROW_H: f64 = 26.0;
 
 const ROW_IDS: [&[LiveId]; 13] = [
-    ids!(upper.tree.tree_body.row_0), ids!(upper.tree.tree_body.row_1),
-    ids!(upper.tree.tree_body.row_2), ids!(upper.tree.tree_body.row_3),
-    ids!(upper.tree.tree_body.row_4), ids!(upper.tree.tree_body.row_5),
-    ids!(upper.tree.tree_body.row_6), ids!(upper.tree.tree_body.row_7),
-    ids!(upper.tree.tree_body.row_8), ids!(upper.tree.tree_body.row_9),
-    ids!(upper.tree.tree_body.row_10), ids!(upper.tree.tree_body.row_11),
+    ids!(upper.tree.tree_body.row_0),
+    ids!(upper.tree.tree_body.row_1),
+    ids!(upper.tree.tree_body.row_2),
+    ids!(upper.tree.tree_body.row_3),
+    ids!(upper.tree.tree_body.row_4),
+    ids!(upper.tree.tree_body.row_5),
+    ids!(upper.tree.tree_body.row_6),
+    ids!(upper.tree.tree_body.row_7),
+    ids!(upper.tree.tree_body.row_8),
+    ids!(upper.tree.tree_body.row_9),
+    ids!(upper.tree.tree_body.row_10),
+    ids!(upper.tree.tree_body.row_11),
     ids!(upper.tree.tree_body.row_12),
 ];
 const GRP_IDS: [&[LiveId]; 3] = [
@@ -643,7 +668,9 @@ const GRP_IDS: [&[LiveId]; 3] = [
 impl PlayScreenRef {
     pub fn sync(&self, cx: &mut Cx, st: &PlaybackState) {
         let light = crate::ui::frame::light_mode();
-        let Some(mut inner) = self.borrow_mut() else { return };
+        let Some(mut inner) = self.borrow_mut() else {
+            return;
+        };
         let need_seed = !inner.layout_seeded;
         inner.layout_seeded = true;
 
@@ -672,29 +699,36 @@ impl PlayScreenRef {
 
         // Media is opened once per selection, so the decision is taken before
         // the view is borrowed.
-        let need_media = inner.loaded_episode != st.selected;
+        let need_media =
+            inner.loaded_episode != st.selected || inner.loaded_dataset != st.dataset_name;
         if need_media {
             inner.loaded_episode = st.selected;
+            inner.loaded_dataset = st.dataset_name.clone();
         }
 
         let root = &mut inner.view;
 
         script_apply_eval!(cx, root, { draw_bg +: { light: #(light) } });
-        apply_light_in(cx, root, &[
-            (ids!(upper.tree), Themed::Bg),
-            (ids!(upper.side), Themed::Bg),
-            (ids!(upper.side.side_body.task_h), Themed::Text),
-            (ids!(upper.side.side_body.task_t), Themed::Text),
-            (ids!(upper.side.side_body.cur_h), Themed::Text),
-            (ids!(upper.side.side_body.btn_good), Themed::Both),
-            (ids!(upper.side.side_body.btn_bad), Themed::Both),
-            (ids!(upper.side.side_body.btn_del), Themed::Both),
-            (ids!(upper.side.side_body.btn_push), Themed::Both),
-            (ids!(timeline), Themed::Bg),
-            (ids!(timeline.tl_body.drift), Themed::Bg),
-            (ids!(timeline.tl_body.controls.frame_lbl), Themed::Text),
-            (ids!(timeline.tl_body.controls.drift_lbl), Themed::Text),
-        ], light);
+        apply_light_in(
+            cx,
+            root,
+            &[
+                (ids!(upper.tree), Themed::Bg),
+                (ids!(upper.side), Themed::Bg),
+                (ids!(upper.side.side_body.task_h), Themed::Text),
+                (ids!(upper.side.side_body.task_t), Themed::Text),
+                (ids!(upper.side.side_body.cur_h), Themed::Text),
+                (ids!(upper.side.side_body.btn_good), Themed::Both),
+                (ids!(upper.side.side_body.btn_bad), Themed::Both),
+                (ids!(upper.side.side_body.btn_del), Themed::Both),
+                (ids!(upper.side.side_body.btn_push), Themed::Both),
+                (ids!(timeline), Themed::Bg),
+                (ids!(timeline.tl_body.drift), Themed::Bg),
+                (ids!(timeline.tl_body.controls.frame_lbl), Themed::Text),
+                (ids!(timeline.tl_body.controls.drift_lbl), Themed::Text),
+            ],
+            light,
+        );
         for p in [
             ids!(upper.tree.tree_head) as &[LiveId],
             ids!(upper.side.side_head),
@@ -757,10 +791,19 @@ impl PlayScreenRef {
                     let first = ordered.get(start).map(|e| e.index).unwrap_or(0);
                     let last = ordered.get(shown - 1).map(|e| e.index).unwrap_or(0);
                     let range = format!("ep {:03}–{:03} of {}", first, last, total);
-                    Some(if groups.len() == 1 { range } else { range + "  ·  all tasks" })
+                    Some(if groups.len() == 1 {
+                        range
+                    } else {
+                        range + "  ·  all tasks"
+                    })
                 }
                 (true, _) => None,
-                (false, _) => groups.get(i).map(|n| n.to_string()),
+                (false, 0) => Some(if groups.len() == 1 {
+                    groups[0].to_string()
+                } else {
+                    format!("{} episodes · {} tasks", total, groups.len())
+                }),
+                (false, _) => None,
             };
             match text {
                 Some(name) => {
@@ -784,7 +827,11 @@ impl PlayScreenRef {
                     row.set_visible(cx, true);
                     row.label(cx, ids!(ep_name))
                         .set_text(cx, &format!("ep {:03}  ·  {:.1}s", e.index, e.duration_s));
-                    let sel = if st.selected == Some(e.index) { 1.0 } else { 0.0 };
+                    let sel = if st.selected == Some(e.index) {
+                        1.0
+                    } else {
+                        0.0
+                    };
                     let mut r = row.clone();
                     script_apply_eval!(cx, r, { draw_bg +: { sel: #(sel) light: #(light) } });
                     let mut n = row.widget(cx, ids!(ep_name));
@@ -812,9 +859,21 @@ impl PlayScreenRef {
         // ---- inspector ----------------------------------------------------
         let s = &st.stats;
         for (p, val, warn) in [
-            (ids!(upper.side.side_body.st_frames) as &[LiveId], format!("{}", s.frames), 0.0),
-            (ids!(upper.side.side_body.st_dur), format!("{:.1}s", s.duration_s), 0.0),
-            (ids!(upper.side.side_body.st_fps), format!("{}", s.fps as u32), 0.0),
+            (
+                ids!(upper.side.side_body.st_frames) as &[LiveId],
+                format!("{}", s.frames),
+                0.0,
+            ),
+            (
+                ids!(upper.side.side_body.st_dur),
+                format!("{:.1}s", s.duration_s),
+                0.0,
+            ),
+            (
+                ids!(upper.side.side_body.st_fps),
+                format!("{}", s.fps as u32),
+                0.0,
+            ),
             (
                 ids!(upper.side.side_body.st_drift),
                 format!("{:+.1} f", s.drift_frames),
@@ -830,7 +889,8 @@ impl PlayScreenRef {
             let mut vw = r.widget(cx, ids!(v));
             script_apply_eval!(cx, vw, { draw_text +: { warn: #(warn) light: #(light) } });
         }
-        root.label(cx, ids!(upper.side.side_body.task_t)).set_text(cx, &s.task);
+        root.label(cx, ids!(upper.side.side_body.task_t))
+            .set_text(cx, &s.task);
 
         // Curation buttons carry the current tag, so the answer to "is this one
         // marked?" is where the marking happens, not only in the far-left list.
@@ -882,7 +942,9 @@ impl PlayScreenRef {
             // arm was from what it was told, all joints against one zero.
             plot.clear();
             for (i, st_c) in st.state_series.iter().enumerate() {
-                let Some(act) = st.action_series.get(i) else { continue };
+                let Some(act) = st.action_series.get(i) else {
+                    continue;
+                };
                 let err: Vec<(f64, f64)> = st_c
                     .points
                     .iter()
@@ -928,7 +990,8 @@ impl PlayScreenRef {
         // player never did — its robot view did not move during playback.
         let viewer = root.widget(cx, ids!(stage_3d));
         if let Some(joints) = st.joints_now() {
-            if let Some(mut rv) = viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+            if let Some(mut rv) = viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>()
+            {
                 // Already in URDF convention: the backend owns that mapping,
                 // because it is a property of the robot, not of the view.
                 rv.set_joint_angles(cx, joints);
@@ -955,7 +1018,9 @@ impl PlayScreenRef {
 
     /// Transport tick: advance the views the playhead drives, nothing else.
     pub fn tick(&self, cx: &mut Cx, st: &PlaybackState) {
-        let Some(mut inner) = self.borrow_mut() else { return };
+        let Some(mut inner) = self.borrow_mut() else {
+            return;
+        };
         let root = &mut inner.view;
         Self::follow_playhead(cx, root, st);
     }
@@ -973,13 +1038,16 @@ impl PlayScreenRef {
                 .find_map(|c| keys.iter().find(|k| k.contains(c)).map(|k| (*k).clone()))
                 .or_else(|| keys.get(fallback).map(|k| (*k).clone()))
         };
-        let main = pick(&["cam_high", "top", "image"], 0);
-        let wrist = pick(&["wrist", "cam_low", "side"], 1);
+        let main = pick(&["cam_high", "top", "front"], 0);
+        let wrist = pick(&["wrist", "cam_low", "side"], 1)
+            .filter(|k| Some(k) != main.as_ref())
+            .or_else(|| {
+                keys.iter()
+                    .find(|k| Some(**k) != main.as_ref())
+                    .map(|k| (*k).clone())
+            });
 
-        for (path, key) in [
-            (ids!(stage_a) as &[LiveId], main),
-            (ids!(stage_b), wrist),
-        ] {
+        for (path, key) in [(ids!(stage_a) as &[LiveId], main), (ids!(stage_b), wrist)] {
             let player = root.video_player(cx, path);
             if player.borrow().is_none() {
                 continue;
@@ -987,7 +1055,13 @@ impl PlayScreenRef {
             player.clear(cx);
             let Some(key) = key else { continue };
             // A second pane showing the same file is worse than an empty one.
-            player.set_episode_info(st.video_frame_offset, st.stats.frames);
+            player.set_episode_info(
+                st.video_frame_offsets
+                    .get(&key)
+                    .copied()
+                    .unwrap_or(st.video_frame_offset),
+                st.stats.frames,
+            );
             player.set_fps_display(cx, st.stats.fps);
             if let Some(file) = st.video_paths.get(&key) {
                 if let Err(e) = player.load_video(cx, &file.to_string_lossy()) {
@@ -998,7 +1072,8 @@ impl PlayScreenRef {
 
         let viewer = root.widget(cx, ids!(stage_3d));
         if let Some((urdf, assets)) = &st.robot_urdf {
-            if let Some(mut rv) = viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+            if let Some(mut rv) = viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>()
+            {
                 if let Err(e) = rv.load_robot(&urdf.to_string_lossy(), &assets.to_string_lossy()) {
                     ::log::error!("play: urdf {} failed to load: {e}", urdf.display());
                 }
@@ -1008,7 +1083,9 @@ impl PlayScreenRef {
 
     /// True once if the wheel moved the row window, so the app re-syncs it.
     pub fn take_scrolled(&self) -> bool {
-        let Some(mut inner) = self.borrow_mut() else { return false };
+        let Some(mut inner) = self.borrow_mut() else {
+            return false;
+        };
         std::mem::take(&mut inner.scrolled)
     }
 
@@ -1035,10 +1112,16 @@ impl PlayScreenRef {
         let v = &mut inner.view;
         let hit = |v: &mut View, cx: &mut Cx, p: &[LiveId]| v.button(cx, p).clicked(actions);
         if hit(v, cx, ids!(upper.side.side_body.btn_good)) {
-            return Some(Intent::TagEpisode { episode, tag: Some(Tag::Good) });
+            return Some(Intent::TagEpisode {
+                episode,
+                tag: Some(Tag::Good),
+            });
         }
         if hit(v, cx, ids!(upper.side.side_body.btn_bad)) {
-            return Some(Intent::TagEpisode { episode, tag: Some(Tag::Bad) });
+            return Some(Intent::TagEpisode {
+                episode,
+                tag: Some(Tag::Bad),
+            });
         }
         if hit(v, cx, ids!(upper.side.side_body.btn_del)) {
             return Some(Intent::DeleteEpisode(episode));

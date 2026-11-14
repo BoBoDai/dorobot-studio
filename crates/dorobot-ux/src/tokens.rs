@@ -12,7 +12,12 @@ pub mod pal {
         a + (b - a) * t
     }
     pub const fn rgb(r: u8, g: u8, b: u8) -> Vec4f {
-        Vec4f { x: r as f32 / 255.0, y: g as f32 / 255.0, z: b as f32 / 255.0, w: 1.0 }
+        Vec4f {
+            x: r as f32 / 255.0,
+            y: g as f32 / 255.0,
+            z: b as f32 / 255.0,
+            w: 1.0,
+        }
     }
     // dark, light pairs
     pub const VOID_D: Vec4f = rgb(0x0A, 0x09, 0x08);
@@ -85,21 +90,51 @@ pub mod pal {
         pub l: f32,
     }
     impl Th {
-        pub fn void(&self) -> Vec4f { mixv(VOID_D, VOID_L, self.l) }
-        pub fn deep(&self) -> Vec4f { mixv(DEEP_D, DEEP_L, self.l) }
-        pub fn lift(&self) -> Vec4f { mixv(LIFT_D, LIFT_L, self.l) }
-        pub fn sink(&self) -> Vec4f { mixv(SINK_D, SINK_L, self.l) }
-        pub fn edge(&self) -> Vec4f { mixv(EDGE_D, EDGE_L, self.l) }
-        pub fn ink(&self) -> Vec4f { mixv(INK_D, INK_L, self.l) }
-        pub fn ink2(&self) -> Vec4f { mixv(INK2_D, INK2_L, self.l) }
-        pub fn dim(&self) -> Vec4f { mixv(DIM_D, DIM_L, self.l) }
-        pub fn faint(&self) -> Vec4f { mixv(FAINT_D, FAINT_L, self.l) }
-        pub fn vio(&self) -> Vec4f { mixv(VIO_D, VIO_L, self.l) }
-        pub fn viog(&self) -> Vec4f { mixv(VIOG_D, VIOG_L, self.l) }
-        pub fn cy(&self) -> Vec4f { mixv(CY_D, CY_L, self.l) }
-        pub fn ok(&self) -> Vec4f { mixv(OK_D, OK_L, self.l) }
-        pub fn hot(&self) -> Vec4f { mixv(HOT_D, HOT_L, self.l) }
-        pub fn amb(&self) -> Vec4f { mixv(AMB_D, AMB_L, self.l) }
+        pub fn void(&self) -> Vec4f {
+            mixv(VOID_D, VOID_L, self.l)
+        }
+        pub fn deep(&self) -> Vec4f {
+            mixv(DEEP_D, DEEP_L, self.l)
+        }
+        pub fn lift(&self) -> Vec4f {
+            mixv(LIFT_D, LIFT_L, self.l)
+        }
+        pub fn sink(&self) -> Vec4f {
+            mixv(SINK_D, SINK_L, self.l)
+        }
+        pub fn edge(&self) -> Vec4f {
+            mixv(EDGE_D, EDGE_L, self.l)
+        }
+        pub fn ink(&self) -> Vec4f {
+            mixv(INK_D, INK_L, self.l)
+        }
+        pub fn ink2(&self) -> Vec4f {
+            mixv(INK2_D, INK2_L, self.l)
+        }
+        pub fn dim(&self) -> Vec4f {
+            mixv(DIM_D, DIM_L, self.l)
+        }
+        pub fn faint(&self) -> Vec4f {
+            mixv(FAINT_D, FAINT_L, self.l)
+        }
+        pub fn vio(&self) -> Vec4f {
+            mixv(VIO_D, VIO_L, self.l)
+        }
+        pub fn viog(&self) -> Vec4f {
+            mixv(VIOG_D, VIOG_L, self.l)
+        }
+        pub fn cy(&self) -> Vec4f {
+            mixv(CY_D, CY_L, self.l)
+        }
+        pub fn ok(&self) -> Vec4f {
+            mixv(OK_D, OK_L, self.l)
+        }
+        pub fn hot(&self) -> Vec4f {
+            mixv(HOT_D, HOT_L, self.l)
+        }
+        pub fn amb(&self) -> Vec4f {
+            mixv(AMB_D, AMB_L, self.l)
+        }
 
         /// Categorical series colour by index, theme-stepped. Indices past
         /// [`SERIES_MAX`] wrap, which is a bug at the call site rather than

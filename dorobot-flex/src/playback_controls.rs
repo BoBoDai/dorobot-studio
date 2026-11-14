@@ -1,7 +1,7 @@
 //! Playback Controls Widget for Footer
 
-use makepad_widgets::*;
 use makepad_app_shell::theme::get_global_dark_mode;
+use makepad_widgets::*;
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -219,7 +219,11 @@ impl Widget for PlaybackControls {
         });
 
         // Check button clicks using the clicked() method on captured actions
-        if self.view.button(cx, ids!(buttons_row.play_btn)).clicked(&actions) {
+        if self
+            .view
+            .button(cx, ids!(buttons_row.play_btn))
+            .clicked(&actions)
+        {
             self.is_playing = !self.is_playing;
             let action = if self.is_playing {
                 PlaybackAction::Play
@@ -228,14 +232,24 @@ impl Widget for PlaybackControls {
             };
             cx.widget_action(self.widget_uid(), action);
             let text = if self.is_playing { "Pause" } else { "Play" };
-            self.view.button(cx, ids!(buttons_row.play_btn)).set_text(cx, text);
+            self.view
+                .button(cx, ids!(buttons_row.play_btn))
+                .set_text(cx, text);
         }
 
-        if self.view.button(cx, ids!(buttons_row.step_back_btn)).clicked(&actions) {
+        if self
+            .view
+            .button(cx, ids!(buttons_row.step_back_btn))
+            .clicked(&actions)
+        {
             cx.widget_action(self.widget_uid(), PlaybackAction::StepBackward);
         }
 
-        if self.view.button(cx, ids!(buttons_row.step_fwd_btn)).clicked(&actions) {
+        if self
+            .view
+            .button(cx, ids!(buttons_row.step_fwd_btn))
+            .clicked(&actions)
+        {
             cx.widget_action(self.widget_uid(), PlaybackAction::StepForward);
         }
     }
@@ -295,12 +309,17 @@ impl PlaybackControlsRef {
     /// `draw_walk`, so a screen holding its playback state elsewhere shows a
     /// button labelled "Play" while the episode is playing.
     pub fn set_playing(&self, cx: &mut Cx, playing: bool) {
-        let Some(mut inner) = self.borrow_mut() else { return };
+        let Some(mut inner) = self.borrow_mut() else {
+            return;
+        };
         if inner.is_playing == playing {
             return;
         }
         inner.is_playing = playing;
         let text = if playing { "Pause" } else { "Play" };
-        inner.view.button(cx, ids!(buttons_row.play_btn)).set_text(cx, text);
+        inner
+            .view
+            .button(cx, ids!(buttons_row.play_btn))
+            .set_text(cx, text);
     }
 }
