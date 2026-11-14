@@ -165,6 +165,10 @@ script_mod! {
 
     mod.widgets.nx = {}
 
+    // Balance PingFang button ink against its cap-height band, scaling the
+    // correction with type size. Leave other platforms' fallback faces alone.
+    mod.widgets.Button.draw_text.temp_y_shift = #(if cfg!(target_os = "macos") { -0.15f64 } else { 0.0f64 })
+
     // ----------------------------------------------------------------- type --
     // Inherit the app's PingFang iOS sheet and the framework's fallbacks.
     mod.widgets.nx.FONT_R = mod.theme.font_regular{line_spacing: 1.4}

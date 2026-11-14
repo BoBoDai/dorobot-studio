@@ -1,0 +1,115 @@
+{
+  "scope": "Nine representative Replay buttons in light and dark appearance on macOS with PingFang SC",
+  "method": "Bounding-box center of visible text/symbol pixels, excluding button edges; grayscale threshold with 2x device scale. Signed offsets are logical pixels relative to button center. Rasterization and glyph descenders affect the bounds.",
+  "max_absolute_offset": 1.1,
+  "measurements": [
+    {
+      "appearance": "dark",
+      "control": "robot_panel.head.close",
+      "offset_x": 0.0,
+      "offset_y": 0.4
+    },
+    {
+      "appearance": "dark",
+      "control": "robot_panel.head.maximize",
+      "offset_x": 0.0,
+      "offset_y": -0.35
+    },
+    {
+      "appearance": "dark",
+      "control": "panels_btn",
+      "offset_x": 0.17,
+      "offset_y": -0.85
+    },
+    {
+      "appearance": "dark",
+      "control": "details_btn",
+      "offset_x": 0.15,
+      "offset_y": -0.85
+    },
+    {
+      "appearance": "dark",
+      "control": "episodes_btn",
+      "offset_x": 0.27,
+      "offset_y": 0.4
+    },
+    {
+      "appearance": "dark",
+      "control": "signals_btn",
+      "offset_x": -0.01,
+      "offset_y": 0.65
+    },
+    {
+      "appearance": "dark",
+      "control": "play_btn",
+      "offset_x": 0.5,
+      "offset_y": 0.0
+    },
+    {
+      "appearance": "dark",
+      "control": "speed_btn",
+      "offset_x": -0.25,
+      "offset_y": 0.5
+    },
+    {
+      "appearance": "dark",
+      "control": "appearance",
+      "offset_x": 0.0,
+      "offset_y": 0.5
+    },
+    {
+      "appearance": "light",
+      "control": "robot_panel.head.close",
+      "offset_x": 0.0,
+      "offset_y": 0.4
+    },
+    {
+      "appearance": "light",
+      "control": "robot_panel.head.maximize",
+      "offset_x": 0.0,
+      "offset_y": -0.1
+    },
+    {
+      "appearance": "light",
+      "control": "panels_btn",
+      "offset_x": 0.42,
+      "offset_y": -1.1
+    },
+    {
+      "appearance": "light",
+      "control": "details_btn",
+      "offset_x": 0.15,
+      "offset_y": -1.1
+    },
+    {
+      "appearance": "light",
+      "control": "episodes_btn",
+      "offset_x": 0.27,
+      "offset_y": 0.4
+    },
+    {
+      "appearance": "light",
+      "control": "signals_btn",
+      "offset_x": -0.01,
+      "offset_y": 0.4
+    },
+    {
+      "appearance": "light",
+      "control": "play_btn",
+      "offset_x": 0.5,
+      "offset_y": 0.0
+    },
+    {
+      "appearance": "light",
+      "control": "speed_btn",
+      "offset_x": -0.25,
+      "offset_y": 0.5
+    },
+    {
+      "appearance": "light",
+      "control": "appearance",
+      "offset_x": -0.25,
+      "offset_y": 0.5
+    }
+  ]
+}

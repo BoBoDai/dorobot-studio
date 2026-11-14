@@ -59,3 +59,18 @@ and paused episode/frame, all eight Replay utility button dimensions,
 maximize/Escape, close/reopen, appearance switching and restoration of the
 original layout. Original light/dark captures were visually inspected.
 The earlier 57-check suite was not rerun for this localized size adjustment.
+
+## Button content alignment
+
+On macOS, button labels and text-symbol icons use a type-size-scaled baseline
+correction for PingFang. Body text is unaffected, and other platforms retain
+their fallback-font positioning. This also applies through JIT live reload.
+
+Before correction, sampled button ink sat 1.15–3 logical pixels below the
+button center. [Pixel measurements](typography-controls-evidence/button-alignment.json)
+of nine representative buttons in both appearances put the remaining absolute
+offset at 1.1 logical pixels or less; the panel icons are within 0.4 pixels.
+This measures rasterized ink bounds, including varying descenders, rather than
+claiming exact geometric centering for every possible string. Original captures
+were visually inspected. The running process, layout, paused frame and 28px
+utility control sizes were retained; no native build or restart was used.
