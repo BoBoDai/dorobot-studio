@@ -1,0 +1,262 @@
+[
+  {
+    "name": "focused panel button does not also start playback",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "drag moves title and its actual 3D/plot content",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "vertical divider resizes panels",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "horizontal divider resizes panels",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "maximize shows the intended plot",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "Escape restores panel grid",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "closed camera can be reopened with content intact",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "appearance and navigation retain custom layout",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "native Replay window opens with independent layout",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "both windows share transport and frame position",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "extra window layout changes independently",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "closing extra window preserves main task",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "extra window retains its layout after reopening",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "extra window reopens after close",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "single-frame stepping",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "pointer scrubbing moves the shared playhead",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "bad tag persists through navigation",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "exclude and Undo recover the same episode and tag",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "cancel Hub form retains active episode",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "missing rig keeps Record and Save disabled",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "disabled Record cannot start capture",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "hardware has calibration controls and a recovery action",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "no policy runner keeps Stop disabled",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "navigation divider is resizable",
+    "pass": true,
+    "scope": "file dataset"
+  },
+  {
+    "name": "all closed panels leave recovery controls available",
+    "pass": true,
+    "scope": "layout recovery"
+  },
+  {
+    "name": "reset restores every view after closing all panels",
+    "pass": true,
+    "scope": "layout recovery"
+  },
+  {
+    "name": "arrangement with 1 columns retains panel content",
+    "pass": true,
+    "scope": "layout recovery"
+  },
+  {
+    "name": "arrangement with 4 columns retains panel content",
+    "pass": true,
+    "scope": "layout recovery"
+  },
+  {
+    "name": "arrangement with 2 columns retains panel content",
+    "pass": true,
+    "scope": "layout recovery"
+  },
+  {
+    "name": "compact signal paging reaches the last existing lane",
+    "pass": true,
+    "scope": "layout recovery"
+  },
+  {
+    "name": "restart restores panel order, sizes and visibility",
+    "pass": true,
+    "scope": "restart"
+  },
+  {
+    "name": "restart restores episode and paused playhead",
+    "pass": true,
+    "scope": "restart"
+  },
+  {
+    "name": "restart restores playback speed without starting playback",
+    "pass": true,
+    "scope": "restart"
+  },
+  {
+    "name": "restart preserves curation tag",
+    "pass": true,
+    "scope": "restart"
+  },
+  {
+    "name": "restart restores navigation width",
+    "pass": true,
+    "scope": "restart"
+  },
+  {
+    "name": "simulated completed take saves and clears review",
+    "pass": true,
+    "scope": "simulated device"
+  },
+  {
+    "name": "simulated record starts with an available Stop",
+    "pass": true,
+    "scope": "simulated device"
+  },
+  {
+    "name": "simulated stop presents Save, Discard and Re-record",
+    "pass": true,
+    "scope": "simulated device"
+  },
+  {
+    "name": "simulated re-record starts a fresh take",
+    "pass": true,
+    "scope": "simulated device"
+  },
+  {
+    "name": "simulated discard clears staged take",
+    "pass": true,
+    "scope": "simulated device"
+  },
+  {
+    "name": "incomplete calibration keeps Continue disabled",
+    "pass": true,
+    "scope": "simulated device"
+  },
+  {
+    "name": "simulated evaluation Stop disables itself after stopping",
+    "pass": true,
+    "scope": "simulated device"
+  },
+  {
+    "name": "Cancel the native folder picker without changing episode, playhead or layout",
+    "pass": true,
+    "scope": "native picker"
+  },
+  {
+    "name": "Cancel the native rig-profile picker without configuring or starting hardware",
+    "pass": true,
+    "scope": "native picker"
+  },
+  {
+    "name": "Compact calibration scroll reaches Continue and Restart controls",
+    "pass": true,
+    "scope": "compact calibration"
+  },
+  {
+    "name": "2x playback speed is shared by both windows",
+    "pass": true,
+    "scope": "speed and curation"
+  },
+  {
+    "name": "0.25x playback speed is shared by both windows",
+    "pass": true,
+    "scope": "speed and curation"
+  },
+  {
+    "name": "0.5x playback speed is shared by both windows",
+    "pass": true,
+    "scope": "speed and curation"
+  },
+  {
+    "name": "1x playback speed is shared by both windows",
+    "pass": true,
+    "scope": "speed and curation"
+  },
+  {
+    "name": "2x control changes actual playback rate",
+    "pass": true,
+    "scope": "speed and curation"
+  },
+  {
+    "name": "good tag survives navigation",
+    "pass": true,
+    "scope": "speed and curation"
+  },
+  {
+    "name": "cancel upload form retains episode and tag",
+    "pass": true,
+    "scope": "speed and curation"
+  }
+]

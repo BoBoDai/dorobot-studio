@@ -29,8 +29,8 @@ script_mod! {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_CHIP{}
                 get_color: fn() {
-                    let normal = mix(#xD8D4CF, #x7A7169, self.light)
-                    let hot = mix(#xC43B36, #xE54048, self.light)
+                    let normal = mix(#xD1D1D6, #x8E8E93, self.light)
+                    let hot = mix(#xD70015, #xFF453A, self.light)
                     return mix(normal, hot, self.alarm)
                 }
             }
@@ -45,12 +45,12 @@ script_mod! {
                 pixel: fn() {
                     let x = self.pos.x
                     let s = self.seed
-                    let bg0 = mix(#x1B1917, #xFBFAF8, self.light)
-                    let hot = mix(#x1B1917, #xF2F0ED, self.light)
+                    let bg0 = mix(#x2C2C2E, #xFFFFFF, self.light)
+                    let hot = mix(#x2C2C2E, #xF2F2F7, self.light)
                     let bg = mix(bg0, hot, self.alarm)
                     // centre line
                     let mid = 1.0 - smoothstep(0.0, 0.01, abs(self.pos.y - 0.5))
-                    let base = mix(bg, mix(#x2A2725, #xF2F0ED, self.light), mid * 0.8)
+                    let base = mix(bg, mix(#x38383A, #xF2F2F7, self.light), mid * 0.8)
                     // measured (solid blue) and commanded (dashed amber)
                     let ym = 0.5 + 0.26 * sin(x * 6.0 + s) + 0.08 * sin(x * 17.0 + s * 2.0)
                     // the alarmed joint pulls away in the last third
@@ -58,8 +58,8 @@ script_mod! {
                     let lm = 1.0 - smoothstep(0.0, 0.02, abs(self.pos.y - ym))
                     let dash = step(0.5, fract(x * 44.0))
                     let la = (1.0 - smoothstep(0.0, 0.02, abs(self.pos.y - ya))) * dash
-                    let c1 = mix(base, #xD15010, lm)
-                    return mix(c1, #xB07514, la)
+                    let c1 = mix(base, #x007AFF, lm)
+                    return mix(c1, #x996300, la)
                 }
             }
         }
@@ -70,8 +70,8 @@ script_mod! {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
-                    let normal = mix(#x7A7169, #xD8D4CF, self.light)
-                    let hot = mix(#xC43B36, #xE54048, self.light)
+                    let normal = mix(#xAEAEB2, #x636366, self.light)
+                    let hot = mix(#xD70015, #xFF453A, self.light)
                     return mix(normal, hot, self.alarm)
                 }
             }
@@ -89,8 +89,8 @@ script_mod! {
             light: instance(0.0)
             pixel: fn() {
                 let t = step(self.rect_size.y - 1.0, self.pos.y * self.rect_size.y)
-                return mix(mix(#x1B1917, #xFFFFFF, self.light),
-                           mix(#x2A2725, #xF2F0ED, self.light), t)
+                return mix(mix(#x2C2C2E, #xFFFFFF, self.light),
+                           mix(#x38383A, #xF2F2F7, self.light), t)
             }
         }
         run_id := Label{
@@ -98,7 +98,7 @@ script_mod! {
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
-                get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
+                get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
             }
         }
         run_state := mod.widgets.ux.Chip{
@@ -111,7 +111,7 @@ script_mod! {
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
-                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
             }
         }
     }
@@ -125,7 +125,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x141312, #xFBFAF8, self.light) }
+            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
         }
 
         // ---- policy bar ----
@@ -148,30 +148,12 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_META{}
-                    get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                    get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
                 }
             }
             Filler{}
-            btn_stop := Button{
-                text: "STOP ROLLOUT"
-                padding: Inset{left: 22. right: 22. top: 11. bottom: 11.}
-                draw_bg +: {
-                    light: instance(0.0)
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                        let idle = mix(#x1B1917, #xF2F0ED, self.light)
-                        sdf.fill_keep(mix(idle, mix(#x2A2725, #xE8E5E1, self.light), self.hover))
-                        sdf.stroke(#xC43B36, 1.2)
-                        return sdf.result
-                    }
-                }
-                draw_text +: {
-                    color: #xC43B36
-                    color_hover: #xC43B36
-                    color_down: #xC43B36
-                    text_style: mod.widgets.ux.TEXT_CHIP{}
-                }
+            btn_stop := mod.widgets.nx.NxBtn{height: 44 text: "Stop rollout"
+                draw_text +: {get_color: fn() {return mix(#xC40013, #x8E8E93, self.disabled)}}
             }
         }
 
@@ -197,8 +179,8 @@ script_mod! {
                                 light: instance(0.0)
                                 pixel: fn() {
                                     let d = length(self.pos - vec2(0.5, 0.45))
-                                    return mix(mix(#x1B1917, #x0A0908, clamp(d, 0.0, 1.0)),
-                                               mix(#xF2F0ED, #xE8E5E1, clamp(d, 0.0, 1.0)), self.light)
+                                    return mix(mix(#x2C2C2E, #x000000, clamp(d, 0.0, 1.0)),
+                                               mix(#xF2F2F7, #xE5E5EA, clamp(d, 0.0, 1.0)), self.light)
                                 }
                             }
                         }
@@ -212,8 +194,8 @@ script_mod! {
                                 light: instance(0.0)
                                 pixel: fn() {
                                     let d = length(self.pos - vec2(0.5, 0.5))
-                                    return mix(mix(#x1B1917, #x0A0908, clamp(d, 0.0, 1.0)),
-                                               mix(#xF2F0ED, #xE8E5E1, clamp(d, 0.0, 1.0)), self.light)
+                                    return mix(mix(#x2C2C2E, #x000000, clamp(d, 0.0, 1.0)),
+                                               mix(#xF2F2F7, #xE5E5EA, clamp(d, 0.0, 1.0)), self.light)
                                 }
                             }
                         }
@@ -222,8 +204,8 @@ script_mod! {
                 stack := mod.widgets.ux.Card{
                     width: Fill height: Fill
                     flow: Down
-                    st_head := mod.widgets.ux.PanelHead{ title +: { text: "action vs state — per joint" } }
-                    st_body := View{
+                    st_head := mod.widgets.ux.PanelHead{ title +: { text: "Action vs state" } }
+                    st_body := ScrollYView{
                         width: Fill height: Fill flow: Down
                         padding: Inset{top: 4. bottom: 4.}
                         div_0 := DivergenceRow{ chart +: { draw_bg +: {seed: 0.0} } }
@@ -258,14 +240,14 @@ script_mod! {
                                 let dx = (p.x - self.rect_size.x * 0.5) / max(p.y - horizon, 1.0)
                                 let vline = (1.0 - step(0.02, fract(dx * 2.5 + 0.5))) * below
                                 let g = clamp(hline + vline, 0.0, 1.0) * 0.4
-                                let base = mix(#x141312, #xF2F0ED, self.light)
-                                let stage = mix(base, mix(#x2A2725, #xD8D4CF, self.light), g)
+                                let base = mix(#x1C1C1E, #xF2F2F7, self.light)
+                                let stage = mix(base, mix(#x38383A, #xD1D1D6, self.light), g)
                                 // predicted end-effector ribbon
                                 let t = clamp((self.pos.x - 0.22) / 0.56, 0.0, 1.0)
                                 let ty = 0.36 + 0.34 * t * t
                                 let ribbon = 1.0 - smoothstep(0.0, 0.030, abs(self.pos.y - ty))
                                 let inband = step(0.22, self.pos.x) * (1.0 - step(0.80, self.pos.x))
-                                return mix(stage, #xD15010, ribbon * inband * 0.55)
+                                return mix(stage, #x007AFF, ribbon * inband * 0.55)
                             }
                         }
                     }
@@ -287,7 +269,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.FONT_MEDIUM{font_size: 13.0}
-                                get_color: fn() { return mix(#x3E7A4A, #x6FAB78, self.light) }
+                                get_color: fn() { return mix(#x30D158, #x248A3D, self.light) }
                             }
                         }
                     }
@@ -364,15 +346,27 @@ impl EvalScreenRef {
             theme_panel_head(cx, &head, light);
         }
 
+        root.widget(cx, ids!(body))
+            .set_visible(cx, !st.checkpoint.is_empty());
+        root.button(cx, ids!(pbar.btn_stop))
+            .set_enabled(cx, st.driving);
+        root.widget(cx, ids!(pbar.btn_stop))
+            .set_disabled(cx, !st.driving);
         // ---- policy bar ----------------------------------------------------
-        root.label(cx, ids!(pbar.ckpt.label))
-            .set_text(cx, &st.checkpoint);
+        root.label(cx, ids!(pbar.ckpt.label)).set_text(
+            cx,
+            if st.checkpoint.is_empty() {
+                "No checkpoint"
+            } else {
+                &st.checkpoint
+            },
+        );
         root.label(cx, ids!(pbar.status.label)).set_text(
             cx,
             if st.driving {
                 "policy driving"
             } else {
-                "stopped"
+                "Not driving"
             },
         );
         root.label(cx, ids!(pbar.latency))

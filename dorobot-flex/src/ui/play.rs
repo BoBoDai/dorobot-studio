@@ -12,8 +12,6 @@ use crate::ui::frame::{apply_light, apply_light_in, theme_chip, theme_panel_head
 use crate::widgets::time_series_plot::TimeSeriesPlotWidgetExt;
 use crate::widgets::timeline::TimelineWidgetExt;
 use crate::widgets::video_player::VideoPlayerWidgetExt;
-use makepad_app_shell::grid::panel_grid::PanelGridWidgetExt;
-use makepad_app_shell::grid::LayoutState;
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -22,7 +20,7 @@ script_mod! {
 
     // Episode row in the tree: index, duration, quality tag.
     let EpisodeRow = View{
-        width: Fill height: 26
+        width: Fill height: 44
         flow: Right
         align: Align{y: 0.5}
         spacing: 8.0
@@ -37,26 +35,25 @@ script_mod! {
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 let base = mix(#x1A1F2900, #xFFFFFF00, self.light)
-                let on = mix(#xEF6F2E, #xF2F0ED, self.light)
+                let on = mix(#x0A84FF, #xF2F2F7, self.light)
                 sdf.box(4.0, 1.0, self.rect_size.x - 8.0, self.rect_size.y - 2.0, 0.5)
                 sdf.fill(mix(base, on, self.sel))
                 return sdf.result
             }
         }
         ep_name := Label{
-            width: 150 text: "ep 000"
+            width: Fill max_lines: 1 text_overflow: Ellipsis text: "ep 000"
             draw_text +: {
                 sel: instance(0.0)
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
-                    let idle = mix(#xD8D4CF, #x6B625B, self.light)
-                    let on = mix(#xE8E5E1, #xEF6F2E, self.light)
+                    let idle = mix(#xD1D1D6, #x636366, self.light)
+                    let on = mix(#xE5E5EA, #x0A84FF, self.light)
                     return mix(idle, on, self.sel)
                 }
             }
         }
-        Filler{}
         ep_tag := mod.widgets.ux.Chip{
             draw_bg +: {tone: 1.0}
             label +: { text: "good" draw_text +: {tone: 1.0} }
@@ -69,7 +66,7 @@ script_mod! {
         draw_text +: {
             light: instance(0.0)
             text_style: mod.widgets.ux.TEXT_CHIP{}
-            get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+            get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
         }
     }
 
@@ -82,7 +79,7 @@ script_mod! {
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+                get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
             }
         }
         v := Label{
@@ -92,8 +89,8 @@ script_mod! {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
-                    let normal = mix(#xD8D4CF, #x2A2725, self.light)
-                    let alert = mix(#xB07514, #xF0A330, self.light)
+                    let normal = mix(#xD1D1D6, #x38383A, self.light)
+                    let alert = mix(#x996300, #xFF9F0A, self.light)
                     return mix(normal, alert, self.warn)
                 }
             }
@@ -110,20 +107,20 @@ script_mod! {
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 // 0 neutral, 1 good, 2 bad, 3 primary
-                let d_ok = mix(#x1B1917, #x2A2725, step(0.5, self.tone))
-                let d_bad = mix(d_ok, #x2A2725, step(1.5, self.tone))
-                let dark_f = mix(d_bad, #xD15010, step(2.5, self.tone))
-                let l_ok = mix(#xFFFFFF, #xF2F0ED, step(0.5, self.tone))
-                let l_bad = mix(l_ok, #xF2F0ED, step(1.5, self.tone))
-                let light_f = mix(l_bad, #xD15010, step(2.5, self.tone))
+                let d_ok = mix(#x2C2C2E, #x38383A, step(0.5, self.tone))
+                let d_bad = mix(d_ok, #x38383A, step(1.5, self.tone))
+                let dark_f = mix(d_bad, #x007AFF, step(2.5, self.tone))
+                let l_ok = mix(#xFFFFFF, #xF2F2F7, step(0.5, self.tone))
+                let l_bad = mix(l_ok, #xF2F2F7, step(1.5, self.tone))
+                let light_f = mix(l_bad, #x007AFF, step(2.5, self.tone))
                 let fill = mix(dark_f, light_f, self.light)
-                let d_e = mix(#x2A2725, #x6FAB78, step(0.5, self.tone))
-                let d_e2 = mix(d_e, #xE54048, step(1.5, self.tone))
-                let dark_e = mix(d_e2, #xD15010, step(2.5, self.tone))
-                let l_e = mix(#xD8D4CF, #xD8D4CF, step(0.5, self.tone))
-                let l_e2 = mix(l_e, #xC43B36, step(1.5, self.tone))
-                let light_e = mix(l_e2, #xD15010, step(2.5, self.tone))
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
+                let d_e = mix(#x38383A, #x30D158, step(0.5, self.tone))
+                let d_e2 = mix(d_e, #xFF453A, step(1.5, self.tone))
+                let dark_e = mix(d_e2, #x007AFF, step(2.5, self.tone))
+                let l_e = mix(#xD1D1D6, #xD1D1D6, step(0.5, self.tone))
+                let l_e2 = mix(l_e, #xD70015, step(1.5, self.tone))
+                let light_e = mix(l_e2, #x007AFF, step(2.5, self.tone))
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
                 // The tag an episode already carries reads as pressed, so the
                 // sidebar answers "what is this tagged?" without looking away.
                 let hot = mix(fill, mix(fill * 1.55, fill * 1.22, self.light), self.sel)
@@ -139,16 +136,16 @@ script_mod! {
             sel: instance(0.0)
             text_style: mod.widgets.ux.TEXT_BODY{}
             get_color: fn() {
-                let d_ok = mix(#xD8D4CF, #x3E7A4A, step(0.5, self.tone))
-                let d_bad = mix(d_ok, #xC43B36, step(1.5, self.tone))
+                let d_ok = mix(#xD1D1D6, #x30D158, step(0.5, self.tone))
+                let d_bad = mix(d_ok, #xFF6961, step(1.5, self.tone))
                 let dark_c = mix(d_bad, #xFFFFFF, step(2.5, self.tone))
-                let l_ok = mix(#x2A2725, #x6FAB78, step(0.5, self.tone))
-                let l_bad = mix(l_ok, #xE54048, step(1.5, self.tone))
+                let l_ok = mix(#x38383A, #x248A3D, step(0.5, self.tone))
+                let l_bad = mix(l_ok, #xD70015, step(1.5, self.tone))
                 let light_c = mix(l_bad, #xFFFFFF, step(2.5, self.tone))
                 let base = mix(dark_c, light_c, self.light)
                 // A selected button fills with its own colour, so the label has
                 // to leave that colour to stay legible on it.
-                return mix(base, mix(#xF2F0ED, #x141312, self.light), self.sel)
+                return mix(base, mix(#xF2F2F7, #x1C1C1E, self.light), self.sel)
             }
         }
     }
@@ -162,8 +159,8 @@ script_mod! {
             light: instance(0.0)
             pixel: fn() {
                 let d = length(self.pos - vec2(0.5, 0.45))
-                return mix(mix(#x1B1917, #x0A0908, clamp(d, 0.0, 1.0)),
-                           mix(#xF2F0ED, #xE8E5E1, clamp(d, 0.0, 1.0)), self.light)
+                return mix(mix(#x2C2C2E, #x000000, clamp(d, 0.0, 1.0)),
+                           mix(#xF2F2F7, #xE5E5EA, clamp(d, 0.0, 1.0)), self.light)
             }
         }
     }
@@ -183,8 +180,8 @@ script_mod! {
                 let dx = (p.x - self.rect_size.x * 0.5) / max(p.y - horizon, 1.0)
                 let vline = (1.0 - step(0.02, fract(dx * 2.5 + 0.5))) * below
                 let g = clamp(hline + vline, 0.0, 1.0) * 0.45
-                let base = mix(#x141312, #xF2F0ED, self.light)
-                return mix(base, mix(#x2A2725, #xD8D4CF, self.light), g)
+                let base = mix(#x1C1C1E, #xF2F2F7, self.light)
+                return mix(base, mix(#x38383A, #xD1D1D6, self.light), g)
             }
         }
     }
@@ -206,9 +203,30 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x141312, #xFBFAF8, self.light) }
+            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
         }
 
+        toolbar := View{width: Fill height: 44 flow: Right spacing: 8.0
+            episodes_btn := Button{height: 44 text: "Episodes"}
+            signals_btn := Button{height: 44 text: "Show signals"}
+            signal_nav := View{width: Fit height: 44 flow: Right spacing: 4.0 align: Align{y: 0.5} visible: false
+                signal_prev := Button{width: 44 height: 44 text: "↑"}
+                signal_count := Label{text: "1–2 / 6" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                signal_next := Button{width: 44 height: 44 text: "↓"}
+            }
+            Filler{}
+            details_btn := Button{height: 44 text: "Details"}
+            panels_btn := Button{height: 44 text: "Panels"}
+        }
+        panel_tools := View{visible: false width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 6.0
+            robot_toggle := Button{height: 44 text: "3D view"}
+            camera_a_toggle := Button{height: 44 text: "Main camera"}
+            camera_b_toggle := Button{height: 44 text: "Wrist camera"}
+            error_toggle := Button{height: 44 text: "Tracking error"}
+            layout_cycle := Button{height: 44 text: "Arrange"}
+            layout_reset := Button{height: 44 text: "Reset layout"}
+            new_window := Button{height: 44 text: "Replay window"}
+        }
         upper := View{
             width: Fill height: Fill
             flow: Right
@@ -216,7 +234,7 @@ script_mod! {
 
             // ---- episode tree ----
             tree := mod.widgets.ux.Card{
-                width: 268 height: Fill
+                width: 224 height: Fill
                 flow: Down
                 tree_head := mod.widgets.ux.PanelHead{ title +: { text: "dataset" } }
                 tree_body := View{
@@ -253,53 +271,40 @@ script_mod! {
                 }
             }
 
-            // ---- real drag-and-drop panel grid (makepad-app-shell) ----
-            // Panels here are draggable, maximisable and closable for real;
-            // the grid owns layout state and emits PanelAction::LayoutChanged.
-            grid := PanelGrid{
-                width: Fill height: Fill
-                window_container +: {
-                    row1 +: {
-                        s1_1 +: {
-                            title: "cam_high"
-                            content +: { stage_a := VideoPlayer{} }
-                        }
-                        s1_2 +: {
-                            title: "3D View"
-                            content +: { stage_3d := RobotView{} }
-                        }
-                        s1_3 +: { visible: false }
-                        s1_4 +: { visible: false }
-                        s1_5 +: { visible: false }
-                        s1_6 +: { visible: false }
-                        s1_7 +: { visible: false }
-                        s1_8 +: { visible: false }
-                        s1_9 +: { visible: false }
+            grid := FlexPanels{
+                robot_panel := StudioPanel{
+                    head +: {title +: {text: "3D view"}}
+                    stage_3d := RobotView{
+                        keyboard_controls: false width: Fill height: Fill
+                        sky_horizon: mod.theme.color_bg_app sky_zenith: mod.theme.color_bg_app
+                        ground_color: mod.theme.color_bg_container ground2_color: mod.theme.color_bg_container
+                        grid_color: mod.theme.color_text_disabled
                     }
-                    row2 +: {
-                        s2_1 +: {
-                            title: "cam_wrist"
-                            content +: { stage_b := VideoPlayer{} }
-                        }
-                        s2_2 +: {
-                            title: "tracking error"
-                            content +: { stage_plot := PlotPane{} }
-                        }
-                        s2_3 +: { visible: false }
-                        s2_4 +: { visible: false }
-                        s2_5 +: { visible: false }
-                        s2_6 +: { visible: false }
-                        s2_7 +: { visible: false }
-                        s2_8 +: { visible: false }
-                        s2_9 +: { visible: false }
-                    }
-                    row3 +: { visible: false height: 0 }
+                }
+                camera_a_panel := StudioPanel{
+                    head +: {title +: {text: "Main camera"}}
+                    camera_a_empty := Label{width: Fill height: Fit text: "No main-camera recording in this episode"
+                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                    stage_a := VideoPlayer{}
+                }
+                camera_b_panel := StudioPanel{
+                    head +: {title +: {text: "Wrist camera"}}
+                    camera_b_empty := Label{width: Fill height: Fit text: "No wrist-camera recording in this episode"
+                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                    stage_b := VideoPlayer{}
+                }
+                error_panel := StudioPanel{
+                    head +: {title +: {text: "Tracking error"}}
+                    stage_plot := PlotPane{}
+                }
+                empty := View{visible: false width: Fill height: Fill flow: Down padding: 24.0 spacing: 16.0
+                    Label{width: Fill text: "All panels are closed. Use Panels to reopen a view or reset the layout."
+                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}}}
                 }
             }
 
-            // ---- inspector + curation ----
             side := mod.widgets.ux.Card{
-                width: 288 height: Fill
+                width: 264 height: Fill
                 flow: Down
                 side_head := mod.widgets.ux.PanelHead{ title +: { text: "Episode" } }
                 // Scrolls, so dragging the footer up can never put the
@@ -308,6 +313,8 @@ script_mod! {
                     width: Fill height: Fill flow: Down
                     padding: Inset{left: 14. right: 14. top: 10.}
                     spacing: 2.0
+                    btn_good := ActionBtn{ text: "Tag good"      draw_bg +: {tone: 1.0} draw_text +: {tone: 1.0} }
+                    btn_bad := ActionBtn{ text: "Tag bad"        draw_bg +: {tone: 2.0} draw_text +: {tone: 2.0} margin: Inset{top: 8.} }
                     st_frames := StatRow{ k +: { text: "FRAMES" } }
                     st_dur := StatRow{ k +: { text: "DURATION" } }
                     st_fps := StatRow{ k +: { text: "FPS" } }
@@ -318,7 +325,7 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_CHIP{}
-                            get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+                            get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
                         }
                     }
                     task_t := Label{
@@ -327,7 +334,7 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_BODY{}
-                            get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
+                            get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
                         }
                     }
                     cur_h := Label{
@@ -336,11 +343,9 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_CHIP{}
-                            get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+                            get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
                         }
                     }
-                    btn_good := ActionBtn{ text: "Tag good"      draw_bg +: {tone: 1.0} draw_text +: {tone: 1.0} }
-                    btn_bad := ActionBtn{ text: "Tag bad"        draw_bg +: {tone: 2.0} draw_text +: {tone: 2.0} margin: Inset{top: 8.} }
                     btn_del := ActionBtn{ text: "Exclude episode" margin: Inset{top: 8.} }
                     btn_push := ActionBtn{ text: "Push to Hub"   draw_bg +: {tone: 3.0} draw_text +: {tone: 3.0} margin: Inset{top: 8.} }
                     Filler{}
@@ -350,7 +355,7 @@ script_mod! {
 
         // ---- timeline ----
         timeline := mod.widgets.ux.Card{
-            width: Fill height: 372
+            width: Fill height: 172
             flow: Down
             // No close button: the transport is not something to dismiss. The
             // head doubles as the resize grip for the footer.
@@ -371,10 +376,9 @@ script_mod! {
                     align: Align{y: 0.5}
                     spacing: 12.0
                     transport := PlaybackControls{
-                        width: 160 height: Fit
+                        width: 184 height: Fit
                         show_bg: false
-                        // Time and speed live on the scrubber and the frame
-                        // counter already; two clocks would disagree.
+                        // The shared transport row owns the clock and speed control.
                         time_row +: { visible: false }
                         speed_row +: { visible: false }
                     }
@@ -383,16 +387,17 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_META{}
-                            get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
+                            get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
                         }
                     }
                     Filler{}
+                    speed_btn := Button{width: 112 height: 44 text: "Speed 1×"}
                     drift_lbl := Label{
                         text: "DRIFT"
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_CHIP{}
-                            get_color: fn() { return mix(#xB07514, #xF0A330, self.light) }
+                            get_color: fn() { return mix(#xFFB340, #x996300, self.light) }
                         }
                     }
                 }
@@ -404,15 +409,16 @@ script_mod! {
                 // told you nothing: the joints overlap, and a joint that moves
                 // a little is flattened by one that moves a lot.
                 lanes := View{
-                    width: Fill height: Fill flow: Down spacing: 1.0
+                    width: Fill height: Fill
+                    content := View{width: Fill height: Fit flow: Down spacing: 1.0
                     lane_0 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_0 := Label{
                             width: 104
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_0 := TimeSeriesPlot{
@@ -421,13 +427,13 @@ script_mod! {
                         }
                     }
                     lane_1 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_1 := Label{
                             width: 104
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_1 := TimeSeriesPlot{
@@ -436,13 +442,13 @@ script_mod! {
                         }
                     }
                     lane_2 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_2 := Label{
                             width: 104
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_2 := TimeSeriesPlot{
@@ -451,13 +457,13 @@ script_mod! {
                         }
                     }
                     lane_3 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_3 := Label{
                             width: 104
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_3 := TimeSeriesPlot{
@@ -466,13 +472,13 @@ script_mod! {
                         }
                     }
                     lane_4 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_4 := Label{
                             width: 104
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_4 := TimeSeriesPlot{
@@ -481,19 +487,20 @@ script_mod! {
                         }
                     }
                     lane_5 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_5 := Label{
                             width: 104
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_5 := TimeSeriesPlot{
                             width: Fill height: Fill
                             header +: { visible: false }
                         }
+                    }
                     }
                 }
             }
@@ -505,10 +512,18 @@ script_mod! {
 pub struct PlayScreen {
     #[deref]
     view: View,
-    /// The grid initialises its own layout, so `layout_state().is_none()` is
-    /// never true — seed ours exactly once instead, and let user drags stand.
+    #[rust(true)]
+    episodes_open: bool,
+    #[rust]
+    signal_first: usize,
+    #[rust]
+    signal_rows: usize,
     #[rust(false)]
-    layout_seeded: bool,
+    details_open: bool,
+    #[rust(false)]
+    signals_open: bool,
+    #[rust]
+    layout_width: f64,
     /// Episode index displayed by each row, in row order.
     #[rust]
     row_episode: Vec<u64>,
@@ -531,11 +546,47 @@ pub struct PlayScreen {
     #[rust]
     loaded_dataset: String,
     /// Footer height, dragged by its head.
-    #[rust(372f64)]
+    #[rust(172f64)]
     footer_h: f64,
     /// `(pointer y at grab, footer height at grab)` while resizing.
     #[rust]
     footer_drag: Option<(f64, f64)>,
+}
+
+impl PlayScreen {
+    fn update_signal_window(&mut self, cx: &mut Cx) {
+        self.view
+            .widget(cx, ids!(toolbar.signal_nav))
+            .set_visible(cx, self.signals_open);
+        if !self.signals_open {
+            return;
+        }
+        let lanes = self.view.widget(cx, ids!(timeline.tl_body.lanes));
+        let height = lanes.area().rect(cx).size.y;
+        self.signal_rows = ((height / 45.0).floor() as usize).clamp(1, 6);
+        self.signal_first = self.signal_first.min(6 - self.signal_rows);
+        for i in 0..6 {
+            let path = format!("timeline.tl_body.lanes.content.lane_{i}");
+            let ids: Vec<_> = path.split('.').map(LiveId::from_str).collect();
+            self.view.widget(cx, &ids).set_visible(
+                cx,
+                i >= self.signal_first && i < self.signal_first + self.signal_rows,
+            );
+        }
+        self.view
+            .widget(cx, ids!(toolbar.signal_nav))
+            .set_visible(cx, self.signals_open);
+        self.view
+            .label(cx, ids!(toolbar.signal_nav.signal_count))
+            .set_text(
+                cx,
+                &format!(
+                    "{}–{} / 6",
+                    self.signal_first + 1,
+                    self.signal_first + self.signal_rows
+                ),
+            );
+    }
 }
 
 impl Widget for PlayScreen {
@@ -549,7 +600,7 @@ impl Widget for PlayScreen {
         match event {
             Event::MouseDown(e) => {
                 let head = self.view.widget(cx, ids!(timeline.tl_head));
-                if !head.is_empty() && head.area().rect(cx).contains(e.abs) {
+                if self.signals_open && !head.is_empty() && head.area().rect(cx).contains(e.abs) {
                     self.footer_drag = Some((e.abs.y, self.footer_h));
                 }
             }
@@ -577,6 +628,17 @@ impl Widget for PlayScreen {
         }
 
         if let Event::Scroll(e) = event {
+            let lanes = self.view.widget(cx, ids!(timeline.tl_body.lanes));
+            if self.signals_open && lanes.area().rect(cx).contains(e.abs) && e.scroll.y.abs() > 0.0
+            {
+                let step = if e.scroll.y > 0.0 { 1 } else { -1 };
+                self.signal_first = (self.signal_first as i64 + step)
+                    .clamp(0, 6usize.saturating_sub(self.signal_rows.max(1)) as i64)
+                    as usize;
+                self.update_signal_window(cx);
+                self.view.redraw(cx);
+                e.handled_y.set(true);
+            }
             let max = self.total_rows.saturating_sub(ROW_IDS.len());
             let tree = self.view.widget(cx, ids!(upper.tree));
             if max > 0 && !tree.is_empty() && tree.area().rect(cx).contains(e.abs) {
@@ -616,33 +678,33 @@ const FOOTER_MAX_FRAC: f64 = 0.55;
 /// Footer lanes, one per joint.
 const LANE_IDS: [(&[LiveId], &[LiveId]); 6] = [
     (
-        ids!(timeline.tl_body.lanes.lane_0.plot_0),
-        ids!(timeline.tl_body.lanes.lane_0.name_0),
+        ids!(timeline.tl_body.lanes.content.lane_0.plot_0),
+        ids!(timeline.tl_body.lanes.content.lane_0.name_0),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_1.plot_1),
-        ids!(timeline.tl_body.lanes.lane_1.name_1),
+        ids!(timeline.tl_body.lanes.content.lane_1.plot_1),
+        ids!(timeline.tl_body.lanes.content.lane_1.name_1),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_2.plot_2),
-        ids!(timeline.tl_body.lanes.lane_2.name_2),
+        ids!(timeline.tl_body.lanes.content.lane_2.plot_2),
+        ids!(timeline.tl_body.lanes.content.lane_2.name_2),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_3.plot_3),
-        ids!(timeline.tl_body.lanes.lane_3.name_3),
+        ids!(timeline.tl_body.lanes.content.lane_3.plot_3),
+        ids!(timeline.tl_body.lanes.content.lane_3.name_3),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_4.plot_4),
-        ids!(timeline.tl_body.lanes.lane_4.name_4),
+        ids!(timeline.tl_body.lanes.content.lane_4.plot_4),
+        ids!(timeline.tl_body.lanes.content.lane_4.name_4),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_5.plot_5),
-        ids!(timeline.tl_body.lanes.lane_5.name_5),
+        ids!(timeline.tl_body.lanes.content.lane_5.plot_5),
+        ids!(timeline.tl_body.lanes.content.lane_5.name_5),
     ),
 ];
 
 /// Must track `EpisodeRow`'s height, so a wheel notch advances whole rows.
-const ROW_H: f64 = 26.0;
+const ROW_H: f64 = 44.0;
 
 const ROW_IDS: [&[LiveId]; 13] = [
     ids!(upper.tree.tree_body.row_0),
@@ -666,13 +728,98 @@ const GRP_IDS: [&[LiveId]; 3] = [
 ];
 
 impl PlayScreenRef {
+    pub fn shift_signals(&self, cx: &mut Cx, step: i64) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.signal_first = (inner.signal_first as i64 + step)
+                .clamp(0, 6usize.saturating_sub(inner.signal_rows.max(1)) as i64)
+                as usize;
+            inner.update_signal_window(cx);
+            inner.view.redraw(cx);
+        }
+    }
+
+    pub fn toggle_pane(&self, cx: &mut Cx, pane: &str) {
+        if let Some(mut inner) = self.borrow_mut() {
+            match pane {
+                "details" => inner.details_open = !inner.details_open,
+                "episodes" => inner.episodes_open = !inner.episodes_open,
+                "signals" => inner.signals_open = !inner.signals_open,
+                _ => return,
+            }
+            inner.layout_width = -1.0;
+        }
+        self.adapt_layout(cx);
+    }
+
+    pub fn adapt_layout(&self, cx: &mut Cx) {
+        let Some(mut inner) = self.borrow_mut() else {
+            return;
+        };
+        inner.update_signal_window(cx);
+        let width = inner.view.area().rect(cx).size.x;
+        if width <= 0.0 || (inner.layout_width - width).abs() < 1.0 {
+            return;
+        }
+        inner.layout_width = width;
+        let compact = width < 1080.0;
+        let details = inner.details_open;
+        let episodes = inner.episodes_open && (!compact || !details);
+        let signals = inner.signals_open;
+        inner
+            .view
+            .widget(cx, ids!(upper.tree))
+            .set_visible(cx, episodes);
+        inner
+            .view
+            .widget(cx, ids!(upper.side))
+            .set_visible(cx, details);
+        inner
+            .view
+            .widget(cx, ids!(timeline.tl_body.lanes))
+            .set_visible(cx, signals);
+        inner
+            .view
+            .button(cx, ids!(toolbar.details_btn))
+            .set_text(cx, if details { "Hide details" } else { "Details" });
+        inner.view.button(cx, ids!(toolbar.episodes_btn)).set_text(
+            cx,
+            if episodes {
+                "Hide episodes"
+            } else {
+                "Episodes"
+            },
+        );
+        inner.view.button(cx, ids!(toolbar.signals_btn)).set_text(
+            cx,
+            if signals {
+                "Hide signals"
+            } else {
+                "Show signals"
+            },
+        );
+        let height = if signals {
+            inner.footer_h.max(244.0)
+        } else {
+            172.0
+        };
+        if let Some(mut card) = inner.view.widget(cx, ids!(timeline)).borrow_mut::<View>() {
+            card.walk.height = Size::Fixed(height);
+        }
+        inner.view.redraw(cx);
+    }
+    /// Theme changes reapply script defaults; restore the current pane choices.
+    pub fn restore_panel_design(&self, cx: &mut Cx) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.layout_width = -1.0;
+        }
+        self.adapt_layout(cx);
+    }
+
     pub fn sync(&self, cx: &mut Cx, st: &PlaybackState) {
         let light = crate::ui::frame::light_mode();
         let Some(mut inner) = self.borrow_mut() else {
             return;
         };
-        let need_seed = !inner.layout_seeded;
-        inner.layout_seeded = true;
 
         // Episode order and the visible window are derived from state alone, so
         // they are settled before the view is borrowed.
@@ -743,36 +890,28 @@ impl PlayScreenRef {
 
         // The app-shell panels theme through their own dark_mode instance;
         // drive it from the same value so both systems stay in step.
+        let sky = if light > 0.5 {
+            dorobot_ux::tokens::pal::VOID_L
+        } else {
+            dorobot_ux::tokens::pal::DEEP_D
+        };
+        let ground = if light > 0.5 {
+            dorobot_ux::tokens::pal::VOID_L
+        } else {
+            dorobot_ux::tokens::pal::LIFT_D
+        };
+        let mut robot = root.widget(cx, ids!(stage_3d));
+        script_apply_eval!(cx, robot, {sky_horizon: #(sky) sky_zenith: #(sky) ground_color: #(ground) ground2_color: #(ground)});
         let dark_mode = 1.0 - light;
         makepad_app_shell::theme::set_global_dark_mode(dark_mode);
-        let grid = root.panel_grid(cx, ids!(upper.grid));
-        if !grid.is_empty() {
-            grid.apply_dark_mode(cx, dark_mode);
-            // Seed once; after that the grid owns layout so a user's drag
-            // survives the next repaint.
-            if need_seed {
-                let mut layout = LayoutState::with_panel_count(4);
-                // with_panel_count packs three to a row; this screen wants 2x2.
-                layout.row_assignments = vec![
-                    vec!["panel_0".into(), "panel_1".into()],
-                    vec!["panel_2".into(), "panel_3".into()],
-                    vec![],
-                ];
-                layout.visible_panels = ["panel_0", "panel_1", "panel_2", "panel_3"]
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect();
-                for (id, title) in [
-                    ("panel_0", "cam_high"),
-                    ("panel_1", "3D View"),
-                    ("panel_2", "cam_wrist"),
-                    ("panel_3", "tracking error"),
-                ] {
-                    layout.panel_titles.insert(id.into(), title.into());
-                }
-                grid.set_layout_state(cx, layout);
-            }
+        for (_, name_id) in LANE_IDS {
+            let mut label = root.widget(cx, name_id);
+            script_apply_eval!(cx, label, { draw_text +: { light: #(light) } });
         }
+        root.widget(cx, ids!(camera_a_empty))
+            .set_visible(cx, st.video_paths.is_empty());
+        root.widget(cx, ids!(camera_b_empty))
+            .set_visible(cx, st.video_paths.len() < 2);
 
         // ---- episode tree: group headers interleaved with rows ------------
         let shown = (start + ROW_IDS.len()).min(total);
@@ -1010,6 +1149,8 @@ impl PlayScreenRef {
         tl.set_current_time(cx, st.current_time);
         tl.set_playing(cx, st.is_playing);
         tl.set_speed(cx, st.speed);
+        root.button(cx, ids!(timeline.tl_body.controls.speed_btn))
+            .set_text(cx, &format!("Speed {}×", st.speed));
         root.playback_controls(cx, ids!(timeline.tl_body.controls.transport))
             .set_playing(cx, st.is_playing);
         root.label(cx, ids!(timeline.tl_body.controls.frame_lbl))

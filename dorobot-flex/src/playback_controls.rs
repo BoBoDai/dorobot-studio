@@ -19,8 +19,8 @@ script_mod! {
         draw_bg +: {
             dark_mode: instance(0.0)
             pixel: fn() {
-                let light_bg = vec4(0.984, 0.980, 0.973, 1.0)
-                let dark_bg = vec4(0.078, 0.075, 0.071, 1.0)
+                let light_bg = vec4(1.000, 1.000, 1.000, 1.0)
+                let dark_bg = vec4(0.110, 0.110, 0.118, 1.0)
                 return mix(light_bg, dark_bg, self.dark_mode)
             }
         }
@@ -34,42 +34,48 @@ script_mod! {
             align: Align{x: 0.5 y: 0.5}
 
             step_back_btn := Button{
-                width: 36
-                height: 28
+                width: 44
+                height: 44
                 text: "<<"
                 draw_bg +: {
                     dark_mode: instance(0.0)
                     pixel: fn() {
-                        let light_bg = vec4(0.910, 0.898, 0.882, 1.0)
-                        let dark_bg = vec4(0.165, 0.153, 0.145, 1.0)
+                        let light_bg = vec4(0.898, 0.898, 0.918, 1.0)
+                        let dark_bg = vec4(0.220, 0.220, 0.227, 1.0)
                         let base = mix(light_bg, dark_bg, self.dark_mode)
-                        let hover_mix = mix(vec4(0.847, 0.831, 0.812, 1.0), vec4(0.165, 0.153, 0.145, 1.0), self.dark_mode)
-                        return mix(base, hover_mix, self.hover)
+                        let hover_mix = mix(vec4(0.820, 0.820, 0.839, 1.0), vec4(0.220, 0.220, 0.227, 1.0), self.dark_mode)
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                        sdf.fill(mix(base, hover_mix, self.hover))
+                        return sdf.result
                     }
                 }
                 draw_text +: {
                     text_style: mod.widgets.flex.TEXT_SMALL{}
                     dark_mode: instance(0.0)
                     get_color: fn() {
-                        let light_text = vec4(0.106, 0.098, 0.090, 1.0)
-                        let dark_text = vec4(0.910, 0.898, 0.882, 1.0)
+                        let light_text = vec4(0.110, 0.110, 0.118, 1.0)
+                        let dark_text = vec4(0.898, 0.898, 0.918, 1.0)
                         return mix(light_text, dark_text, self.dark_mode)
                     }
                 }
             }
 
             play_btn := Button{
-                width: 52
-                height: 28
+                width: 64
+                height: 44
                 text: "Play"
                 draw_bg +: {
-                    color: #xD15010
+                    color: #x007AFF
                     pixel: fn() {
                         let base = self.color
-                        let hover_color = vec4(0.820, 0.314, 0.063, 1.0)
-                        let pressed_color = vec4(0.937, 0.435, 0.180, 1.0)
+                        let hover_color = vec4(0.000, 0.478, 1.000, 1.0)
+                        let pressed_color = vec4(0.039, 0.518, 1.000, 1.0)
                         let color = mix(base, hover_color, self.hover)
-                        return mix(color, pressed_color, self.down)
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                        sdf.fill(mix(color, pressed_color, self.down))
+                        return sdf.result
                     }
                 }
                 draw_text +: {
@@ -82,25 +88,28 @@ script_mod! {
             }
 
             step_fwd_btn := Button{
-                width: 36
-                height: 28
+                width: 44
+                height: 44
                 text: ">>"
                 draw_bg +: {
                     dark_mode: instance(0.0)
                     pixel: fn() {
-                        let light_bg = vec4(0.910, 0.898, 0.882, 1.0)
-                        let dark_bg = vec4(0.165, 0.153, 0.145, 1.0)
+                        let light_bg = vec4(0.898, 0.898, 0.918, 1.0)
+                        let dark_bg = vec4(0.220, 0.220, 0.227, 1.0)
                         let base = mix(light_bg, dark_bg, self.dark_mode)
-                        let hover_mix = mix(vec4(0.847, 0.831, 0.812, 1.0), vec4(0.165, 0.153, 0.145, 1.0), self.dark_mode)
-                        return mix(base, hover_mix, self.hover)
+                        let hover_mix = mix(vec4(0.820, 0.820, 0.839, 1.0), vec4(0.220, 0.220, 0.227, 1.0), self.dark_mode)
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                        sdf.fill(mix(base, hover_mix, self.hover))
+                        return sdf.result
                     }
                 }
                 draw_text +: {
                     text_style: mod.widgets.flex.TEXT_SMALL{}
                     dark_mode: instance(0.0)
                     get_color: fn() {
-                        let light_text = vec4(0.106, 0.098, 0.090, 1.0)
-                        let dark_text = vec4(0.910, 0.898, 0.882, 1.0)
+                        let light_text = vec4(0.110, 0.110, 0.118, 1.0)
+                        let dark_text = vec4(0.898, 0.898, 0.918, 1.0)
                         return mix(light_text, dark_text, self.dark_mode)
                     }
                 }
@@ -120,8 +129,8 @@ script_mod! {
                     text_style: mod.widgets.flex.TEXT_MONO{}
                     dark_mode: instance(0.0)
                     get_color: fn() {
-                        let light_text = vec4(0.106, 0.098, 0.090, 1.0)
-                        let dark_text = vec4(0.910, 0.898, 0.882, 1.0)
+                        let light_text = vec4(0.110, 0.110, 0.118, 1.0)
+                        let dark_text = vec4(0.898, 0.898, 0.918, 1.0)
                         return mix(light_text, dark_text, self.dark_mode)
                     }
                 }
@@ -133,8 +142,8 @@ script_mod! {
                     text_style: mod.widgets.flex.TEXT_SMALL{}
                     dark_mode: instance(0.0)
                     get_color: fn() {
-                        let light_text = vec4(0.478, 0.443, 0.412, 1.0)
-                        let dark_text = vec4(0.478, 0.443, 0.412, 1.0)
+                        let light_text = vec4(0.557, 0.557, 0.576, 1.0)
+                        let dark_text = vec4(0.557, 0.557, 0.576, 1.0)
                         return mix(light_text, dark_text, self.dark_mode)
                     }
                 }
@@ -146,8 +155,8 @@ script_mod! {
                     text_style: mod.widgets.flex.TEXT_MONO{}
                     dark_mode: instance(0.0)
                     get_color: fn() {
-                        let light_text = vec4(0.420, 0.384, 0.357, 1.0)
-                        let dark_text = vec4(0.478, 0.443, 0.412, 1.0)
+                        let light_text = vec4(0.388, 0.388, 0.400, 1.0)
+                        let dark_text = vec4(0.557, 0.557, 0.576, 1.0)
                         return mix(light_text, dark_text, self.dark_mode)
                     }
                 }
@@ -168,8 +177,8 @@ script_mod! {
                     text_style: mod.widgets.flex.TEXT_SMALL{}
                     dark_mode: instance(0.0)
                     get_color: fn() {
-                        let light_text = vec4(0.478, 0.443, 0.412, 1.0)
-                        let dark_text = vec4(0.478, 0.443, 0.412, 1.0)
+                        let light_text = vec4(0.557, 0.557, 0.576, 1.0)
+                        let dark_text = vec4(0.557, 0.557, 0.576, 1.0)
                         return mix(light_text, dark_text, self.dark_mode)
                     }
                 }
@@ -181,8 +190,8 @@ script_mod! {
                     text_style: mod.widgets.flex.TEXT_SMALL{}
                     dark_mode: instance(0.0)
                     get_color: fn() {
-                        let light_text = vec4(0.106, 0.098, 0.090, 1.0)
-                        let dark_text = vec4(0.910, 0.898, 0.882, 1.0)
+                        let light_text = vec4(0.110, 0.110, 0.118, 1.0)
+                        let dark_text = vec4(0.898, 0.898, 0.918, 1.0)
                         return mix(light_text, dark_text, self.dark_mode)
                     }
                 }

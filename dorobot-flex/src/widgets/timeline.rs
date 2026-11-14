@@ -27,8 +27,8 @@ script_mod! {
             text_style: theme.font_regular{font_size: 9.0}
             dark_mode: instance(0.0)
             get_color: fn() {
-                let light_text = vec4(0.420, 0.384, 0.357, 1.0)
-                let dark_text = vec4(0.478, 0.443, 0.412, 1.0)
+                let light_text = vec4(0.388, 0.388, 0.400, 1.0)
+                let dark_text = vec4(0.557, 0.557, 0.576, 1.0)
                 return mix(light_text, dark_text, self.dark_mode)
             }
         }
@@ -50,8 +50,8 @@ script_mod! {
             draw_bg +: {
                 dark_mode: instance(0.0)
                 pixel: fn() {
-                    let light_bg = vec4(0.910, 0.898, 0.882, 1.0)
-                    let dark_bg = vec4(0.106, 0.098, 0.090, 1.0)
+                    let light_bg = vec4(0.898, 0.898, 0.918, 1.0)
+                    let dark_bg = vec4(0.110, 0.110, 0.118, 1.0)
                     return mix(light_bg, dark_bg, self.dark_mode)
                 }
             }
@@ -70,8 +70,8 @@ script_mod! {
             draw_bg +: {
                 dark_mode: instance(0.0)
                 pixel: fn() {
-                    let light_bg = vec4(0.949, 0.941, 0.929, 1.0)
-                    let dark_bg = vec4(0.165, 0.153, 0.145, 1.0)
+                    let light_bg = vec4(0.949, 0.949, 0.969, 1.0)
+                    let dark_bg = vec4(0.220, 0.220, 0.227, 1.0)
                     return mix(light_bg, dark_bg, self.dark_mode)
                 }
             }
@@ -82,7 +82,7 @@ script_mod! {
                 height: Fill
                 margin: Inset{left: 0.}
                 show_bg: true
-                draw_bg.color: #xC43B36
+                draw_bg.color: #xD70015
             }
 
             // Episode markers (rendered as overlays)
@@ -262,7 +262,7 @@ impl Timeline {
         };
 
         // Draw ticks
-        self.draw_tick.color = vec4(0.478, 0.443, 0.412, 1.0);
+        self.draw_tick.color = vec4(0.557, 0.557, 0.576, 1.0);
 
         let mut time = 0.0;
         while time <= self.duration {

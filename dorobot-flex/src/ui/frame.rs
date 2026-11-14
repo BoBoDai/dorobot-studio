@@ -25,44 +25,26 @@ script_mod! {
     // chips looked dull. They are colours designed for a white background.
     //
     // Names are dorobot_ux::tokens::pal's, so a drift is greppable next time.
-    mod.widgets.ux.GROUND      = #x141312   // pal::DEEP_D
-    mod.widgets.ux.SURFACE     = #x1B1917   // pal::LIFT_D
-    mod.widgets.ux.ELEVATED    = #x2A2725   // pal::EDGE_D
-    mod.widgets.ux.LINE        = #x2A2725   // pal::EDGE_D
-    mod.widgets.ux.INK         = #xF2F0EC   // pal::INK_D
-    mod.widgets.ux.INK_2       = #xCFC9C2   // pal::INK2_D
-    mod.widgets.ux.INK_3       = #x94877F   // pal::DIM_D
-    mod.widgets.ux.ACCENT      = #xEF6F2E   // pal::VIO_D
-    mod.widgets.ux.ACCENT_SOFT = #x2A1708   // pal::VIOG_D — the accent's ground
-    mod.widgets.ux.OK          = #x6FAB78   // pal::OK_D
-    mod.widgets.ux.WARN        = #xF0A330   // pal::AMB_D
-    mod.widgets.ux.STOP        = #xE54048   // pal::HOT_D
+    mod.widgets.ux.GROUND      = #x1C1C1E   // pal::DEEP_D
+    mod.widgets.ux.SURFACE     = #x2C2C2E   // pal::LIFT_D
+    mod.widgets.ux.ELEVATED    = #x38383A   // pal::EDGE_D
+    mod.widgets.ux.LINE        = #x38383A   // pal::EDGE_D
+    mod.widgets.ux.INK         = #xF5F5F7   // pal::INK_D
+    mod.widgets.ux.INK_2       = #xD1D1D6   // pal::INK2_D
+    mod.widgets.ux.INK_3       = #xAEAEB2   // pal::DIM_D
+    mod.widgets.ux.ACCENT      = #x0A84FF   // pal::VIO_D
+    mod.widgets.ux.ACCENT_SOFT = #x19334D   // pal::VIOG_D — the accent's ground
+    mod.widgets.ux.OK          = #x30D158   // pal::OK_D
+    mod.widgets.ux.WARN        = #xFF9F0A   // pal::AMB_D
+    mod.widgets.ux.STOP        = #xFF453A   // pal::HOT_D
 
     // ----------------------------------------------------------------- type --
     // Roboto for Latin, Noto Sans SC for Chinese. ("Open Sans SC" is not a
     // released family; Noto Sans SC is the standard open Simplified-Chinese
     // face and pairs cleanly with Roboto's humanist proportions.)
-    mod.widgets.ux.FONT_REGULAR = TextStyle{
-        font_family: FontFamily{
-            latin := FontMember{res: crate_resource("self:resources/fonts/Roboto-Regular.ttf") asc: 0.0 desc: 0.0}
-            chinese := FontMember{res: crate_resource("self:resources/fonts/NotoSansSC-Regular.ttf") asc: 0.0 desc: 0.0}
-        }
-        line_spacing: 1.35
-    }
-    mod.widgets.ux.FONT_MEDIUM = TextStyle{
-        font_family: FontFamily{
-            latin := FontMember{res: crate_resource("self:resources/fonts/Roboto-Medium.ttf") asc: 0.0 desc: 0.0}
-            chinese := FontMember{res: crate_resource("self:resources/fonts/NotoSansSC-Regular.ttf") asc: 0.0 desc: 0.0}
-        }
-        line_spacing: 1.35
-    }
-    mod.widgets.ux.FONT_BOLD = TextStyle{
-        font_family: FontFamily{
-            latin := FontMember{res: crate_resource("self:resources/fonts/Roboto-Bold.ttf") asc: 0.0 desc: 0.0}
-            chinese := FontMember{res: crate_resource("self:resources/fonts/NotoSansSC-Regular.ttf") asc: 0.0 desc: 0.0}
-        }
-        line_spacing: 1.35
-    }
+    mod.widgets.ux.FONT_REGULAR = mod.widgets.nx.FONT_R{}
+    mod.widgets.ux.FONT_MEDIUM = mod.widgets.nx.FONT_M{}
+    mod.widgets.ux.FONT_BOLD = mod.widgets.nx.FONT_B{}
 
     // Lighter, smaller, airier than before — the previous scale read as heavy.
     mod.widgets.ux.TEXT_H1    = mod.widgets.ux.FONT_MEDIUM{font_size: 19.0}
@@ -70,7 +52,7 @@ script_mod! {
     mod.widgets.ux.TEXT_BODY  = mod.widgets.ux.FONT_REGULAR{font_size: 11.5}
     mod.widgets.ux.TEXT_META  = mod.widgets.ux.FONT_REGULAR{font_size: 10.5}
     mod.widgets.ux.TEXT_CHIP  = mod.widgets.ux.FONT_MEDIUM{font_size: 9.5}
-    mod.widgets.ux.TEXT_NAV   = mod.widgets.ux.FONT_REGULAR{font_size: 10.5}
+    mod.widgets.ux.TEXT_NAV   = mod.widgets.ux.FONT_MEDIUM{font_size: 12.0}
 
     // -------------------------------------------------------------- surfaces --
     // Panel with a hairline border, the base for every card and rail.
@@ -83,12 +65,12 @@ script_mod! {
         draw_bg +: {
             light: instance(0.0)
             border_size: 1.0
-            border_radius: 0.0
+            border_radius: 14.0
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                let fill = mix(#x1B1917, #xFFFFFF, self.light)
-                let edge = mix(#x2A2725, #xE8E5E1, self.light)
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
+                let fill = mix(#x2C2C2E, #xFFFFFF, self.light)
+                let edge = mix(#x38383A, #xE5E5EA, self.light)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 14.0)
                 sdf.fill_keep(fill)
                 sdf.stroke(edge, 1.0)
                 return sdf.result
@@ -109,21 +91,22 @@ script_mod! {
             light: instance(0.0)
             pixel: fn() {
                 // hairline along the bottom edge only
-                let base = mix(#x1B1917, #xFFFFFF, self.light)
-                let border = mix(#x2A2725, #xE8E5E1, self.light)
+                let base = mix(#x2C2C2E, #xFFFFFF, self.light)
+                let border = mix(#x38383A, #xE5E5EA, self.light)
                 let t = step(self.rect_size.y - 1.0, self.pos.y * self.rect_size.y)
                 return mix(base, border, t)
             }
         }
 
         grip := View{
+            visible: false
             width: 10 height: 14
             show_bg: true
             draw_bg +: {
                 light: instance(0.0)
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    let c = mix(#x6B625B, #xD8D4CF, self.light)
+                    let c = mix(#xAEAEB2, #x636366, self.light)
                     let r = 1.0
                     sdf.circle(2.0, 3.0, r)  sdf.fill(c)
                     sdf.circle(7.0, 3.0, r)  sdf.fill(c)
@@ -136,15 +119,17 @@ script_mod! {
             }
         }
         title := Label{
+            width: Fill max_lines: 1 text_overflow: Ellipsis
             text: "Panel"
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_TITLE{}
-                get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
+                get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
             }
         }
         Filler{}
         btn_max := View{
+            visible: false
             width: 13 height: 13
             show_bg: true
             draw_bg +: {
@@ -152,12 +137,13 @@ script_mod! {
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.box(2.0, 2.0, 9.0, 9.0, 1.5)
-                    sdf.stroke(mix(#x7A7169, #xD8D4CF, self.light), 1.1)
+                    sdf.stroke(mix(#xAEAEB2, #x636366, self.light), 1.1)
                     return sdf.result
                 }
             }
         }
         btn_close := View{
+            visible: false
             width: 13 height: 13
             margin: Inset{left: 6.}
             show_bg: true
@@ -166,9 +152,9 @@ script_mod! {
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.move_to(3.0, 3.0)  sdf.line_to(10.0, 10.0)
-                    sdf.stroke(mix(#x7A7169, #xD8D4CF, self.light), 1.1)
+                    sdf.stroke(mix(#xAEAEB2, #x636366, self.light), 1.1)
                     sdf.move_to(10.0, 3.0) sdf.line_to(3.0, 10.0)
-                    sdf.stroke(mix(#x7A7169, #xD8D4CF, self.light), 1.1)
+                    sdf.stroke(mix(#xAEAEB2, #x636366, self.light), 1.1)
                     return sdf.result
                 }
             }
@@ -190,24 +176,24 @@ script_mod! {
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 // Shader `let` is immutable, so select branchlessly on tone.
-                let f_ok = mix(#x2A2725, #x2A2725, step(0.5, self.tone))
-                let f_stop = mix(f_ok, #x2A2725, step(1.5, self.tone))
-                let f_accent = mix(f_stop, #x2A2725, step(2.5, self.tone))
-                let fill = mix(f_accent, #x2A2725, step(3.5, self.tone))
-                let l_ok = mix(#x2A2725, #x6FAB78, step(0.5, self.tone))
-                let l_stop = mix(l_ok, #xE54048, step(1.5, self.tone))
-                let l_accent = mix(l_stop, #xEF6F2E, step(2.5, self.tone))
-                let line = mix(l_accent, #xF0A330, step(3.5, self.tone))
+                let f_ok = mix(#x38383A, #x38383A, step(0.5, self.tone))
+                let f_stop = mix(f_ok, #x38383A, step(1.5, self.tone))
+                let f_accent = mix(f_stop, #x38383A, step(2.5, self.tone))
+                let fill = mix(f_accent, #x38383A, step(3.5, self.tone))
+                let l_ok = mix(#x38383A, #x30D158, step(0.5, self.tone))
+                let l_stop = mix(l_ok, #xFF453A, step(1.5, self.tone))
+                let l_accent = mix(l_stop, #x0A84FF, step(2.5, self.tone))
+                let line = mix(l_accent, #xFF9F0A, step(3.5, self.tone))
                 // light palette: tinted washes instead of dark fills
-                let lf_ok = mix(#xF2F0ED, #xF2F0ED, step(0.5, self.tone))
-                let lf_stop = mix(lf_ok, #xF2F0ED, step(1.5, self.tone))
-                let lf_accent = mix(lf_stop, #xF2F0ED, step(2.5, self.tone))
-                let lfill = mix(lf_accent, #xF2F0ED, step(3.5, self.tone))
-                let ll_ok = mix(#xE8E5E1, #xD8D4CF, step(0.5, self.tone))
-                let ll_stop = mix(ll_ok, #xC43B36, step(1.5, self.tone))
-                let ll_accent = mix(ll_stop, #xD15010, step(2.5, self.tone))
-                let lline = mix(ll_accent, #xB07514, step(3.5, self.tone))
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
+                let lf_ok = mix(#xF2F2F7, #xF2F2F7, step(0.5, self.tone))
+                let lf_stop = mix(lf_ok, #xF2F2F7, step(1.5, self.tone))
+                let lf_accent = mix(lf_stop, #xF2F2F7, step(2.5, self.tone))
+                let lfill = mix(lf_accent, #xF2F2F7, step(3.5, self.tone))
+                let ll_ok = mix(#xE5E5EA, #xD1D1D6, step(0.5, self.tone))
+                let ll_stop = mix(ll_ok, #xD70015, step(1.5, self.tone))
+                let ll_accent = mix(ll_stop, #x007AFF, step(2.5, self.tone))
+                let lline = mix(ll_accent, #x996300, step(3.5, self.tone))
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 14.0)
                 sdf.fill_keep(mix(fill, lfill, self.light))
                 sdf.stroke(mix(line, lline, self.light), 1.0)
                 return sdf.result
@@ -220,14 +206,14 @@ script_mod! {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_CHIP{}
                 get_color: fn() {
-                    let c_ok = mix(#xD8D4CF, #x3E7A4A, step(0.5, self.tone))
-                    let c_stop = mix(c_ok, #xC43B36, step(1.5, self.tone))
-                    let c_accent = mix(c_stop, #xD15010, step(2.5, self.tone))
-                    let dark_c = mix(c_accent, #xB07514, step(3.5, self.tone))
-                    let l_ok = mix(#x7A7169, #x6FAB78, step(0.5, self.tone))
-                    let l_stop = mix(l_ok, #xE54048, step(1.5, self.tone))
-                    let l_accent = mix(l_stop, #xEF6F2E, step(2.5, self.tone))
-                    let light_c = mix(l_accent, #xF0A330, step(3.5, self.tone))
+                    let c_ok = mix(#xD1D1D6, #x30D158, step(0.5, self.tone))
+                    let c_stop = mix(c_ok, #xFF6961, step(1.5, self.tone))
+                    let c_accent = mix(c_stop, #x64B5FF, step(2.5, self.tone))
+                    let dark_c = mix(c_accent, #xFFB340, step(3.5, self.tone))
+                    let l_ok = mix(#x636366, #x1D7A34, step(0.5, self.tone))
+                    let l_stop = mix(l_ok, #xD70015, step(1.5, self.tone))
+                    let l_accent = mix(l_stop, #x0060CC, step(2.5, self.tone))
+                    let light_c = mix(l_accent, #x996300, step(3.5, self.tone))
                     return mix(dark_c, light_c, self.light)
                 }
             }
@@ -246,8 +232,8 @@ script_mod! {
         draw_bg +: {
             light: instance(0.0)
             pixel: fn() {
-                let base = mix(#x141312, #xFFFFFF, self.light)
-                let border = mix(#x2A2725, #xE8E5E1, self.light)
+                let base = mix(#x1C1C1E, #xFFFFFF, self.light)
+                let border = mix(#x38383A, #xE5E5EA, self.light)
                 let t = step(self.rect_size.y - 1.0, self.pos.y * self.rect_size.y)
                 return mix(base, border, t)
             }
@@ -260,7 +246,7 @@ script_mod! {
                 light: instance(0.0)
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    let c = mix(#xD8D4CF, #x6B625B, self.light)
+                    let c = mix(#xD1D1D6, #x636366, self.light)
                     sdf.move_to(2.0, 5.0)  sdf.line_to(18.0, 5.0)  sdf.stroke(c, 1.3)
                     sdf.move_to(2.0, 10.0) sdf.line_to(18.0, 10.0) sdf.stroke(c, 1.3)
                     sdf.move_to(2.0, 15.0) sdf.line_to(18.0, 15.0) sdf.stroke(c, 1.3)
@@ -275,7 +261,7 @@ script_mod! {
             draw_bg +: {
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    let c = #xD15010
+                    let c = #x007AFF
                     // stylised arm: base, upper link, forearm, gripper dot
                     sdf.box(3.0, 19.0, 13.0, 4.0, 1.2)
                     sdf.fill(c)
@@ -288,7 +274,7 @@ script_mod! {
                     sdf.fill(c)
                     sdf.rotate(-0.5, 12.0, 10.0)
                     sdf.circle(20.0, 6.0, 2.6)
-                    sdf.fill(#xD8D4CF)
+                    sdf.fill(#xD1D1D6)
                     return sdf.result
                 }
             }
@@ -298,7 +284,7 @@ script_mod! {
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.FONT_MEDIUM{font_size: 14.0}
-                get_color: fn() { return mix(#xE8E5E1, #x2A2725, self.light) }
+                get_color: fn() { return mix(#xE5E5EA, #x38383A, self.light) }
             }
         }
         Filler{}
@@ -315,9 +301,9 @@ script_mod! {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.circle(8.5, 7.0, 5.4)
-                        sdf.stroke(mix(#xD8D4CF, #x7A7169, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         sdf.move_to(5.5, 13.0) sdf.line_to(11.5, 13.0)
-                        sdf.stroke(mix(#xD8D4CF, #x7A7169, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         return sdf.result
                     }
                 }
@@ -330,9 +316,9 @@ script_mod! {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.circle(8.5, 8.5, 7.2)
-                        sdf.stroke(mix(#xD8D4CF, #x7A7169, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         sdf.circle(8.5, 12.0, 0.9)
-                        sdf.fill(mix(#xD8D4CF, #x7A7169, self.light))
+                        sdf.fill(mix(#xD1D1D6, #x636366, self.light))
                         return sdf.result
                     }
                 }
@@ -347,9 +333,9 @@ script_mod! {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.circle(8.5, 8.5, 6.6)
-                        sdf.stroke(mix(#xD8D4CF, #x7A7169, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         sdf.circle(8.5, 8.5, 2.4)
-                        sdf.stroke(mix(#xD8D4CF, #x7A7169, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         return sdf.result
                     }
                 }
@@ -359,8 +345,8 @@ script_mod! {
                 align: Align{x: 0.5 y: 0.5}
                 show_bg: true
                 draw_bg +: {
-                    color: #xEF6F2E
-                    border_radius: 0.0
+                    color: #x0A84FF
+                    border_radius: 14.0
                 }
                 Label{
                     text: "AK"
@@ -377,10 +363,11 @@ script_mod! {
     // One rail entry. `icon` picks the glyph, `active` drives the pill + tint.
     mod.widgets.ux.NavItem = View{
         width: Fill
-        height: 58
-        flow: Down
-        align: Align{x: 0.5 y: 0.5}
-        spacing: 6.0
+        height: 48
+        flow: Right
+        padding: 12.0
+        align: Align{y: 0.5}
+        spacing: 12.0
         cursor: MouseCursor.Hand
         show_bg: true
         draw_bg +: {
@@ -388,13 +375,10 @@ script_mod! {
             light: instance(0.0)
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                let well = mix(#x2A2725, #xF2F0ED, self.light)
+                let well = mix(#x19334D, #xE5F0FF, self.light)
                 let idle = mix(#x0F131B00, #xF7F8FB00, self.light)
-                sdf.box(6.0, 2.0, self.rect_size.x - 12.0, self.rect_size.y - 4.0, 0.5)
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0)
                 sdf.fill(mix(idle, well, self.active))
-                // slim accent marker on the leading edge
-                sdf.box(1.0, 10.0, 2.5, self.rect_size.y - 20.0, 1.25)
-                sdf.fill(mix(idle, #xD15010, self.active))
                 return sdf.result
             }
         }
@@ -412,8 +396,8 @@ script_mod! {
                 light: instance(0.0)
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    let idle_c = mix(#x7A7169, #x7A7169, self.light)
-                    let on_c = mix(#xD15010, #xEF6F2E, self.light)
+                    let idle_c = mix(#xD1D1D6, #x38383A, self.light)
+                    let on_c = mix(#x64B5FF, #x0060CC, self.light)
                     let c = mix(idle_c, on_c, self.active)
                     // Design space is 22 units square; scale it to the view.
                     let s = self.rect_size.x / 22.0
@@ -469,8 +453,8 @@ script_mod! {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_NAV{}
                 get_color: fn() {
-                    let idle_c = mix(#x7A7169, #x7A7169, self.light)
-                    let on_c = mix(#xD15010, #xEF6F2E, self.light)
+                    let idle_c = mix(#xD1D1D6, #x38383A, self.light)
+                    let on_c = mix(#x64B5FF, #x0060CC, self.light)
                     return mix(idle_c, on_c, self.active)
                 }
             }
@@ -478,17 +462,17 @@ script_mod! {
     }
 
     mod.widgets.ux.NavRail = View{
-        width: 88
+        width: 172
         height: Fill
         flow: Down
-        padding: Inset{top: 14. left: 2. right: 2.}
+        padding: 0.0
         spacing: 4.0
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
             pixel: fn() {
-                let base = mix(#x141312, #xFBFAF8, self.light)
-                let border = mix(#x2A2725, #xE8E5E1, self.light)
+                let base = mix(#x1C1C1E, #xFFFFFF, self.light)
+                let border = mix(#x38383A, #xE5E5EA, self.light)
                 let t = step(self.rect_size.x - 1.0, self.pos.x * self.rect_size.x)
                 return mix(base, border, t)
             }
@@ -496,9 +480,9 @@ script_mod! {
 
         nav_library  := mod.widgets.ux.NavItem{ caption +: { text: "Library" }  glyph +: { draw_bg +: {icon: 0.0} } }
         nav_record   := mod.widgets.ux.NavItem{ caption +: { text: "Record" }   glyph +: { draw_bg +: {icon: 1.0} } }
-        nav_play     := mod.widgets.ux.NavItem{ caption +: { text: "Play" }     glyph +: { draw_bg +: {icon: 2.0} } }
+        nav_play     := mod.widgets.ux.NavItem{ caption +: { text: "Replay" }     glyph +: { draw_bg +: {icon: 2.0} } }
         nav_hardware := mod.widgets.ux.NavItem{ caption +: { text: "Hardware" } glyph +: { draw_bg +: {icon: 3.0} } }
-        nav_eval     := mod.widgets.ux.NavItem{ caption +: { text: "Eval" }     glyph +: { draw_bg +: {icon: 4.0} } }
+        nav_eval     := mod.widgets.ux.NavItem{ caption +: { text: "Evaluate" }     glyph +: { draw_bg +: {icon: 4.0} } }
     }
 }
 

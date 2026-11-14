@@ -8,6 +8,24 @@ This is a standalone Git repository and Cargo workspace. Open this directory
 as the project root. The application builds without a sibling Nexus checkout;
 its shared UI crate is included in `crates/dorobot-ux`.
 
+### iOS appearance and Makepad JIT
+
+The desktop app uses OctoSense's current Makepad iOS light/dark style sheets,
+with blue accents, grouped surfaces and rounded controls. Start it through the
+Relax Rust JIT:
+
+```sh
+./tools/run_jit.sh
+./tools/run_jit.sh --check
+./tools/run_jit.sh --dark
+```
+
+The first launch builds a pinned runner in your user cache; later launches
+reuse it. Rust, Cargo, Git, Python 3 and a platform C compiler are required.
+The default JIT launch omits FFmpeg. With FFmpeg installed, use
+`./tools/run_jit.sh --video` for video decoding. See [JIT setup and validation](docs/JIT.md)
+for runtime versions, source editing and tested limits.
+
 ### Adora Nano preview
 
 The Nano URDF and meshes are included in `data/adora_nano`. From this project:
@@ -16,7 +34,7 @@ The Nano URDF and meshes are included in `data/adora_nano`. From this project:
 ./tools/run_nano_preview.sh
 ```
 
-The launcher creates three synthetic joint-motion clips if needed and opens
+The JIT launcher creates three synthetic joint-motion clips if needed and opens
 them in the Play screen. Space plays/pauses; Home returns to the start. These
 clips are kinematic previews, not captured data or commands for hardware.
 This launcher builds without FFmpeg/video decoding; the standard build below
@@ -37,7 +55,8 @@ The primary application for LeRobot dataset visualization featuring:
 - **Multi-camera video playback** with synchronized scrubbing
 - **3D robot visualization** from URDF models
 - **Time series plots** for joint states and sensor data
-- **Flexible panel layout** with drag-and-drop rearrangement
+- **Flexible panel layout** with drag rearrangement, resizing, maximize/restore and local layout recovery
+- **Additional native Replay window** sharing the episode and transport, with its own layout
 - **Episode browser** with hierarchical task grouping
 
 ### Architecture
@@ -65,10 +84,20 @@ The primary application for LeRobot dataset visualization featuring:
 
 ### Panel Drag-and-Drop
 
-Panels can be rearranged by dragging their title bars. The content follows the panel:
-- Video panels swap their video sources
-- Robot view can be moved to any panel position
-- Panel visibility can be toggled via the layout menu
+Drag a panel title to rearrange its content. Drag a divider to resize the grid;
+use the panel's expand button to maximize it, and Escape to restore the grid.
+**Replay → Panels** reopens closed views, changes the arrangement, resets the
+layout, or opens a separate native **Replay window**. Both windows share the
+selected episode and playback; their panel layouts are independent. The **Speed**
+control cycles through 0.25×, 0.5×, 1× and 2× in both windows and survives restart. Closing
+the extra window preserves the main task. Layouts and navigation width are
+saved locally. Hardware uses the same panel behavior and has **Restore panels**.
+
+The four Replay views are 3D, main camera, wrist camera and tracking error.
+Camera panels explain missing media. Record and Hardware keep their controls
+visible with setup guidance; recording stays disabled until a profile exists.
+See the [functional UX judge loop](docs/ux/functional-review.md) for the workflow
+checks, score, and unverified hardware limits.
 
 ## Project Structure
 
@@ -100,7 +129,7 @@ dorobot-studio/
 
 ### Prerequisites
 
-- Rust toolchain (1.75+)
+- A current stable Rust toolchain
 - FFmpeg development libraries (for video decoding)
 
 On macOS:

@@ -8,6 +8,7 @@ use makepad_widgets::*;
 
 pub mod eval;
 pub mod frame;
+pub mod flex_layout;
 pub mod hardware;
 pub mod library;
 pub mod play;
@@ -17,6 +18,7 @@ pub mod record;
 pub fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
     frame::script_mod(vm);
     library::script_mod(vm);
+    flex_layout::script_mod(vm);
     hardware::script_mod(vm);
     record::script_mod(vm);
     play::script_mod(vm);

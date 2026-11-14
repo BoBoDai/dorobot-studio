@@ -1,0 +1,345 @@
+{
+  "source": {
+    "dorobot-studio": "3e09ff249e83ea7f3c09e7c66acf1f41d5ce7ad5",
+    "dorobot-nexus": "688e3e6a8ac7bed9e0b95f7f30240892dac80640",
+    "makepad": "44d8220f12acfa46157019267e119e0866dd6b05"
+  },
+  "capture": "Original Makepad pixels; copied unchanged. Machine paths and runtime data omitted.",
+  "files": [
+    {
+      "file": "studio-1440x900-light-library.png",
+      "sha256": "8a12279f2c990ec31ba671977de5e548cb1a4e74d7029c6470257aa27e645120",
+      "screen": "Library",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1440x900-light-record.png",
+      "sha256": "363f2c397a0b5887ce356f57d687253a89ea85b93557d9214c038be68a58b391",
+      "screen": "Record",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1440x900-light-play.png",
+      "sha256": "96411d8473a7c7cd7fe1e3bdb78d88210a87f860c7cb70615046cfc144f92de4",
+      "screen": "Play",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1440x900-light-hardware.png",
+      "sha256": "9c073620454bd2e3bb7ad7af9e7221544b695e4db53ae06699fe208f433e88c5",
+      "screen": "Hardware",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1440x900-light-eval.png",
+      "sha256": "51e647e696e20d50254977267a273eb193f3ebd8cb6cbc1cb9081273f5e3cba7",
+      "screen": "Eval",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1440x900-dark-library.png",
+      "sha256": "551d44d6b48b714f60ab2644ad1db3e214d033ce038f8c3bbed7a6164e5c98c8",
+      "screen": "Library",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1440x900-dark-record.png",
+      "sha256": "e9f7b815b2a47fd8e000d1740d749f91bf1abc5f5e67f426b66dc592500be2df",
+      "screen": "Record",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1440x900-dark-play.png",
+      "sha256": "71a29f9886689ea7477832d97feddf142d751a78c35d73bfdd0b7da57fe3735f",
+      "screen": "Play",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1440x900-dark-hardware.png",
+      "sha256": "87f2bfde2dcb4e52bc22ddcc2dde8bf8504f57fe8e5b025d22aa35f9f4d7bed2",
+      "screen": "Hardware",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1440x900-dark-eval.png",
+      "sha256": "0f941c43e77d5f0707f732b99256053d218f3582884293c367679eeef4225f7f",
+      "screen": "Eval",
+      "size": [
+        1440,
+        900
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-light-library.png",
+      "sha256": "7dabded9ef03c359b065e878475d7ec90d57ca81f24d2a7cd58692d18c8bacf5",
+      "screen": "Library",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-light-record.png",
+      "sha256": "c5c0cc6436f765e24f638ae1013071f261df5797f73a882c03b3aad0989c4f8f",
+      "screen": "Record",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-light-play.png",
+      "sha256": "73e26035a4622f853d94df56b0dff85ee660b83e814ec234e2b8e609c48c45c9",
+      "screen": "Play",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-light-hardware.png",
+      "sha256": "1097222622c1d843a4644299a1135b55c217c9c1d4752b493e6625f7faf241d0",
+      "screen": "Hardware",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-light-eval.png",
+      "sha256": "b3737b6ed9013ef533558f96c76f5c20a02582f8fb3f0ceff01bd282f88a2e98",
+      "screen": "Eval",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "light",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-dark-library.png",
+      "sha256": "da515769af02c67f6db7139bb164fc7aa6782db1f7222a983947fb6a5982b1ae",
+      "screen": "Library",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-dark-record.png",
+      "sha256": "d8a383ff77204cd21688fad3a98aff29013ae5b00ba32c8cc92ce450d9c17ff0",
+      "screen": "Record",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-dark-play.png",
+      "sha256": "faa3ebedb9eb9132d672381b683ac2b35cb024d783a13991b4fe8af47f0d3f9e",
+      "screen": "Play",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-dark-hardware.png",
+      "sha256": "bb6ccf43fdbce5ecb80693c575f010d88cc55f9456400eb94c07e7661e995305",
+      "screen": "Hardware",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "studio-1024x768-dark-eval.png",
+      "sha256": "14e60368a7c70d5739da78ea23c90af50ebb8ff84e63798d8712feccecb6a68b",
+      "screen": "Eval",
+      "size": [
+        1024,
+        768
+      ],
+      "appearance": "dark",
+      "input": "pointer click"
+    },
+    {
+      "file": "replay-details-and-tag.png",
+      "sha256": "868cdad0fe58b3cc7636c7b07d592164f76d95422b0423e379783522346f26cd",
+      "kind": "interaction journey"
+    },
+    {
+      "file": "last-signal.png",
+      "sha256": "ee59d3d301f12bcfbd3eef069752546cd4f13b209f97171365633c39980c4877",
+      "kind": "interaction journey"
+    },
+    {
+      "file": "mac-mini-m2-nano.png",
+      "sha256": "b7e124a0715364294bc6033e92c24e055e45fa82487bc6b6a51e83bb1fc703c2",
+      "kind": "Mac-mini original pixels"
+    }
+  ],
+  "journeys": [
+    {
+      "name": "select second Nano episode",
+      "pass": true
+    },
+    {
+      "name": "pause and single-frame step",
+      "pass": true
+    },
+    {
+      "name": "seek to start",
+      "pass": true
+    },
+    {
+      "name": "pointer seek",
+      "pass": true
+    },
+    {
+      "name": "navigation retains episode and position",
+      "pass": true
+    },
+    {
+      "name": "appearance retains current task and details",
+      "pass": true
+    },
+    {
+      "name": "tag episode through UI",
+      "pass": true
+    },
+    {
+      "name": "last signal is reachable",
+      "pass": true
+    },
+    {
+      "name": "cancel transfer form retains episode",
+      "pass": true
+    },
+    {
+      "name": "unconfigured capture has a setup path",
+      "pass": true
+    },
+    {
+      "name": "hardware check returns without recording",
+      "pass": true
+    },
+    {
+      "name": "return from setup to replay",
+      "pass": true
+    }
+  ],
+  "restart": [
+    "dark",
+    "screen",
+    "episode",
+    "time",
+    "tag",
+    "playing"
+  ],
+  "capture_source": {
+    "dorobot-studio": "3e09ff249e83ea7f3c09e7c66acf1f41d5ce7ad5",
+    "dorobot-nexus": "7f87c2e02829a36d8ffe36202508500b7a5200fc"
+  },
+  "cluster": [
+    {
+      "machine": "Mac mini M2 Pro, 32 GB",
+      "os": "macOS 26.4.1",
+      "studio": {
+        "captures": 10,
+        "checks_passed": 12
+      },
+      "nexus": {
+        "captures": 16,
+        "checks_passed": 9
+      },
+      "nano_structure": [
+        27,
+        26,
+        17,
+        134
+      ]
+    },
+    {
+      "machine": "Mac mini M4 Pro, 64 GB",
+      "os": "macOS 15.7.9",
+      "studio": {
+        "captures": 10,
+        "checks_passed": 12
+      },
+      "nexus": {
+        "captures": 16,
+        "checks_passed": 9
+      },
+      "nano_structure": [
+        27,
+        26,
+        17,
+        134
+      ]
+    }
+  ]
+}

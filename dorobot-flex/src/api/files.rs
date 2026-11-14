@@ -705,6 +705,9 @@ impl FileBackend {
 }
 
 impl Backend for FileBackend {
+    fn dataset_id(&self) -> Option<&str> {
+        self.open.as_ref().map(|(id, _)| id.as_str())
+    }
     fn status(&self) -> Option<&str> {
         Some(&self.status)
     }
@@ -1047,6 +1050,21 @@ mod tests {
         let mut b = FileBackend::new(&root);
         assert_eq!(b.playback.episodes[0].tag, Some(Tag::Good));
         assert_eq!(b.playback.episodes[1].tag, Some(Tag::Bad));
+        // A UI relaunch without the original --dataset argument reopens the
+        // actual folder, even when it lives outside the default library.
+        b.dispatch(Intent::SelectEpisode(1));
+        b.dispatch(Intent::Navigate(Screen::Play));
+        let saved = crate::preferences::Session::snapshot(&b, true);
+        let mut reopened = FileBackend::new(root.join("missing-library"));
+        saved.restore(&mut reopened, true);
+        assert_eq!(reopened.playback.selected, Some(1));
+        assert_eq!(reopened.playback.episodes[1].tag, Some(Tag::Bad));
+        assert_eq!(reopened.screen, Screen::Play);
+        assert!(!reopened.playback.is_playing);
+        // An explicit empty/different dataset takes precedence over recovery.
+        let mut explicit = FileBackend::new(root.join("different-library"));
+        saved.restore(&mut explicit, false);
+        assert!(explicit.playback.episodes.is_empty());
         // A failed sidecar publication must not show an unsaved tag.
         fs::create_dir(root.join("meta/dorobot_tags.json.tmp")).unwrap();
         b.dispatch(Intent::TagEpisode {

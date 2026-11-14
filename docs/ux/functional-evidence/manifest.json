@@ -1,0 +1,579 @@
+{
+  "implementation": "6a5cc6b",
+  "host": "Apple M5 Max, macOS 26.6.2",
+  "evaluator": "model-authored; not an independent human review",
+  "captures": [
+    {
+      "file": "recorded/studio-1024x768-dark-eval.png",
+      "kind": "dataset matrix",
+      "sha256": "9f2e7dfe7bd9cdd95b539e1d57bcb6f057c8295552fdb88213dca24a2e30033d",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1024x768-dark-hardware.png",
+      "kind": "dataset matrix",
+      "sha256": "5eb58fe630b9392b4117426af8b6302e02e86681f702f9c236be3c54fd0006c9",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1024x768-dark-library.png",
+      "kind": "dataset matrix",
+      "sha256": "7f1708851b91fb74392e07161356781fe165ce6717bac6bc442a2b3ded6dbba2",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1024x768-dark-play.png",
+      "kind": "dataset matrix, refreshed for speed control",
+      "sha256": "9ab594c8266ed8122a264bfff06768e79dd9a22e59916a89f35943e6aa5d4c61",
+      "size": [
+        2048,
+        1536
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1024x768-dark-record.png",
+      "kind": "dataset matrix",
+      "sha256": "685f02fa9ddc168c6d1a0db55ee267c832e90e54c6f62ce112b9bbe138874a65",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1024x768-light-eval.png",
+      "kind": "dataset matrix",
+      "sha256": "b511ceb7b0c89c29f26ce9a8bf1e78912c1dbc0c5ecdafaaa628a8689c04666b",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1024x768-light-hardware.png",
+      "kind": "dataset matrix",
+      "sha256": "348c3dd81c65328c144a3174e8a835952ae92cf782a8c5eba7abf3ce2326e342",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1024x768-light-library.png",
+      "kind": "dataset matrix",
+      "sha256": "3b5d0ff92906b97713d6377cf700bd9a619ec038e3c5c8801beea108d58ccadd",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1024x768-light-play.png",
+      "kind": "dataset matrix, refreshed for speed control",
+      "sha256": "fc72a0c50666286a834582d82d02bb9f6ddee1037c9ac1f6a378e682ff23171c",
+      "size": [
+        2048,
+        1536
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1024x768-light-record.png",
+      "kind": "dataset matrix",
+      "sha256": "a986c25570704d93851369e95215434cc07d9d6a200854ea01fa1be93bd52422",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-eval.png",
+      "kind": "dataset matrix",
+      "sha256": "ad7c0c477c737b87d46c7672f9e13ee33cf9b5153ec3ab036b78b69034f68103",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-hardware.png",
+      "kind": "dataset matrix",
+      "sha256": "132aa217b85e6cd50ae166ae9061f4981e3f568aeb132a6fdceee46d09d940d7",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-library.png",
+      "kind": "dataset matrix",
+      "sha256": "c3f3f924969ddb72ca154986878c7322605fdc9c46cc2823d94aa7e39f8a5163",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-play.png",
+      "kind": "dataset matrix, refreshed for speed control",
+      "sha256": "f652e98bba79f653aacdf1ce0b7fdecd1d3818cf35581faa6bd90c8b83935d8e",
+      "size": [
+        2880,
+        1800
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-record.png",
+      "kind": "dataset matrix",
+      "sha256": "8e927c2a5d5da48d704b620c0181b314432313a92d8909230b87d5a359dfdd30",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-light-eval.png",
+      "kind": "dataset matrix",
+      "sha256": "cc10748c846e41000c7e4aab8aa9d2b9dcba13a5cc48bdd2a1e6513bb7bacf44",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-light-hardware.png",
+      "kind": "dataset matrix",
+      "sha256": "38d38aac24db5bb35742a012556e57899aa754727557f46d0bf433f29c2d937e",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-light-library.png",
+      "kind": "dataset matrix",
+      "sha256": "a9f684532f36054c62fec74145b910897f4187402fca64583c419c82b1d4823e",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-light-play.png",
+      "kind": "dataset matrix, refreshed for speed control",
+      "sha256": "29733616e06b6c7c2ddd58f3e1fc92be57639837828a9af92d8dd2fe845ec720",
+      "size": [
+        2880,
+        1800
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "recorded/studio-1440x900-light-record.png",
+      "kind": "dataset matrix",
+      "sha256": "51adc8295f16f4d9b1a7d1882d1e92d5c3a7c297a20b71fce0d6a5dd6d122147",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-eval.png",
+      "kind": "simulated matrix",
+      "sha256": "ee5684b2864c2ceea8d8ab8e20fdc4c33f8b35746203ef150b9dd95aaf8d1ae6",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-hardware.png",
+      "kind": "simulated matrix",
+      "sha256": "1deb9bcafda81c5cab144eee59fc87c1c9c475d77a67524a69188edf176c851c",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-library.png",
+      "kind": "simulated matrix",
+      "sha256": "39f661de52e51c390ff08624d5093643b6ed38f5e0ce48ea1b2347191b188be1",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-play.png",
+      "kind": "simulated matrix, refreshed for speed control",
+      "sha256": "f907462f318de8ec22bea0c677a22fc47a4665d89f9573a8a50e8569668d1cf6",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-record.png",
+      "kind": "simulated matrix",
+      "sha256": "eb16caede2cc34e1cdb264b63187507aaf9e119715ddcec5f5639d77224dc095",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-light-eval.png",
+      "kind": "simulated matrix",
+      "sha256": "70417081f85cad0a20ca74c7cfb2f24810f62141346b09477a1a2f7e5a453605",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-light-hardware.png",
+      "kind": "simulated matrix",
+      "sha256": "7245ac41bed0d47c50a57ae1b2eb49985f9374d89af2a02fd1e1b2fd38cc54a8",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-light-library.png",
+      "kind": "simulated matrix",
+      "sha256": "3fbe3f0665d9d89dcee8c8d16b0144102fd4e6a1cfaa17a3be0051199a9dc74c",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-light-play.png",
+      "kind": "simulated matrix, refreshed for speed control",
+      "sha256": "5d8ed203b07e72560e7d45d5183d9932734a5887f5bbc319e7f6768e820194e9",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1024x768-light-record.png",
+      "kind": "simulated matrix",
+      "sha256": "5a68f58bf2daa5158b66289e378080b2e98287901666d85f761ae8e964c33d56",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-eval.png",
+      "kind": "simulated matrix",
+      "sha256": "3956bea3126588b5c96f4bb1cfcbcf76d122aea0cee7e6d04bf09c648d74a8fe",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-hardware.png",
+      "kind": "simulated matrix",
+      "sha256": "eb09ef50cc79a0332a0d53ca16da825d3f04c317d8112a12b0972569c7bda72d",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-library.png",
+      "kind": "simulated matrix",
+      "sha256": "c579b87422656e63ae7dd791028fd7ffacdb9cce6efa170e9338db4cde75ce97",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-play.png",
+      "kind": "simulated matrix, refreshed for speed control",
+      "sha256": "6db9fb26006d8cccef382e6191824c7d1dbb7b7e63e2064bd783620181a6548e",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-record.png",
+      "kind": "simulated matrix",
+      "sha256": "24c59a448de73c27d0934382240d534fef43c9a41f68cfc7f324a1f79c15b548",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-light-eval.png",
+      "kind": "simulated matrix",
+      "sha256": "3fbeedd91a0d3d53a332b09bfc292f8160648f1d50162b4ce22dd7a46ec78b9a",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-light-hardware.png",
+      "kind": "simulated matrix",
+      "sha256": "d94f483611715936cd6ee1972ad2e89b19967587cf24cb50466742832a825efe",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-light-library.png",
+      "kind": "simulated matrix",
+      "sha256": "b1b4e170cbedf38efee3b4dbcb9a41a6a39a8a55620b90da920a5682048bcd04",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-light-play.png",
+      "kind": "simulated matrix, refreshed for speed control",
+      "sha256": "81dbb46f399088a852ec7ec78b11c7820e33cfbb55bf34aa15bfcd37677cc087",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated/studio-1440x900-light-record.png",
+      "kind": "simulated matrix",
+      "sha256": "092a48b800574f7f64bbcfde2b6a1d2c82bafb6f09efa406866199050b32e2ed",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "workflow/before-restart.png",
+      "kind": "workflow",
+      "sha256": "35c1ba1870efdc8602851980551437dd62335cfe11ec4e2b1ea4dafe48328f2f",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "workflow/custom-layout.png",
+      "kind": "workflow",
+      "sha256": "a34d72682efe6fc60e514c789eb97c3a2a798d98435b433dd356d0fb08e35d3a",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "workflow/native-replay-window.png",
+      "kind": "workflow",
+      "sha256": "0d4714fa6d2bc81b5dce4f91810d177a43df54d3ecb9bc724a77deb478a0ade7",
+      "size": [
+        1280,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "workflow/unconfigured-recording.png",
+      "kind": "workflow",
+      "sha256": "02b5ec8ab28a80fb908f71a734bb72df993e8b5cbba99eb72bc3aa100fd99484",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "layout/all-panels-closed.png",
+      "kind": "layout",
+      "sha256": "69c501e3ea759432b793d125949fb9a1ad48d156d2a9d44447a322cc7712037c",
+      "size": [
+        1440,
+        900
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "layout/compact-details-dark.png",
+      "kind": "layout",
+      "sha256": "351481a01ff8e2c4d06bba740dbf7dbdd5a883afa58720b3a864e81e959a96b7",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "layout/compact-details-light.png",
+      "kind": "layout",
+      "sha256": "79f1780c31b15d37531f1e936581ab53252cca1f6968cf699b01e67181b31199",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "layout/compact-last-signal.png",
+      "kind": "layout",
+      "sha256": "9806c4bcf1dddd1ba595f6aaf7229bca6e65ee1d1574075b88bb79d0fd343050",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "restart/restored-layout.png",
+      "kind": "restart",
+      "sha256": "9564899e78dcb521da20d84610752c04510b6a34691c938b4a491058d30a309c",
+      "size": [
+        3024,
+        1804
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated-workflow/simulated-calibration.png",
+      "kind": "simulated-workflow",
+      "sha256": "f15799b7eb6503a73a5f576c19719bc7f15f5de54b0c5d62b85518979731126f",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated-workflow/simulated-evaluation-stopped.png",
+      "kind": "simulated-workflow",
+      "sha256": "f4dae8571b70446cc96029d73b6b5efa9441ed3a8ca2da1b08e96fd09410c92f",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "simulated-workflow/simulated-take-review.png",
+      "kind": "simulated-workflow",
+      "sha256": "49390781463d51534187d8a5ada1679d529d64b38db85d09f09954dbe66a51df",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "compact/compact-calibration-actions.png",
+      "kind": "simulated compact flow",
+      "sha256": "de643e6e41ec5f25c9b04196a18ef8fa2b47ba0f6aab89908cb1f9776e953204",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "compact/compact-evaluation-last-trace.png",
+      "kind": "simulated compact flow",
+      "sha256": "6110b16a74267b7e3c0db0502d2a0264be10bcf7e4cf3b5b9bd658ce794f9e3c",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "iterations/round-1.png",
+      "kind": "rejected round 1",
+      "sha256": "54a4c3ee8b0f6d53c7eace0016a9da954b43ac322c01fe9c7ed3ac8c3dca0985",
+      "size": [
+        1536,
+        1024
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "iterations/round-3-record.png",
+      "kind": "rejected configured-flow review",
+      "sha256": "162bd55ae6e75d705136c8ab4d82538e6e09592a97c163ea02244c683b08636d",
+      "size": [
+        1024,
+        768
+      ],
+      "pixels": "original, unmodified"
+    },
+    {
+      "file": "speed/shared-speed-control.png",
+      "kind": "speed",
+      "sha256": "7f2a6967ca6c2341d2a59ed22abe43211de2ea5088bcb234834b25f3fc60841a",
+      "size": [
+        3024,
+        1802
+      ],
+      "pixels": "original, unmodified"
+    }
+  ],
+  "checks": 52,
+  "capture_notes": "Replay matrices, speed and restart captures were refreshed after the speed control addition. Earlier interaction captures document their passed workflows before that control was added; iteration captures show rejected states."
+}

@@ -23,35 +23,35 @@ script_mod! {
     // lift (raised), with edge for hairlines; see `dorobot_ux::tokens::pal`.
 
     // Ground everything sits on — ux void.
-    mod.widgets.shell.BG_CONTENT_L = #xF2F0ED
-    mod.widgets.shell.BG_CONTENT_D = #x0A0908
+    mod.widgets.shell.BG_CONTENT_L = #xF2F2F7
+    mod.widgets.shell.BG_CONTENT_D = #x000000
 
     // Chrome surfaces — ux deep.
-    mod.widgets.shell.BG_HEADER_L = #xFBFAF8
-    mod.widgets.shell.BG_HEADER_D = #x141312
-    mod.widgets.shell.BG_PANEL_L = #xFBFAF8
-    mod.widgets.shell.BG_PANEL_D = #x141312
-    mod.widgets.shell.BG_FOOTER_L = #xFBFAF8
-    mod.widgets.shell.BG_FOOTER_D = #x141312
+    mod.widgets.shell.BG_HEADER_L = #xFFFFFF
+    mod.widgets.shell.BG_HEADER_D = #x1C1C1E
+    mod.widgets.shell.BG_PANEL_L = #xFFFFFF
+    mod.widgets.shell.BG_PANEL_D = #x1C1C1E
+    mod.widgets.shell.BG_FOOTER_L = #xFFFFFF
+    mod.widgets.shell.BG_FOOTER_D = #x1C1C1E
 
     // Raised surfaces — ux lift. The sidebar and a panel's title bar sit a
     // step above the surface they belong to.
     mod.widgets.shell.BG_SIDEBAR_L = #xFFFFFF
-    mod.widgets.shell.BG_SIDEBAR_D = #x1B1917
+    mod.widgets.shell.BG_SIDEBAR_D = #x2C2C2E
     mod.widgets.shell.BG_PANEL_TITLE_L = #xFFFFFF
-    mod.widgets.shell.BG_PANEL_TITLE_D = #x1B1917
+    mod.widgets.shell.BG_PANEL_TITLE_D = #x2C2C2E
 
     // Hairlines — ux edge.
-    mod.widgets.shell.BORDER_L = #xD8D4CF
-    mod.widgets.shell.BORDER_D = #x2A2725
+    mod.widgets.shell.BORDER_L = #xD1D1D6
+    mod.widgets.shell.BORDER_D = #x38383A
 
     // Type — ux ink and dim.
-    mod.widgets.shell.TEXT_L = #x161413
-    mod.widgets.shell.TEXT_D = #xF2F0EC
-    mod.widgets.shell.TEXT_DIM_L = #x5E564E
-    mod.widgets.shell.TEXT_DIM_D = #x94877F
+    mod.widgets.shell.TEXT_L = #x1C1C1E
+    mod.widgets.shell.TEXT_D = #xF5F5F7
+    mod.widgets.shell.TEXT_DIM_L = #x636366
+    mod.widgets.shell.TEXT_DIM_D = #xAEAEB2
 
-    // Accent — ux vio, the one warm signal colour.
-    mod.widgets.shell.ACCENT_L = #xD15010
-    mod.widgets.shell.ACCENT_D = #xEF6F2E
+    // Accent — ux vio, the iOS blue accent.
+    mod.widgets.shell.ACCENT_L = #x007AFF
+    mod.widgets.shell.ACCENT_D = #x0A84FF
 }

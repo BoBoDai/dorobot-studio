@@ -20,7 +20,7 @@ script_mod! {
         flow: Down
         cursor: MouseCursor.Hand
 
-        head := mod.widgets.ux.PanelHead{ title +: { text: "dataset" } }
+        head := mod.widgets.ux.PanelHead{visible: false title +: { text: "dataset" } }
 
         thumb := View{
             width: Fill
@@ -32,17 +32,17 @@ script_mod! {
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     // placeholder preview: soft vertical gradient + camera glyph
-                    let top = mix(#x2A2725, #xF2F0ED, self.light)
-                    let bot = mix(#x2A2725, #xE8E5E1, self.light)
+                    let top = mix(#x38383A, #xF2F2F7, self.light)
+                    let bot = mix(#x38383A, #xE5E5EA, self.light)
                     let g = mix(top, bot, self.pos.y)
                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 0.5)
                     sdf.fill(g)
                     let cx0 = self.rect_size.x * 0.5
                     let cy0 = self.rect_size.y * 0.5
                     sdf.box(cx0 - 15.0, cy0 - 10.0, 30.0, 20.0, 3.0)
-                    sdf.stroke(mix(#x6B625B, #xD8D4CF, self.light), 1.2)
+                    sdf.stroke(mix(#xAEAEB2, #x636366, self.light), 1.2)
                     sdf.circle(cx0, cy0, 5.5)
-                    sdf.stroke(mix(#x6B625B, #xD8D4CF, self.light), 1.2)
+                    sdf.stroke(mix(#xAEAEB2, #x636366, self.light), 1.2)
                     return sdf.result
                 }
             }
@@ -60,7 +60,7 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.FONT_MEDIUM{font_size: 13.5}
-                    get_color: fn() { return mix(#xE8E5E1, #x2A2725, self.light) }
+                    get_color: fn() { return mix(#xE5E5EA, #x38383A, self.light) }
                 }
             }
             meta := Label{
@@ -68,7 +68,7 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_META{}
-                    get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                    get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                 }
             }
             chips := View{
@@ -112,10 +112,10 @@ script_mod! {
                 border_radius: 0.0
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                    sdf.fill_keep(mix(#x2A2725, #xF2F0ED, self.light))
-                    sdf.stroke(mix(#x2A2725, #xE8E5E1, self.light), 1.0)
-                    let c = mix(#xD8D4CF, #x5E564E, self.light)
+                    sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                    sdf.fill_keep(mix(#x38383A, #xF2F2F7, self.light))
+                    sdf.stroke(mix(#x38383A, #xE5E5EA, self.light), 1.0)
+                    let c = mix(#xD1D1D6, #x636366, self.light)
                     if self.kind < 0.5 {
                         // robot arm
                         sdf.box(11.0, 27.0, 18.0, 4.0, 1.0) sdf.fill(c)
@@ -139,7 +139,7 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_BODY{}
-                    get_color: fn() { return mix(#xE8E5E1, #x2A2725, self.light) }
+                    get_color: fn() { return mix(#xE5E5EA, #x38383A, self.light) }
                 }
             }
             dev_detail := Label{
@@ -147,7 +147,7 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_META{}
-                    get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+                    get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
                 }
             }
         }
@@ -159,7 +159,7 @@ script_mod! {
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.circle(5.0, 5.0, 4.0)
-                    sdf.fill(mix(#x7A7169, #x3E7A4A, self.online))
+                    sdf.fill(mix(#x8E8E93, #x248A3D, self.online))
                     return sdf.result
                 }
             }
@@ -181,8 +181,8 @@ script_mod! {
                 light: instance(0.0)
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    let d = mix(#x6B625B, #x2A2725, self.pos.y)
-                    let l = mix(#xF2F0ED, #xE8E5E1, self.pos.y)
+                    let d = mix(#x8E8E93, #x38383A, self.pos.y)
+                    let l = mix(#xF2F2F7, #xE5E5EA, self.pos.y)
                     sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 0.5)
                     sdf.fill(mix(d, l, self.light))
                     return sdf.result
@@ -196,7 +196,7 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_BODY{}
-                    get_color: fn() { return mix(#xE8E5E1, #x2A2725, self.light) }
+                    get_color: fn() { return mix(#xE5E5EA, #x38383A, self.light) }
                 }
             }
             sdataset := Label{
@@ -204,7 +204,7 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_META{}
-                    get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                    get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                 }
             }
             sstate := mod.widgets.ux.Chip{
@@ -224,7 +224,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x141312, #xFBFAF8, self.light) }
+            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
         }
 
         left_col := View{
@@ -235,7 +235,7 @@ script_mod! {
 
             header := View{
                 width: Fill height: Fit
-                flow: Right
+                flow: Flow.Right{wrap: true}
                 align: Align{y: 0.5}
                 spacing: 12.0
                 padding: Inset{left: 4., bottom: 2.}
@@ -245,21 +245,21 @@ script_mod! {
                     draw_text +: {
                         light: instance(0.0)
                         text_style: mod.widgets.ux.TEXT_H1{}
-                        get_color: fn() { return mix(#xE8E5E1, #x1B1917, self.light) }
+                        get_color: fn() { return mix(#xE5E5EA, #x2C2C2E, self.light) }
                     }
                 }
                 Filler{}
                 btn_new := Button{
-                    text: "+  New Recording Session"
+                    text: "New recording"
                     padding: Inset{left: 18. right: 18. top: 11. bottom: 11.}
                     draw_bg +: {
                         border_radius: 0.0
                         pixel: fn() {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            let base = #xD15010
-                            let c = mix(base, #xD15010, self.hover)
-                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                            sdf.fill(mix(c, #xEF6F2E, self.down))
+                            let base = #x007AFF
+                            let c = mix(base, #x007AFF, self.hover)
+                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                            sdf.fill(mix(c, #x0A84FF, self.down))
                             return sdf.result
                         }
                     }
@@ -270,7 +270,7 @@ script_mod! {
                         text_style: mod.widgets.ux.TEXT_BODY{}
                     }
                 }
-                btn_open := Button{ text: "Open folder…" }
+                btn_open := mod.widgets.nx.NxBtn{ text: "Open folder…" }
                 btn_pull := Button{
                     text: "Pull from Hub"
                     padding: Inset{left: 18. right: 18. top: 11. bottom: 11.}
@@ -279,23 +279,27 @@ script_mod! {
                         border_radius: 0.0
                         pixel: fn() {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                            let idle = mix(#x1B1917, #xFFFFFF, self.light)
-                            let hov = mix(#x2A2725, #xF2F0ED, self.light)
+                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                            let idle = mix(#x2C2C2E, #xFFFFFF, self.light)
+                            let hov = mix(#x38383A, #xF2F2F7, self.light)
                             sdf.fill_keep(mix(idle, hov, self.hover))
-                            sdf.stroke(mix(#x2A2725, #xD8D4CF, self.light), 1.0)
+                            sdf.stroke(mix(#x38383A, #xD1D1D6, self.light), 1.0)
                             return sdf.result
                         }
                     }
                     draw_text +: {
                         light: instance(0.0)
                         text_style: mod.widgets.ux.TEXT_BODY{}
-                        get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
+                        get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
                     }
                 }
             }
 
+            no_datasets := Label{visible: false width: Fill height: Fit
+                text: "Open a dataset folder to review recordings, or choose New recording to set up a robot."
+                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}} }
             grid := mod.widgets.ux.Card{
+                show_bg: false
                 width: Fill
                 height: Fit
                 flow: Down
@@ -327,11 +331,11 @@ script_mod! {
                     btn_max +: { visible: false }
                     btn_close +: { visible: false }
                     view_all := Label{
-                        text: "View all"
+                        text: ""
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_BODY{}
-                            get_color: fn() { return mix(#xD15010, #xEF6F2E, self.light) }
+                            get_color: fn() { return mix(#x007AFF, #x0A84FF, self.light) }
                         }
                     }
                 }
@@ -346,6 +350,7 @@ script_mod! {
         }
 
         hardware_rail := mod.widgets.ux.Card{
+            visible: false
             width: 306
             height: Fill
             flow: Down
@@ -370,8 +375,8 @@ script_mod! {
                             hover: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_BODY{}
                             get_color: fn() {
-                                let base = mix(#xD15010, #xEF6F2E, self.light)
-                                return mix(base, mix(#xD15010, #xEF6F2E, self.light), self.hover)
+                                let base = mix(#x007AFF, #x0A84FF, self.light)
+                                return mix(base, mix(#x007AFF, #x0A84FF, self.light), self.hover)
                             }
                         }
                     }
@@ -460,6 +465,10 @@ impl LibraryScreenRef {
             return;
         };
         let root = &mut inner.view;
+        root.widget(cx, ids!(left_col.no_datasets))
+            .set_visible(cx, state.datasets.is_empty());
+        root.widget(cx, ids!(left_col.recent))
+            .set_visible(cx, !state.sessions.is_empty());
 
         // Static chrome: page background, panels, headers, links.
         script_apply_eval!(cx, root, { draw_bg +: { light: #(light) } });
@@ -469,6 +478,7 @@ impl LibraryScreenRef {
             &[
                 (ids!(left_col.header.page_title), Themed::Text),
                 (ids!(left_col.header.btn_new), Themed::Both),
+                (ids!(left_col.header.btn_open), Themed::Both),
                 (ids!(left_col.header.btn_pull), Themed::Both),
                 (ids!(left_col.grid), Themed::Bg),
                 (ids!(left_col.recent), Themed::Bg),

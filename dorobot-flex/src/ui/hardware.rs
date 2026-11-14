@@ -4,12 +4,11 @@
 //! `makepad_urdf_player::RobotView` mounts once a rig profile supplies a URDF;
 //! until then it renders an empty viewport so the screen is still verifiable.
 
-use makepad_app_shell::grid::panel_grid::PanelGridWidgetExt;
-use makepad_app_shell::grid::LayoutState;
+use super::flex_layout::FlexPanelsWidgetExt;
 use makepad_widgets::*;
 
 use crate::api::{HardwareState, Intent, JointProgress, StepState};
-use crate::ui::frame::{apply_light, apply_light_in, theme_panel_head, Themed};
+use crate::ui::frame::{apply_light, apply_light_in, Themed};
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -36,10 +35,10 @@ script_mod! {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     let active = step(0.5, self.state) * (1.0 - step(1.5, self.state))
                     let done = step(1.5, self.state)
-                    let idle_ring = mix(#x2A2725, #xD8D4CF, self.light)
-                    let ring = mix(idle_ring, #xD15010, active + done)
-                    let base = mix(#x141312, #xFFFFFF, self.light)
-                    let fill = mix(base, #xD15010, active)
+                    let idle_ring = mix(#x38383A, #xD1D1D6, self.light)
+                    let ring = mix(idle_ring, #x007AFF, active + done)
+                    let base = mix(#x1C1C1E, #xFFFFFF, self.light)
+                    let fill = mix(base, #x007AFF, active)
                     sdf.circle(13.0, 13.0, 11.5)
                     sdf.fill_keep(fill)
                     sdf.stroke(ring, 1.6)
@@ -47,7 +46,7 @@ script_mod! {
                     sdf.move_to(7.5, 13.2)
                     sdf.line_to(11.4, 17.0)
                     sdf.line_to(18.5, 9.4)
-                    sdf.stroke(mix(#x00000000, #x3E7A4A, done), 2.0)
+                    sdf.stroke(mix(#x00000000, #x248A3D, done), 2.0)
                     return sdf.result
                 }
             }
@@ -59,7 +58,7 @@ script_mod! {
                     text_style: mod.widgets.ux.TEXT_CHIP{}
                     get_color: fn() {
                         let active = step(0.5, self.state) * (1.0 - step(1.5, self.state))
-                        let idle = mix(#xD8D4CF, #x7A7169, self.light)
+                        let idle = mix(#xD1D1D6, #x8E8E93, self.light)
                         return mix(idle, #xFFFFFF, active)
                     }
                 }
@@ -74,9 +73,9 @@ script_mod! {
                 get_color: fn() {
                     let active = step(0.5, self.state) * (1.0 - step(1.5, self.state))
                     let done = step(1.5, self.state)
-                    let pending = mix(#x7A7169, #xD8D4CF, self.light)
-                    let fin = mix(#xD8D4CF, #x2A2725, self.light)
-                    let acc = mix(#xD15010, #xEF6F2E, self.light)
+                    let pending = mix(#xAEAEB2, #x636366, self.light)
+                    let fin = mix(#xD1D1D6, #x38383A, self.light)
+                    let acc = mix(#x007AFF, #x0A84FF, self.light)
                     return mix(mix(pending, fin, done), acc, active)
                 }
             }
@@ -85,14 +84,14 @@ script_mod! {
 
     let StepLine = View{
         width: Fill height: 1
-        margin: Inset{left: 12. right: 12.}
+        margin: Inset{left: 6. right: 6.}
         show_bg: true
         draw_bg +: {
             done: instance(0.0)
             light: instance(0.0)
             pixel: fn() {
-                let idle = mix(#x2A2725, #xE8E5E1, self.light)
-                return mix(idle, #xD15010, self.done)
+                let idle = mix(#x38383A, #xE5E5EA, self.light)
+                return mix(idle, #x007AFF, self.done)
             }
         }
     }
@@ -109,8 +108,8 @@ script_mod! {
             light: instance(0.0)
             pixel: fn() {
                 // hairline separator on the bottom edge
-                let base = mix(#x1B1917, #xFFFFFF, self.light)
-                let sep = mix(#x2A2725, #xF2F0ED, self.light)
+                let base = mix(#x2C2C2E, #xFFFFFF, self.light)
+                let sep = mix(#x38383A, #xF2F2F7, self.light)
                 let t = step(self.rect_size.y - 1.0, self.pos.y * self.rect_size.y)
                 return mix(base, sep, t)
             }
@@ -124,15 +123,15 @@ script_mod! {
                 light: instance(0.0)
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    let empty = mix(#x141312, #xFFFFFF, self.light)
-                    let ring = mix(mix(#x6B625B, #xD8D4CF, self.light), #x3E7A4A, self.done)
+                    let empty = mix(#x1C1C1E, #xFFFFFF, self.light)
+                    let ring = mix(mix(#xAEAEB2, #x636366, self.light), #x248A3D, self.done)
                     sdf.circle(11.0, 11.0, 9.0)
-                    sdf.fill_keep(mix(empty, #x6FAB78, self.done))
+                    sdf.fill_keep(mix(empty, #x30D158, self.done))
                     sdf.stroke(ring, 1.4)
                     sdf.move_to(6.5, 11.2)
                     sdf.line_to(9.7, 14.4)
                     sdf.line_to(15.4, 7.8)
-                    sdf.stroke(mix(#x00000000, #x3E7A4A, self.done), 1.8)
+                    sdf.stroke(mix(#x00000000, #x248A3D, self.done), 1.8)
                     return sdf.result
                 }
             }
@@ -142,16 +141,16 @@ script_mod! {
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
-                get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+                get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
             }
         }
         jname := Label{
-            width: 132
+            width: 112 max_lines: 1 text_overflow: Ellipsis
             text: "joint"
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_BODY{}
-                get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
+                get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
             }
         }
         bar := View{
@@ -164,26 +163,26 @@ script_mod! {
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     sdf.box(0.0, 3.0, self.rect_size.x, 6.0, 3.0)
-                    sdf.fill(mix(#x2A2725, #xE8E5E1, self.light))
+                    sdf.fill(mix(#x38383A, #xE5E5EA, self.light))
                     // swept portion, centred like a range sweep
                     let w = self.rect_size.x * self.frac
                     let x0 = (self.rect_size.x - w) * 0.5
                     sdf.box(x0, 3.0, w, 6.0, 3.0)
-                    sdf.fill(mix(#xD15010, #x3E7A4A, self.done))
+                    sdf.fill(mix(#x007AFF, #x248A3D, self.done))
                     return sdf.result
                 }
             }
         }
         readout := Label{
-            width: 152
+            width: 104 max_lines: 1 text_overflow: Ellipsis
             text: ""
             draw_text +: {
                 warn: instance(0.0)
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
-                    let normal = mix(#xD8D4CF, #x7A7169, self.light)
-                    let alert = mix(#xB07514, #xF0A330, self.light)
+                    let normal = mix(#xD1D1D6, #x8E8E93, self.light)
+                    let alert = mix(#xFF9F0A, #x996300, self.light)
                     return mix(normal, alert, self.warn)
                 }
             }
@@ -200,7 +199,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x141312, #xFBFAF8, self.light) }
+            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
         }
 
         stepper := View{
@@ -223,34 +222,35 @@ script_mod! {
         // owns the layout, so they drag, resize, maximise and persist.
         // Each Card keeps its body verbatim inside the slot — its own
         // walk and its children's are what lay the contents out.
-        content := PanelGrid{
-            width: Fill height: Fill
-            window_container +: {
-                row1 +: {
-                    s1_1 +: {
-                        title: "live mirror"
-                        content +: {
-                    mirror := View{
+        layout_tools := View{width: Fill height: 44 flow: Right spacing: 8.0
+            hardware_reset := Button{height: 44 text: "Restore panels"}
+            Label{width: Fill text: "Drag panel titles to arrange · drag dividers to resize"
+                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+        }
+        content := FlexPanels{panel_count: 2 persistence_key: "hardware-layout.json"
+            robot_panel := StudioPanel{head +: {title +: {text: "Live mirror"}}
+                content := View{width: Fill height: Fill mirror := View{
                         width: Fill height: Fill
                         flow: Down
                         // The real renderer, which brings its own studio gradient with
                         // it. This was a shader drawing a perspective grid with
                         // "RobotView mounts here" written across it.
-                        viewport := RobotView{ width: Fill height: Fill }
-                    }
-                        }
-                    }
-                    s1_2 +: {
-                        title: "Joint calibration"
-                        content +: {
-                    calib := View{
-                        width: 660 height: Fill
+                        viewport := RobotView{
+                        keyboard_controls: false width: Fill height: Fill
+                        sky_horizon: mod.theme.color_bg_app sky_zenith: mod.theme.color_bg_app
+                        ground_color: mod.theme.color_bg_container ground2_color: mod.theme.color_bg_container
+                        grid_color: mod.theme.color_text_disabled }
+                    }}
+            }
+            camera_a_panel := StudioPanel{head +: {title +: {text: "Joint calibration"}}
+                content := View{width: Fill height: Fill calib := ScrollYView{
+                        width: Fill height: Fill
                         flow: Down
 
                         banner := RoundedView{
-                            width: Fill height: 84
+                            width: Fill height: Fit
                             margin: Inset{left: 12. right: 12. top: 12.}
-                            padding: Inset{left: 18. right: 18.}
+                            padding: Inset{left: 12. right: 12. top: 12. bottom: 12.}
                             flow: Right
                             align: Align{y: 0.5}
                             spacing: 16.0
@@ -262,8 +262,8 @@ script_mod! {
                                 pixel: fn() {
                                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                                     sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                                    sdf.fill_keep(mix(#x1B1917, #xFBFAF8, self.light))
-                                    sdf.stroke(mix(#x2A2725, #xE8E5E1, self.light), 1.0)
+                                    sdf.fill_keep(mix(#x2C2C2E, #xFFFFFF, self.light))
+                                    sdf.stroke(mix(#x38383A, #xE5E5EA, self.light), 1.0)
                                     return sdf.result
                                 }
                             }
@@ -282,7 +282,7 @@ script_mod! {
                                         // angle from 12 o'clock, clockwise, 0..1
                                         let a = fract(atan2(p.x, -p.y) / 6.2831853 + 1.0)
                                         let on = 1.0 - step(self.frac, a)
-                                        let track = mix(mix(#x2A2725, #xE8E5E1, self.light), #x3E7A4A, on)
+                                        let track = mix(mix(#x38383A, #xE5E5EA, self.light), #x248A3D, on)
                                         return mix(#x00000000, track, band)
                                     }
                                 }
@@ -291,7 +291,7 @@ script_mod! {
                                     draw_text +: {
                                         light: instance(0.0)
                                         text_style: mod.widgets.ux.TEXT_TITLE{}
-                                        get_color: fn() { return mix(#xE8E5E1, #x2A2725, self.light) }
+                                        get_color: fn() { return mix(#xE5E5EA, #x38383A, self.light) }
                                     }
                                 }
                             }
@@ -303,12 +303,12 @@ script_mod! {
                                     draw_text +: {
                                         light: instance(0.0)
                                         text_style: mod.widgets.ux.TEXT_TITLE{}
-                                        get_color: fn() { return mix(#xE8E5E1, #x2A2725, self.light) }
+                                        get_color: fn() { return mix(#xE5E5EA, #x38383A, self.light) }
                                     }
                                 }
                                 subline := Label{
                                     text: "0/0 joints complete"
-                                    draw_text +: { color: #xD8D4CF text_style: mod.widgets.ux.TEXT_META{} }
+                                    draw_text +: { color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{} }
                                 }
                             }
                         }
@@ -342,17 +342,17 @@ script_mod! {
                                     pixel: fn() {
                                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                                         sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                                        let idle = mix(#x1B1917, #xFFFFFF, self.light)
-                                        let hov = mix(#x2A2725, #xF2F0ED, self.light)
+                                        let idle = mix(#x2C2C2E, #xFFFFFF, self.light)
+                                        let hov = mix(#x38383A, #xF2F2F7, self.light)
                                         sdf.fill_keep(mix(idle, hov, self.hover))
-                                        sdf.stroke(mix(#x2A2725, #xD8D4CF, self.light), 1.0)
+                                        sdf.stroke(mix(#x38383A, #xD1D1D6, self.light), 1.0)
                                         return sdf.result
                                     }
                                 }
                                 draw_text +: {
                                     light: instance(0.0)
                                     text_style: mod.widgets.ux.TEXT_BODY{}
-                                    get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
+                                    get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
                                 }
                             }
                             btn_continue := Button{
@@ -363,10 +363,10 @@ script_mod! {
                                     light: instance(0.0)
                                     pixel: fn() {
                                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                                        let off = mix(#x2A2725, #xE8E5E1, self.light)
-                                        let live = mix(off, #xD15010, self.enabled_f)
+                                        let off = mix(#x38383A, #xE5E5EA, self.light)
+                                        let live = mix(off, #x007AFF, self.enabled_f)
                                         sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                                        sdf.fill(mix(live, #xD15010, self.hover * self.enabled_f))
+                                        sdf.fill(mix(live, #x007AFF, self.hover * self.enabled_f))
                                         return sdf.result
                                     }
                                 }
@@ -375,25 +375,13 @@ script_mod! {
                                     light: instance(0.0)
                                     text_style: mod.widgets.ux.TEXT_BODY{}
                                     get_color: fn() {
-                                        let off = mix(#x7A7169, #xD8D4CF, self.light)
+                                        let off = mix(#xAEAEB2, #x636366, self.light)
                                         return mix(off, #xFFFFFF, self.enabled_f)
                                     }
                                 }
                             }
                         }
-                    }
-                        }
-                    }
-                    s1_3 +: { visible: false width: 0 height: 0 }
-                    s1_4 +: { visible: false width: 0 height: 0 }
-                    s1_5 +: { visible: false width: 0 height: 0 }
-                    s1_6 +: { visible: false width: 0 height: 0 }
-                    s1_7 +: { visible: false width: 0 height: 0 }
-                    s1_8 +: { visible: false width: 0 height: 0 }
-                    s1_9 +: { visible: false width: 0 height: 0 }
-                }
-                row2 +: { visible: false height: 0 }
-                row3 +: { visible: false height: 0 }
+                    }}
             }
         }
     }
@@ -406,37 +394,17 @@ pub struct HardwareScreen {
     /// Model currently mounted in the mirror, so it is opened once.
     #[rust]
     loaded_urdf: Option<(std::path::PathBuf, std::path::PathBuf)>,
-    /// Seed the grid's layout once; after that the grid owns it, so a user's
-    /// drag survives the next repaint.
-    #[rust]
-    layout_seeded: bool,
 }
 
 impl Widget for HardwareScreen {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        self.view.handle_event(cx, event, scope);
+        let actions = cx.capture_actions(|cx| self.view.handle_event(cx, event, scope));
+        if self.view.button(cx, ids!(hardware_reset)).clicked(&actions) {
+            self.view.flex_panels(cx, ids!(content)).reset(cx);
+        }
+        cx.extend_actions(actions);
     }
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        // Panel titles live in the grid's layout state, not the DSL `title:`,
-        // which the grid overwrites from that state on its first layout pass.
-        if !self.layout_seeded {
-            let grid = self.view.panel_grid(cx, ids!(content));
-            if !grid.is_empty() {
-                let mut layout = LayoutState::with_panel_count(2);
-                layout.row_assignments =
-                    vec![vec!["panel_0".into(), "panel_1".into()], vec![], vec![]];
-                layout.visible_panels = ["panel_0", "panel_1"]
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect();
-                for (id, title) in [("panel_0", "live mirror"), ("panel_1", "Joint calibration")] {
-                    layout.panel_titles.insert(id.into(), title.into());
-                }
-                grid.set_layout_state(cx, layout);
-                self.layout_seeded = true;
-            }
-        }
-
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -455,12 +423,12 @@ const LINE_IDS: [&[LiveId]; 4] = [
     ids!(stepper.line_3),
 ];
 const JOINT_IDS: [&[LiveId]; 6] = [
-    ids!(content.s1_2.content.calib.rows.joint_0),
-    ids!(content.s1_2.content.calib.rows.joint_1),
-    ids!(content.s1_2.content.calib.rows.joint_2),
-    ids!(content.s1_2.content.calib.rows.joint_3),
-    ids!(content.s1_2.content.calib.rows.joint_4),
-    ids!(content.s1_2.content.calib.rows.joint_5),
+    ids!(content.camera_a_panel.content.calib.rows.joint_0),
+    ids!(content.camera_a_panel.content.calib.rows.joint_1),
+    ids!(content.camera_a_panel.content.calib.rows.joint_2),
+    ids!(content.camera_a_panel.content.calib.rows.joint_3),
+    ids!(content.camera_a_panel.content.calib.rows.joint_4),
+    ids!(content.camera_a_panel.content.calib.rows.joint_5),
 ];
 
 impl HardwareScreenRef {
@@ -476,10 +444,19 @@ impl HardwareScreenRef {
         }
         let root = &mut inner.view;
 
+        root.label(cx, ids!(content.robot_panel.head.title))
+            .set_text(
+                cx,
+                if state.live_angles.is_empty() {
+                    "Reference pose · no live data"
+                } else {
+                    "Live mirror"
+                },
+            );
         // The mirror renders the robot itself, so the model is opened once and
         // then only posed. With no arm attached there are no live angles yet,
         // and it simply sits at its rest pose.
-        let viewer = root.widget(cx, ids!(content.s1_1.content.mirror.viewport));
+        let viewer = root.widget(cx, ids!(content.robot_panel.content.mirror.viewport));
         if need_load {
             if let (Some((urdf, assets)), Some(mut rv)) = (
                 want.as_ref(),
@@ -502,26 +479,40 @@ impl HardwareScreenRef {
             cx,
             root,
             &[
-                (ids!(content.s1_2.content.calib.banner), Themed::Bg),
-                (ids!(content.s1_2.content.calib.banner.ring), Themed::Bg),
                 (
-                    ids!(content.s1_2.content.calib.banner.ring.ring_text),
+                    ids!(content.camera_a_panel.content.calib.banner),
+                    Themed::Bg,
+                ),
+                (
+                    ids!(content.camera_a_panel.content.calib.banner.ring),
+                    Themed::Bg,
+                ),
+                (
+                    ids!(content.camera_a_panel.content.calib.banner.ring.ring_text),
                     Themed::Text,
                 ),
                 (
-                    ids!(content.s1_2.content.calib.banner.btext.instruction),
+                    ids!(
+                        content
+                            .camera_a_panel
+                            .content
+                            .calib
+                            .banner
+                            .btext
+                            .instruction
+                    ),
                     Themed::Text,
                 ),
                 (
-                    ids!(content.s1_2.content.calib.banner.btext.subline),
+                    ids!(content.camera_a_panel.content.calib.banner.btext.subline),
                     Themed::Text,
                 ),
                 (
-                    ids!(content.s1_2.content.calib.actions.btn_restart),
+                    ids!(content.camera_a_panel.content.calib.actions.btn_restart),
                     Themed::Both,
                 ),
                 (
-                    ids!(content.s1_2.content.calib.actions.btn_continue),
+                    ids!(content.camera_a_panel.content.calib.actions.btn_continue),
                     Themed::Both,
                 ),
             ],
@@ -602,14 +593,28 @@ impl HardwareScreenRef {
         };
         root.label(
             cx,
-            ids!(content.s1_2.content.calib.banner.btext.instruction),
+            ids!(
+                content
+                    .camera_a_panel
+                    .content
+                    .calib
+                    .banner
+                    .btext
+                    .instruction
+            ),
         )
         .set_text(cx, &state.instruction);
-        root.label(cx, ids!(content.s1_2.content.calib.banner.btext.subline))
-            .set_text(cx, &format!("{}/{} joints complete", done_n, total));
-        root.label(cx, ids!(content.s1_2.content.calib.banner.ring.ring_text))
-            .set_text(cx, &format!("{}/{}", done_n, total));
-        let mut ring = root.widget(cx, ids!(content.s1_2.content.calib.banner.ring));
+        root.label(
+            cx,
+            ids!(content.camera_a_panel.content.calib.banner.btext.subline),
+        )
+        .set_text(cx, &format!("{}/{} joints complete", done_n, total));
+        root.label(
+            cx,
+            ids!(content.camera_a_panel.content.calib.banner.ring.ring_text),
+        )
+        .set_text(cx, &format!("{}/{}", done_n, total));
+        let mut ring = root.widget(cx, ids!(content.camera_a_panel.content.calib.banner.ring));
         script_apply_eval!(cx, ring, { draw_bg +: { frac: #(frac) } });
 
         // ---- joint rows ----------------------------------------------------
@@ -664,9 +669,15 @@ impl HardwareScreenRef {
 
         // ---- continue gate --------------------------------------------------
         let enabled = if state.can_continue() { 1.0 } else { 0.0 };
-        let btn = root.button(cx, ids!(content.s1_2.content.calib.actions.btn_continue));
+        let btn = root.button(
+            cx,
+            ids!(content.camera_a_panel.content.calib.actions.btn_continue),
+        );
         btn.set_enabled(cx, state.can_continue());
-        let mut btn_w = root.widget(cx, ids!(content.s1_2.content.calib.actions.btn_continue));
+        let mut btn_w = root.widget(
+            cx,
+            ids!(content.camera_a_panel.content.calib.actions.btn_continue),
+        );
         script_apply_eval!(cx, btn_w, {
             draw_bg +: { enabled_f: #(enabled) }
             draw_text +: { enabled_f: #(enabled) }
@@ -680,13 +691,19 @@ impl HardwareScreenRef {
     pub fn wizard_intent(&self, cx: &mut Cx, actions: &Actions) -> Option<Intent> {
         let mut inner = self.borrow_mut()?;
         let v = &mut inner.view;
-        if v.button(cx, ids!(content.s1_2.content.calib.actions.btn_restart))
-            .clicked(actions)
+        if v.button(
+            cx,
+            ids!(content.camera_a_panel.content.calib.actions.btn_restart),
+        )
+        .clicked(actions)
         {
             return Some(Intent::WizardRestartStep);
         }
-        if v.button(cx, ids!(content.s1_2.content.calib.actions.btn_continue))
-            .clicked(actions)
+        if v.button(
+            cx,
+            ids!(content.camera_a_panel.content.calib.actions.btn_continue),
+        )
+        .clicked(actions)
         {
             return Some(Intent::WizardAdvance);
         }

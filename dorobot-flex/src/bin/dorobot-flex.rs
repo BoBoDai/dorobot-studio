@@ -1,8 +1,9 @@
 // DoRobot Studio: real datasets and LeRobot capture, with explicit --demo fixtures.
 
 use dorobot_flex::api::{files::FileBackend, mock::MockBackend, Backend, Intent, Screen};
-use dorobot_flex::makepad_app_shell::shell::layout::ShellLayoutWidgetRefExt;
 use dorobot_flex::playback_controls::PlaybackAction;
+use dorobot_flex::preferences;
+use dorobot_flex::ui::flex_layout::FlexPanelsWidgetRefExt;
 use dorobot_flex::ui::{
     eval::EvalScreenWidgetRefExt, frame, hardware::HardwareScreenWidgetRefExt,
     library::LibraryScreenWidgetRefExt, play::PlayScreenWidgetRefExt,
@@ -10,6 +11,7 @@ use dorobot_flex::ui::{
 };
 use dorobot_flex::widgets::time_series_plot::TimeSeriesPlotAction;
 use dorobot_flex::widgets::timeline::TimelineAction;
+use makepad_urdf_player::robot_view::RobotViewWidgetRefExt;
 use makepad_widgets::*;
 
 /// Transport tick. Matches the shipping player, and is independent of the
@@ -18,6 +20,23 @@ use makepad_widgets::*;
 const PLAYBACK_TIMER_FPS: f64 = 60.0;
 
 app_main!(App);
+
+// Focused buttons own Space/Return; playback shortcuts must not perform a
+// second, unrelated action when a person activates one with the keyboard.
+fn focused_control(root: &WidgetRef, cx: &Cx) -> bool {
+    if cx.has_key_focus(root.area())
+        && (root.borrow::<Button>().is_some() || root.borrow::<TextInput>().is_some())
+    {
+        return true;
+    }
+    let mut found = false;
+    root.children(&mut |_, child| {
+        if !found {
+            found = focused_control(&child, cx);
+        }
+    });
+    found
+}
 
 /// `--dataset <dir>` opens a dataset or library. Fixtures require `--demo`.
 fn make_backend() -> Box<dyn Backend> {
@@ -61,106 +80,87 @@ script_mod! {
 
     startup() do #(App::script_component(vm)){
         ui: Root{
+
             main_window := Window{
                 window.title: "DoRobot Studio"
                 window.inner_size: vec2(1536, 1024)
-                pass.clear_color: #x141312
+                pass.clear_color: mod.theme.color_bg_app
 
                 body +: {
-                    flow: Down
-                    width: Fill
-                    height: Fill
-
-                    hub_form := View{ visible: false width: Fill height: 42 flow: Right spacing: 8.
-                        Label{ text: "Dataset repo (owner/name):" }
-                        hub_repo := TextInput{ width: Fill height: 36 }
-                        hub_go := Button{ text: "Transfer" }
-                        hub_cancel := Button{ text: "Cancel" }
+                    flow: Right width: Fill height: Fill
+                    show_bg: true draw_bg.color: mod.theme.color_bg_app
+                    sidebar := View{
+                        width: 196 height: Fill flow: Down padding: 12.0 spacing: 12.0
+                        show_bg: true draw_bg.color: mod.theme.color_bg_container
+                        Label{ width: Fill height: 52 text: "DoRobot Studio"
+                            draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
+                        nav := mod.widgets.ux.NavRail{ width: Fill height: Fill }
+                        appearance := Button{width: Fill height: 44 text: "Appearance: Light"}
                     }
-                    status := Label{ width: Fill height: Fit text: "" draw_text +: { color: #xD8D4CF text_style: mod.widgets.ux.TEXT_META{} } }
-                    // The screens sit in app-shell's ShellLayout rather than the
-                    // hand-rolled AppBar + work-row they were prototyped in, so
-                    // they inherit what the framework provides: a collapsible
-                    // rail, resizable regions, and panels that dock and persist.
-                    //
-                    // The nav rail and the pages keep their ids, so the screen
-                    // switching in `Screen::apply` still resolves.
-                    shell := ShellLayout{
-                        width: Fill
-                        height: Fill
-
-                        // No floating menu. app-shell ships a hover/pinned
-                        // overlay sidebar (stock "Quick Actions"), but this app
-                        // already has a permanent nav rail — a second menu over
-                        // the top of it is redundant. Both presentations are
-                        // hidden, and the hamburger with them, since it would
-                        // otherwise be a control that does nothing.
-                        pinned_sidebar +: { visible: false width: 0 }
-                        overlay_sidebar +: { visible: false width: 0 }
-
-                        main_container +: {
-                            header +: {
-                                hamburger_btn +: { visible: false width: 0 }
-                                title_label +: { text: "DoRobot Studio" }
-                            }
-
-                            dock_wrapper +: {
-                                dock +: {
-                                    // Region sizes. The shell defaults suit a
-                                    // three-pane IDE; this UX wants a narrow
-                                    // icon rail, no footer strip, and no right
-                                    // rail — its screens bring their own side
-                                    // content.
-                                    root +: { align: SplitterAlign.FromB(0.0) }
-                                    main_area +: { align: SplitterAlign.FromA(96.0) }
-                                    right_area +: { align: SplitterAlign.FromB(0.0) }
-
-                                    // The shell's footer grid ships seven empty
-                                    // demo panels; nothing here uses it.
-                                    footer_content: View{
-                                        width: Fill
-                                        height: Fill
-                                    }
-
-                                    left_sidebar_content: View{
-                                        width: Fill
-                                        height: Fill
-                                        nav := mod.widgets.ux.NavRail{
-                                            width: Fill
-                                            height: Fill
-                                        }
-                                    }
-
-                                    center_content: View{
-                                        width: Fill
-                                        height: Fill
-                                        pages := View{
-                                            width: Fill
-                                            height: Fill
-                                            flow: Overlay
-                                            page_library := LibraryScreen{}
-                                            page_hardware := HardwareScreen{ visible: false }
-                                            page_record := RecordScreen{ visible: false }
-                                            page_play := PlayScreen{ visible: false }
-                                            page_eval := EvalScreen{ visible: false }
-                                        }
-                                    }
-
-                                    // The screens carry their own side content
-                                    // (Library's Hardware panel, Play's inspector),
-                                    // so the shell's own rails stay empty.
-                                    right_sidebar_content: View{
-                                        width: Fill
-                                        height: Fill
+                    sidebar_resize := View{width: 8 height: Fill cursor: MouseCursor.ColResize}
+                    workspace := View{
+                        width: Fill height: Fill flow: Down
+                        page_header := View{
+                            width: Fill height: Fit flow: Down padding: 18.0 spacing: 6.0
+                            page_title := Label{width: Fill text: "Library"
+                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_H1{}} }
+                            status := Label{width: Fill height: Fit max_lines: 2 text_overflow: Ellipsis text: ""
+                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}} }
+                        }
+                        hub_form := View{ visible: false width: Fill height: Fit flow: Right spacing: 8. padding: 12.
+                            hub_repo := TextInput{width: Fill height: 44 empty_text: "Dataset repository: owner/name"}
+                            hub_go := Button{ text: "Transfer" height: 44 }
+                            hub_cancel := Button{ text: "Cancel" height: 44 }
+                        }
+                        setup_page := View{
+                                visible: false width: Fill height: Fit flow: Down padding: 8.0
+                                setup_card := mod.widgets.ux.Card{
+                                    width: Fill height: Fit flow: Down padding: 12.0 spacing: 8.0
+                                    setup_title := Label{width: Fill text: "Set up your robot"
+                                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
+                                    setup_description := Label{width: Fill height: Fit text: ""
+                                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}} }
+                                    setup_actions := View{width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 12.0
+                                        setup_rig := mod.widgets.nx.Primary{height: 44 text: "Choose rig profile…"}
+                                        setup_rescan := mod.widgets.nx.NxBtn{height: 44 text: "Check connections"}
+                                        setup_replay := mod.widgets.nx.NxBtn{height: 44 text: "Open replay"}
                                     }
                                 }
                             }
+                        pages := View{
+                            width: Fill height: Fill flow: Overlay
+                            page_library := LibraryScreen{}
+                            page_hardware := HardwareScreen{visible: false}
+                            page_record := RecordScreen{visible: false}
+                            page_play := PlayScreen{visible: false}
+                            page_eval := EvalScreen{visible: false}
+
                         }
+                    }
+                }
+            }
+            replay_window := Window{
+                window.title: "DoRobot Studio — Replay"
+                window.inner_size: vec2(1280, 900)
+                create_on_start: false
+                body +: {flow: Down width: Fill height: Fill
+                    monitor_bar := View{width: Fill height: 56 flow: Right padding: 6.0
+                        Label{width: Fill text: "Replay · shared episode and playback" draw_text.color: mod.theme.color_text}
+                        close_monitor := Button{height: 44 text: "Close window"}
+                    }
+                    monitor_play := PlayScreen{
+                        upper +: {grid +: {persistence_key: "replay-monitor-layout.json"}}
+                        panel_tools +: {new_window +: {visible: false}}
                     }
                 }
             }
         }
     }
+}
+
+enum FolderRequest {
+    Dataset,
+    Download(String),
 }
 
 #[derive(Script, ScriptHook)]
@@ -180,9 +180,37 @@ pub struct App {
     last_refresh: Option<std::time::Instant>,
     #[rust]
     hub_upload: Option<bool>,
+    #[rust]
+    folder_request: Option<FolderRequest>,
+    #[rust]
+    monitor_open: bool,
+    #[rust(196.0)]
+    sidebar_width: f64,
+    #[rust]
+    resizing_sidebar: bool,
 }
 
 impl App {
+    fn hide_monitor(&mut self, cx: &mut Cx) {
+        self.monitor_open = false;
+        self.ui
+            .window(cx, ids!(replay_window))
+            .set_visible(cx, false);
+    }
+
+    fn save_session(&self) {
+        if std::env::args().any(|a| a == "--demo") {
+            return;
+        }
+        if let Some(path) = preferences::path() {
+            let mut state =
+                preferences::Session::snapshot(&*self.backend, frame::light_mode() < 0.5);
+            state.sidebar_width = self.sidebar_width;
+            if let Err(error) = preferences::save(&path, &state) {
+                ::log::warn!("Could not save UI preferences: {}", error.kind());
+            }
+        }
+    }
     /// Repaint every screen from the current backend snapshot.
     fn sync(&mut self, cx: &mut Cx) {
         self.ui.label(cx, ids!(status)).set_text(
@@ -194,9 +222,44 @@ impl App {
         self.ui
             .widget(cx, ids!(hub_form))
             .set_visible(cx, self.hub_upload.is_some());
+        if self.started {
+            self.save_session();
+        }
         let light = frame::light_mode();
+        dorobot_ux::sync_appearance(cx, light > 0.5);
+        self.ui.button(cx, ids!(appearance)).set_text(
+            cx,
+            if light > 0.5 {
+                "Appearance: Light"
+            } else {
+                "Appearance: Dark"
+            },
+        );
+        self.ui.label(cx, ids!(page_title)).set_text(
+            cx,
+            match self.backend.screen() {
+                Screen::Library => "Library",
+                Screen::Record => "Record",
+                Screen::Play => "Replay",
+                Screen::Hardware => "Hardware",
+                Screen::Eval => "Evaluate",
+            },
+        );
         frame::theme_chrome(cx, &self.ui, light);
+        frame::apply_light(
+            cx,
+            &self.ui,
+            &[
+                (ids!(setup_card), frame::Themed::Bg),
+                (ids!(setup_rescan), frame::Themed::Both),
+                (ids!(setup_replay), frame::Themed::Both),
+            ],
+            light,
+        );
 
+        if let Some(mut sidebar) = self.ui.widget(cx, ids!(sidebar)).borrow_mut::<View>() {
+            sidebar.walk.width = Size::Fixed(self.sidebar_width);
+        }
         let nav = self.ui.widget(cx, ids!(nav));
         frame::sync_nav(cx, &nav, self.backend.screen());
 
@@ -216,8 +279,56 @@ impl App {
             .eval_screen(cx, ids!(page_eval))
             .sync(cx, self.backend.eval());
 
+        if self.monitor_open {
+            self.ui
+                .play_screen(cx, ids!(monitor_play))
+                .sync(cx, self.backend.playback());
+        }
         // Overlay flow: exactly one page is visible at a time.
         let screen = self.backend.screen();
+        let setup = match screen {
+            Screen::Record => self.backend.record().profile_label.is_empty(),
+            Screen::Hardware => self.backend.record().profile_label.is_empty(),
+            Screen::Eval => self.backend.eval().checkpoint.is_empty(),
+            Screen::Play => self.backend.playback().episodes.is_empty(),
+            _ => false,
+        };
+        self.ui.widget(cx, ids!(setup_page)).set_visible(cx, setup);
+        if setup {
+            let evaluating = screen == Screen::Eval;
+            let no_recordings = screen == Screen::Play;
+            self.ui.button(cx, ids!(setup_replay)).set_text(
+                cx,
+                if no_recordings {
+                    "Open library"
+                } else {
+                    "Open replay"
+                },
+            );
+            self.ui.label(cx, ids!(setup_title)).set_text(
+                cx,
+                if no_recordings {
+                    "Choose a recording to replay"
+                } else if evaluating {
+                    "No rollout running"
+                } else {
+                    "Connect a robot to get started"
+                },
+            );
+            self.ui.label(cx, ids!(setup_description)).set_text(cx, if no_recordings {
+                "Open a LeRobot dataset from Library to review robot motion and camera recordings."
+            } else if evaluating {
+                "No policy runner is connected. Open Replay to inspect recorded motion; use Nexus Studio to validate a checkpoint."
+            } else {
+                "Choose a rig profile, then check connections before recording. No hardware is connected."
+            });
+            self.ui
+                .widget(cx, ids!(setup_rig))
+                .set_visible(cx, !evaluating && !no_recordings);
+            self.ui
+                .widget(cx, ids!(setup_rescan))
+                .set_visible(cx, !evaluating && !no_recordings);
+        }
         for (path, s) in [
             (ids!(page_library) as &[LiveId], Screen::Library),
             (ids!(page_hardware), Screen::Hardware),
@@ -232,11 +343,29 @@ impl App {
 
 impl MatchEvent for App {
     fn handle_startup(&mut self, cx: &mut Cx) {
-        // Dark is the product's look; set through the widget because the
-        // global is recomputed from ShellLayout's own state on first draw.
-        self.ui
-            .shell_layout(cx, ids!(shell))
-            .set_dark_mode(cx, true);
+        let args: Vec<String> = std::env::args().collect();
+        let saved = if args.iter().any(|a| a == "--demo") {
+            None
+        } else {
+            preferences::path().and_then(|p| preferences::load(&p))
+        };
+        if let Some(saved) = &saved {
+            if saved.sidebar_width.is_finite() {
+                self.sidebar_width = saved.sidebar_width.clamp(176.0, 320.0);
+            }
+            saved.restore(
+                &mut *self.backend,
+                !args.iter().any(|a| a == "--open" || a == "--dataset"),
+            );
+        }
+        // Match the iOS sheet on first draw; --dark selects its dark appearance.
+        frame::set_light_mode(
+            if args.iter().any(|a| a == "--dark") || saved.as_ref().is_some_and(|s| s.dark) {
+                0.0
+            } else {
+                1.0
+            },
+        );
 
         // Optional deep-link so the diff runner can shoot one screen per launch.
         let args: Vec<String> = std::env::args().collect();
@@ -280,9 +409,121 @@ impl MatchEvent for App {
             .is_none_or(|t| t.elapsed().as_millis() >= 100)
         {
             self.last_refresh = Some(now);
-            self.ui
-                .label(cx, ids!(status))
-                .set_text(cx, self.backend.status().unwrap_or("DEMO"));
+            self.ui.play_screen(cx, ids!(page_play)).adapt_layout(cx);
+            if self.monitor_open {
+                self.ui.play_screen(cx, ids!(monitor_play)).adapt_layout(cx);
+            }
+            if std::env::var_os("DOROBOT_UX_REPORT").is_some() {
+                let play = self.backend.playback();
+                dorobot_flex::ux_probe::write(
+                    cx,
+                    &self.ui,
+                    serde_json::json!({
+                        "screen": self.backend.screen().label(), "dark": frame::light_mode() < 0.5,
+                        "episode": play.selected, "playing": play.is_playing, "time": play.current_time,
+                        "speed": play.speed, "frames": play.stats.frames, "tag": play.selected.and_then(|id| play.episodes.iter().find(|e| e.index == id)).map(|e| format!("{:?}", e.tag)),
+                        "monitor_open": self.monitor_open, "monitor_window": self.ui.window(cx, ids!(replay_window)).window_id().map(|w|w.id()),
+                        "monitor_layout": self.ui.flex_panels(cx, ids!(monitor_play.upper.grid)).snapshot(),
+                        "panel_layout": self.ui.flex_panels(cx, ids!(page_play.upper.grid)).snapshot(),
+                        "recording": self.backend.record().recording, "saved": self.backend.record().saved, "discarded": self.backend.record().discarded,
+                        "folder_pending": self.folder_request.is_some(), "status": self.backend.status(), "hub_open": self.hub_upload.is_some(), "robot_animating": self.ui.robot_view(cx, ids!(page_play.stage_3d)).is_animating(), "signals_visible": self.ui.widget(cx, ids!(page_play.timeline.tl_body.lanes)).visible()
+                    }),
+                    &[
+                        "nav_library",
+                        "nav_record",
+                        "nav_play",
+                        "nav_hardware",
+                        "nav_eval",
+                        "appearance",
+                        "sidebar",
+                        "sidebar_resize",
+                        "setup_rig",
+                        "setup_rescan",
+                        "setup_replay",
+                        "setup_page",
+                        "page_play.timeline.tl_body.controls.frame_lbl",
+                        "monitor_play.timeline.tl_body.controls.frame_lbl",
+                        "new_window",
+                        "close_monitor",
+                        "monitor_play.panels_btn",
+                        "monitor_play.layout_reset",
+                        "monitor_play.play_btn",
+                        "monitor_play.upper.grid.robot_panel",
+                        "monitor_play.upper.grid.error_panel",
+                        "monitor_play.timeline.tl_body.controls.transport",
+                        "panels_btn",
+                        "panel_tools",
+                        "robot_toggle",
+                        "camera_a_toggle",
+                        "camera_b_toggle",
+                        "error_toggle",
+                        "layout_reset",
+                        "layout_cycle",
+                        "page_play.upper.grid",
+                        "robot_panel",
+                        "camera_a_panel",
+                        "camera_b_panel",
+                        "error_panel",
+                        "stage_3d",
+                        "stage_a",
+                        "stage_b",
+                        "stage_plot",
+                        "robot_panel.head",
+                        "robot_panel.head.maximize",
+                        "robot_panel.head.close",
+                        "error_panel.head",
+                        "error_panel.head.maximize",
+                        "error_panel.head.close",
+                        "camera_a_panel.head",
+                        "camera_a_panel.head.maximize",
+                        "camera_a_panel.head.close",
+                        "camera_b_panel.head",
+                        "camera_b_panel.head.maximize",
+                        "camera_b_panel.head.close",
+                        "page_hardware.content.camera_a_panel.content.calib.actions.btn_continue",
+                        "page_hardware.content.camera_a_panel.content.calib.actions.btn_restart",
+                        "page_hardware.hardware_reset",
+                        "page_eval.pbar.btn_stop",
+                        "page_record.transport.btn_record",
+                        "page_record.transport.btn_save",
+                        "page_record.transport.btn_discard",
+                        "page_record.transport.btn_rerecord",
+                        "page_play.upper.side.side_body.btn_del",
+                        "page_play.upper.side.side_body.btn_push",
+                        "episodes_btn",
+                        "details_btn",
+                        "signals_btn",
+                        "signal_prev",
+                        "signal_next",
+                        "page_play.timeline.tl_body.lanes.content.lane_0",
+                        "page_play.timeline.tl_body.lanes.content.lane_5",
+                        "page_play.upper.tree.tree_body.row_0",
+                        "page_play.upper.tree.tree_body.row_1",
+                        "page_play.upper.tree.tree_body.row_2",
+                        "page_play.upper.side.side_body.btn_good",
+                        "page_play.upper.side.side_body.btn_bad",
+                        "page_play.timeline.tl_body.controls.transport",
+                        "speed_btn",
+                        "monitor_play.speed_btn",
+                        "play_btn",
+                        "step_back_btn",
+                        "step_fwd_btn",
+                        "page_play.timeline.tl_body.tl",
+                        "page_library.left_col.header.btn_pull",
+                        "page_library.left_col.header.btn_open",
+                        "hub_repo",
+                        "hub_cancel",
+                        "page_play.upper.side",
+                        "page_play.upper.tree",
+                    ],
+                );
+            }
+            self.ui.label(cx, ids!(status)).set_text(
+                cx,
+                self.backend
+                    .status()
+                    .unwrap_or("DEMO · simulated data; no hardware connected"),
+            );
             match self.backend.screen() {
                 Screen::Library => self
                     .ui
@@ -317,11 +558,43 @@ impl MatchEvent for App {
             self.ui
                 .play_screen(cx, ids!(page_play))
                 .tick(cx, self.backend.playback());
+            if self.monitor_open {
+                self.ui
+                    .play_screen(cx, ids!(monitor_play))
+                    .tick(cx, self.backend.playback());
+            }
         }
         self.ui.redraw(cx);
     }
 
     fn handle_key_down(&mut self, cx: &mut Cx, e: &KeyEvent) {
+        if e.modifiers.logo || e.modifiers.control {
+            let target = match e.key_code {
+                KeyCode::Key1 => Some(Screen::Library),
+                KeyCode::Key2 => Some(Screen::Record),
+                KeyCode::Key3 => Some(Screen::Play),
+                KeyCode::Key4 => Some(Screen::Hardware),
+                KeyCode::Key5 => Some(Screen::Eval),
+                _ => None,
+            };
+            if let Some(target) = target {
+                self.backend.dispatch(Intent::Navigate(target));
+                self.sync(cx);
+                return;
+            }
+        }
+        if e.key_code == KeyCode::Escape && self.hub_upload.is_some() {
+            self.hub_upload = None;
+            self.sync(cx);
+            return;
+        }
+        if self.hub_upload.is_some() {
+            return;
+        }
+
+        if e.key_code == KeyCode::Space && focused_control(&self.ui, cx) {
+            return;
+        }
         let intent = if self.backend.screen() == Screen::Play {
             match e.key_code {
                 KeyCode::Space => Some(Intent::TogglePlay),
@@ -345,7 +618,129 @@ impl MatchEvent for App {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         let mut dirty = false;
+        // The HAL opens Cocoa panels on its main thread and returns asynchronously.
+        // Keep the original operation until either selection or cancellation arrives.
+        for action in actions {
+            if let Some(dialog) = action.downcast_ref::<FileDialogAction>() {
+                match dialog {
+                    FileDialogAction::FileSelected { id, paths }
+                        if *id == live_id!(rig_profile) =>
+                    {
+                        if let Some(path) = paths.first() {
+                            self.backend.dispatch(Intent::ConfigureRig(path.clone()));
+                            self.backend.dispatch(Intent::NewRecordingSession);
+                            dirty = true;
+                        }
+                    }
+                    FileDialogAction::FolderSelected(path) => {
+                        match self.folder_request.take() {
+                            Some(FolderRequest::Dataset) => {
+                                self.backend.dispatch(Intent::OpenFolder(path.clone()))
+                            }
+                            Some(FolderRequest::Download(repo)) => {
+                                let name = repo.split('/').last().unwrap_or("dataset");
+                                if !name.is_empty()
+                                    && name != "."
+                                    && name != ".."
+                                    && !name.contains('\\')
+                                {
+                                    let destination = Some(path.join(name));
+                                    self.backend
+                                        .dispatch(Intent::HubTransfer { repo, destination });
+                                    self.hub_upload = None;
+                                }
+                            }
+                            None => {}
+                        }
+                        dirty = true;
+                    }
+                    FileDialogAction::FolderCancelled => {
+                        self.folder_request = None;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if self
+            .ui
+            .button(cx, ids!(page_play.new_window))
+            .clicked(actions)
+        {
+            self.monitor_open = true;
+            self.ui.window(cx, ids!(replay_window)).show(cx);
+            dirty = true;
+        }
+        if self.ui.button(cx, ids!(close_monitor)).clicked(actions) {
+            self.hide_monitor(cx);
+        }
+        for page in [ids!(page_play) as &[LiveId], ids!(monitor_play)] {
+            let root = self.ui.widget(cx, page);
+            let play = self.ui.play_screen(cx, page);
+            let grid = root.flex_panels(cx, ids!(upper.grid));
+            if root.button(cx, ids!(panels_btn)).clicked(actions) {
+                let tools = root.widget(cx, ids!(panel_tools));
+                tools.set_visible(cx, !tools.visible());
+                self.ui.redraw(cx);
+            }
+            for (id, panel) in [
+                (ids!(robot_toggle), 0),
+                (ids!(camera_a_toggle), 1),
+                (ids!(camera_b_toggle), 2),
+                (ids!(error_toggle), 3),
+            ] {
+                if root.button(cx, id).clicked(actions) {
+                    grid.toggle_panel(cx, panel);
+                }
+            }
+            if root.button(cx, ids!(layout_reset)).clicked(actions) {
+                grid.reset(cx);
+            }
+            if root.button(cx, ids!(speed_btn)).clicked(actions) {
+                let speed = self.backend.playback().speed;
+                let next = if speed < 0.5 {
+                    0.5
+                } else if speed < 1.0 {
+                    1.0
+                } else if speed < 2.0 {
+                    2.0
+                } else {
+                    0.25
+                };
+                self.backend.dispatch(Intent::SetSpeed(next));
+                dirty = true;
+            }
+            if root.button(cx, ids!(layout_cycle)).clicked(actions) {
+                grid.cycle_layout(cx);
+            }
+            for (id, step) in [(ids!(signal_prev), -1), (ids!(signal_next), 1)] {
+                if root.button(cx, id).clicked(actions) {
+                    play.shift_signals(cx, step);
+                }
+            }
+            for (id, pane) in [
+                (ids!(episodes_btn), "episodes"),
+                (ids!(details_btn), "details"),
+                (ids!(signals_btn), "signals"),
+            ] {
+                if root.button(cx, id).clicked(actions) {
+                    play.toggle_pane(cx, pane);
+                }
+            }
+        }
 
+        if self.ui.button(cx, ids!(setup_replay)).clicked(actions) {
+            let target = if self.backend.screen() == Screen::Play {
+                Screen::Library
+            } else {
+                Screen::Play
+            };
+            self.backend.dispatch(Intent::Navigate(target));
+            dirty = true;
+        }
+        if self.ui.button(cx, ids!(setup_rescan)).clicked(actions) {
+            self.backend.dispatch(Intent::WizardRestartStep);
+            dirty = true;
+        }
         let nav = self.ui.widget(cx, ids!(nav));
         for (path, screen) in frame::NAV_ITEMS {
             let item = nav.widget(cx, path);
@@ -358,29 +753,23 @@ impl MatchEvent for App {
             }
         }
 
-        // Gear in the app bar toggles dark/light.
-        let gear = self.ui.widget(cx, ids!(app_bar.actions.gear));
-        if !gear.is_empty() {
-            if frame::view_clicked(actions, gear.widget_uid()) {
-                frame::toggle_light_mode();
-                dirty = true;
-            }
+        if self.ui.button(cx, ids!(appearance)).clicked(actions) {
+            frame::toggle_light_mode();
+            dirty = true;
         }
 
         if self
             .ui
             .button(cx, ids!(page_library.left_col.header.btn_new))
             .clicked(actions)
+            || self.ui.button(cx, ids!(setup_rig)).clicked(actions)
         {
-            if let Some(path) = rfd::FileDialog::new()
-                .set_title("Choose a rig profile (tools/capture/rig.example.json)")
-                .add_filter("Rig profile", &["json"])
-                .pick_file()
-            {
-                self.backend.dispatch(Intent::ConfigureRig(path));
-                self.backend.dispatch(Intent::NewRecordingSession);
-                dirty = true;
-            }
+            cx.open_select_file_dialog(
+                FileDialog::new()
+                    .set_id(live_id!(rig_profile))
+                    .set_title("Choose a rig profile".into())
+                    .add_filter("Rig profile".into(), vec!["json".into()]),
+            );
         }
         if self
             .ui
@@ -396,12 +785,11 @@ impl MatchEvent for App {
             .button(cx, ids!(page_library.left_col.header.btn_open))
             .clicked(actions)
         {
-            if let Some(path) = rfd::FileDialog::new()
-                .set_title("Open LeRobot dataset or dataset library")
-                .pick_folder()
-            {
-                self.backend.dispatch(Intent::OpenFolder(path));
-                dirty = true;
+            if self.folder_request.is_none() {
+                self.folder_request = Some(FolderRequest::Dataset);
+                cx.open_select_folder_dialog(
+                    FileDialog::new().set_title("Open LeRobot dataset or dataset library".into()),
+                );
             }
         }
         for (path, intent) in [
@@ -416,6 +804,7 @@ impl MatchEvent for App {
             (ids!(page_record.transport.btn_save), Intent::SaveEpisode),
             (ids!(page_record.transport.btn_discard), Intent::DiscardLast),
             (ids!(page_record.transport.btn_rerecord), Intent::ReRecord),
+            (ids!(page_eval.pbar.btn_stop), Intent::StopRollout),
         ] {
             if self.ui.button(cx, path).clicked(actions) {
                 self.backend.dispatch(intent);
@@ -445,17 +834,11 @@ impl MatchEvent for App {
                         destination: None,
                     });
                     self.hub_upload = None;
-                } else if let Some(parent) = rfd::FileDialog::new()
-                    .set_title("Choose download parent folder")
-                    .pick_folder()
-                {
-                    let name = repo.split('/').last().unwrap_or("dataset");
-                    if name != "." && name != ".." && !name.contains('\\') {
-                        let destination = Some(parent.join(name));
-                        self.backend
-                            .dispatch(Intent::HubTransfer { repo, destination });
-                        self.hub_upload = None;
-                    }
+                } else if self.folder_request.is_none() {
+                    self.folder_request = Some(FolderRequest::Download(repo));
+                    cx.open_select_folder_dialog(
+                        FileDialog::new().set_title("Choose download parent folder".into()),
+                    );
                 }
                 dirty = true;
             }
@@ -533,20 +916,22 @@ impl MatchEvent for App {
             }
         }
 
-        // Play: episode selection and curation.
-        let play = self.ui.play_screen(cx, ids!(page_play));
-        if let Some(ep) = play.clicked_episode(cx, actions) {
-            self.backend.dispatch(Intent::SelectEpisode(ep));
-            dirty = true;
-        }
-        if let Some(sel) = self.backend.playback().selected {
-            if let Some(intent) = play.curation_intent(cx, actions, sel) {
-                if matches!(intent, Intent::PushToHub) {
-                    self.hub_upload = Some(true);
-                } else {
-                    self.backend.dispatch(intent);
-                }
+        for page in [ids!(page_play) as &[LiveId], ids!(monitor_play)] {
+            // Play: episode selection and curation.
+            let play = self.ui.play_screen(cx, page);
+            if let Some(ep) = play.clicked_episode(cx, actions) {
+                self.backend.dispatch(Intent::SelectEpisode(ep));
                 dirty = true;
+            }
+            if let Some(sel) = self.backend.playback().selected {
+                if let Some(intent) = play.curation_intent(cx, actions, sel) {
+                    if matches!(intent, Intent::PushToHub) {
+                        self.hub_upload = Some(true);
+                    } else {
+                        self.backend.dispatch(intent);
+                    }
+                    dirty = true;
+                }
             }
         }
 
@@ -559,6 +944,7 @@ impl MatchEvent for App {
 
 impl AppMain for App {
     fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
+        dorobot_ux::install_ios(vm, !std::env::args().any(|a| a == "--dark"));
         makepad_widgets::script_mod(vm);
         // Shared tokens first: flex's styles alias onto them.
         dorobot_ux::script_mod(vm);
@@ -581,8 +967,47 @@ impl AppMain for App {
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        if matches!(event, Event::Shutdown | Event::WindowClosed(_)) {
+            self.save_session();
+        }
+        match event {
+            Event::MouseDown(e)
+                if Some(e.window_id) == self.ui.window(cx, ids!(main_window)).window_id() =>
+            {
+                self.resizing_sidebar = self
+                    .ui
+                    .widget(cx, ids!(sidebar_resize))
+                    .area()
+                    .rect(cx)
+                    .contains(e.abs);
+            }
+            Event::MouseMove(e) if self.resizing_sidebar => {
+                self.sidebar_width = e.abs.x.clamp(176.0, 320.0);
+                if let Some(mut sidebar) = self.ui.widget(cx, ids!(sidebar)).borrow_mut::<View>() {
+                    sidebar.walk.width = Size::Fixed(self.sidebar_width);
+                }
+                self.ui.redraw(cx);
+            }
+            Event::MouseUp(_) if self.resizing_sidebar => {
+                self.resizing_sidebar = false;
+                self.save_session();
+            }
+            _ => {}
+        }
+        if let Event::WindowCloseRequested(e) = event {
+            if Some(e.window_id) == self.ui.window(cx, ids!(replay_window)).window_id() {
+                e.accept_close.set(false);
+                self.hide_monitor(cx);
+            }
+        }
         self.match_event(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
+        if matches!(event, Event::LiveEdit | Event::ScriptReapply) && self.started {
+            self.ui
+                .play_screen(cx, ids!(page_play))
+                .restore_panel_design(cx);
+            self.sync(cx);
+        }
         // Scrolling the episode window produces no action, so it is picked up
         // here rather than in handle_actions, which would not run for it.
         if self.ui.play_screen(cx, ids!(page_play)).take_scrolled() {
