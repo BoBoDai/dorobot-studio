@@ -65,7 +65,7 @@ that name-only correction does not change the captured UI or its behavior.
   1 compact calibration reachability, and 7 speed/curation checks.
 - [Measured contrast pairs](functional-evidence/contrast.json): primary/body/warning pairs pass 4.5:1; legacy plot-axis text does not and is deducted.
 - [Original-pixel manifest with SHA-256 hashes](functional-evidence/manifest.json),
-  including the 40 final matrix captures and the interaction/iteration captures.
+  including the 40 matrix captures and the interaction/iteration captures. Replay matrices, speed and restart captures were refreshed for the final speed control; earlier interaction captures retain the UI used for those passes.
 - [Shared speed control](functional-evidence/speed/shared-speed-control.png).
 - [Independent native Replay window](functional-evidence/workflow/native-replay-window.png),
   [custom layout](functional-evidence/workflow/custom-layout.png),
