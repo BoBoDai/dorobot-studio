@@ -55,7 +55,8 @@ The primary application for LeRobot dataset visualization featuring:
 - **Multi-camera video playback** with synchronized scrubbing
 - **3D robot visualization** from URDF models
 - **Time series plots** for joint states and sensor data
-- **Flexible panel layout** with drag-and-drop rearrangement
+- **Flexible panel layout** with drag rearrangement, resizing, maximize/restore and local layout recovery
+- **Additional native Replay window** sharing the episode and transport, with its own layout
 - **Episode browser** with hierarchical task grouping
 
 ### Architecture
@@ -83,10 +84,19 @@ The primary application for LeRobot dataset visualization featuring:
 
 ### Panel Drag-and-Drop
 
-Panels can be rearranged by dragging their title bars. The content follows the panel:
-- Video panels swap their video sources
-- Robot view can be moved to any panel position
-- Panel visibility can be toggled via the layout menu
+Drag a panel title to rearrange its content. Drag a divider to resize the grid;
+use the panel's expand button to maximize it, and Escape to restore the grid.
+**Replay → Panels** reopens closed views, changes the arrangement, resets the
+layout, or opens a separate native **Replay window**. Both windows share the
+selected episode and playback; their panel layouts are independent. Closing
+the extra window preserves the main task. Layouts and navigation width are
+saved locally. Hardware uses the same panel behavior and has **Restore panels**.
+
+The four Replay views are 3D, main camera, wrist camera and tracking error.
+Camera panels explain missing media. Record and Hardware keep their controls
+visible with setup guidance; recording stays disabled until a profile exists.
+See the [functional UX judge loop](docs/ux/functional-review.md) for the workflow
+checks, score, and unverified hardware limits.
 
 ## Project Structure
 

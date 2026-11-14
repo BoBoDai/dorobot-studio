@@ -15,6 +15,12 @@ pub struct Session {
     pub dataset_path: Option<PathBuf>,
     pub episode: Option<u64>,
     pub time: f64,
+    #[serde(default = "default_sidebar_width")]
+    pub sidebar_width: f64,
+}
+
+fn default_sidebar_width() -> f64 {
+    196.0
 }
 
 impl Session {
@@ -31,6 +37,7 @@ impl Session {
                 .and_then(|d| d.path.canonicalize().ok()),
             episode: backend.playback().selected,
             time: backend.playback().current_time,
+            sidebar_width: default_sidebar_width(),
         }
     }
 
@@ -122,6 +129,7 @@ mod tests {
             dataset_path: None,
             episode: Some(2),
             time: 1.5,
+            sidebar_width: 224.0,
         };
         save(&path, &session).unwrap();
         assert_eq!(load(&path), Some(session));

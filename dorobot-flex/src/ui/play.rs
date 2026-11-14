@@ -216,6 +216,16 @@ script_mod! {
             }
             Filler{}
             details_btn := Button{height: 44 text: "Details"}
+            panels_btn := Button{height: 44 text: "Panels"}
+        }
+        panel_tools := View{visible: false width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 6.0
+            robot_toggle := Button{height: 44 text: "3D view"}
+            camera_a_toggle := Button{height: 44 text: "Main camera"}
+            camera_b_toggle := Button{height: 44 text: "Wrist camera"}
+            error_toggle := Button{height: 44 text: "Tracking error"}
+            layout_cycle := Button{height: 44 text: "Arrange"}
+            layout_reset := Button{height: 44 text: "Reset layout"}
+            new_window := Button{height: 44 text: "Replay window"}
         }
         upper := View{
             width: Fill height: Fill
@@ -261,21 +271,35 @@ script_mod! {
                 }
             }
 
-            stage := mod.widgets.ux.Card{
-                width: Fill height: Fill flow: Down
-                stage_head := mod.widgets.ux.PanelHead{title +: {text: "Robot preview"}}
-                media := View{width: Fill height: Fill flow: Right spacing: 8.0
+            grid := FlexPanels{
+                robot_panel := StudioPanel{
+                    head +: {title +: {text: "3D view"}}
                     stage_3d := RobotView{
-                        keyboard_controls: false
-                        width: Fill height: Fill
+                        keyboard_controls: false width: Fill height: Fill
                         sky_horizon: mod.theme.color_bg_app sky_zenith: mod.theme.color_bg_app
                         ground_color: mod.theme.color_bg_container ground2_color: mod.theme.color_bg_container
                         grid_color: mod.theme.color_text_disabled
                     }
-                    cameras := View{width: Fill height: Fill flow: Down spacing: 8.0 visible: false
-                        stage_a := VideoPlayer{}
-                        stage_b := VideoPlayer{visible: false}
-                    }
+                }
+                camera_a_panel := StudioPanel{
+                    head +: {title +: {text: "Main camera"}}
+                    camera_a_empty := Label{width: Fill height: Fit text: "No main-camera recording in this episode"
+                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                    stage_a := VideoPlayer{}
+                }
+                camera_b_panel := StudioPanel{
+                    head +: {title +: {text: "Wrist camera"}}
+                    camera_b_empty := Label{width: Fill height: Fit text: "No wrist-camera recording in this episode"
+                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                    stage_b := VideoPlayer{}
+                }
+                error_panel := StudioPanel{
+                    head +: {title +: {text: "Tracking error"}}
+                    stage_plot := PlotPane{}
+                }
+                empty := View{visible: false width: Fill height: Fill flow: Down padding: 24.0 spacing: 16.0
+                    Label{width: Fill text: "All panels are closed. Use Panels to reopen a view or reset the layout."
+                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}}}
                 }
             }
 
@@ -773,8 +797,11 @@ impl PlayScreenRef {
                 "Show signals"
             },
         );
-        let height = if signals { 300.0 } else { 172.0 };
-        inner.footer_h = height;
+        let height = if signals {
+            inner.footer_h.max(244.0)
+        } else {
+            172.0
+        };
         if let Some(mut card) = inner.view.widget(cx, ids!(timeline)).borrow_mut::<View>() {
             card.walk.height = Size::Fixed(height);
         }
@@ -881,13 +908,10 @@ impl PlayScreenRef {
             let mut label = root.widget(cx, name_id);
             script_apply_eval!(cx, label, { draw_text +: { light: #(light) } });
         }
-        root.widget(cx, ids!(upper.stage.media.cameras))
-            .set_visible(cx, !st.video_paths.is_empty());
-        root.widget(cx, ids!(stage_b))
-            .set_visible(cx, st.video_paths.len() > 1);
-        let head = root.widget(cx, ids!(upper.stage.stage_head));
-        theme_panel_head(cx, &head, light);
-        apply_light_in(cx, root, &[(ids!(upper.stage), Themed::Bg)], light);
+        root.widget(cx, ids!(camera_a_empty))
+            .set_visible(cx, st.video_paths.is_empty());
+        root.widget(cx, ids!(camera_b_empty))
+            .set_visible(cx, st.video_paths.len() < 2);
 
         // ---- episode tree: group headers interleaved with rows ------------
         let shown = (start + ROW_IDS.len()).min(total);

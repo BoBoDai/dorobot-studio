@@ -113,8 +113,18 @@ impl Backend for MockBackend {
                 }
             }
 
-            Intent::RecordStart => self.record.recording = true,
-            Intent::RecordStop => self.record.recording = false,
+            Intent::RecordStart => {
+                self.record.recording = true;
+                self.record.last_take = None;
+            }
+            Intent::RecordStop => {
+                self.record.recording = false;
+                self.record.last_take = Some(TakeReview {
+                    thumbnails: Vec::new(),
+                    verdict: TakeVerdict::ReadyToSave,
+                    warnings: vec!["Simulated take — no hardware connected".into()],
+                });
+            }
             Intent::SaveEpisode => {
                 self.record.saved += 1;
                 self.record.episode_index += 1;
@@ -124,7 +134,10 @@ impl Backend for MockBackend {
                 self.record.discarded += 1;
                 self.record.last_take = None;
             }
-            Intent::ReRecord => self.record.last_take = None,
+            Intent::ReRecord => {
+                self.record.last_take = None;
+                self.record.recording = true;
+            }
             Intent::SetSoundCues(on) => self.record.sound_cues = on,
 
             Intent::SelectEpisode(idx) => self.playback.selected = Some(idx),
@@ -349,7 +362,7 @@ fn record_fixture() -> RecordState {
         elapsed_s: 12.4,
         saved: 21,
         discarded: 2,
-        recording: true,
+        recording: false,
         sound_cues: true,
         cameras: vec!["cam_high".into(), "cam_wrist".into()],
         joints: (0..6)

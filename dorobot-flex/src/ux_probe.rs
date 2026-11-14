@@ -10,12 +10,22 @@ pub fn write(cx: &mut Cx, ui: &WidgetRef, state: serde_json::Value, paths: &[&st
     let mut controls = serde_json::Map::new();
     for path in paths {
         let ids: Vec<_> = path.split('.').map(LiveId::from_str).collect();
-        let widget = ui.widget(cx, &ids);
+        // Unqualified replay controls refer to the main window; a monitor can
+        // contain the same ids. Explicit paths still address either window.
+        let main = ui.widget(cx, ids!(page_play));
+        let local = main.widget(cx, &ids);
+        let widget = if local.is_empty() {
+            ui.widget(cx, &ids)
+        } else {
+            local
+        };
         let rect = widget.area().rect(cx);
         controls.insert(
             (*path).into(),
             serde_json::json!({
                 "visible": widget.visible(),
+                "text": widget.text(),
+                "enabled": widget.borrow::<Button>().map(|b| b.enabled()),
                 "rect": [rect.pos.x, rect.pos.y, rect.size.x, rect.size.y]
             }),
         );

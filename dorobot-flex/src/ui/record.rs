@@ -150,7 +150,7 @@ script_mod! {
                 label +: { text: "profile" }
             }
             task := Label{
-                width: Fill
+                width: Fill max_lines: 1 text_overflow: Ellipsis
                 text: ""
                 draw_text +: {
                     light: instance(0.0)
@@ -239,7 +239,11 @@ script_mod! {
                                 return mix(base, mix(#x38383A, #xD1D1D6, self.light), g)
                             }
                         }
-                        robot_view := mod.widgets.RobotView{ width: Fill height: Fill }
+                        robot_view := mod.widgets.RobotView{keyboard_controls: false width: Fill height: Fill
+                            sky_horizon: mod.theme.color_bg_app sky_zenith: mod.theme.color_bg_app
+                            ground_color: mod.theme.color_bg_container ground2_color: mod.theme.color_bg_container
+                            grid_color: mod.theme.color_text_disabled}
+                        no_robot := Label{width: Fill text: "Choose a rig profile to preview your robot" draw_text.color: mod.theme.color_text}
 
                     }
                 }
@@ -337,84 +341,27 @@ script_mod! {
             spacing: 14.0
             padding: Inset{left: 8. right: 8.}
 
-            btn_discard := Button{
-                text: "Discard last"
-                padding: Inset{left: 22. right: 22. top: 13. bottom: 13.}
-                draw_bg +: {
-                    light: instance(0.0)
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                        let idle = mix(#x2C2C2E, #xFFFFFF, self.light)
-                        sdf.fill_keep(mix(idle, mix(#x38383A, #xF2F2F7, self.light), self.hover))
-                        sdf.stroke(mix(#x38383A, #xD1D1D6, self.light), 1.0)
-                        return sdf.result
-                    }
-                }
-                draw_text +: {
-                    light: instance(0.0)
-                    text_style: mod.widgets.ux.TEXT_BODY{}
-                    get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
-                }
-            }
-            btn_rerecord := Button{
-                text: "Re-record"
-                padding: Inset{left: 22. right: 22. top: 13. bottom: 13.}
-                draw_bg +: {
-                    light: instance(0.0)
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                        let idle = mix(#x2C2C2E, #xFFFFFF, self.light)
-                        sdf.fill_keep(mix(idle, mix(#x38383A, #xF2F2F7, self.light), self.hover))
-                        sdf.stroke(mix(#x38383A, #xD1D1D6, self.light), 1.0)
-                        return sdf.result
-                    }
-                }
-                draw_text +: {
-                    light: instance(0.0)
-                    text_style: mod.widgets.ux.TEXT_BODY{}
-                    get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
-                }
+            btn_discard := mod.widgets.nx.NxBtn{height: 48 text: "Discard last"}
+            btn_rerecord := mod.widgets.nx.NxBtn{height: 48 text: "Re-record"}
+            Filler{}
+            btn_record := mod.widgets.nx.Primary{
+                text: "Record" width: 132 height: 48
+                draw_bg +: {recording: instance(0.0) pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, 10.0)
+                    sdf.fill(mix(#xC40013, #xD1D1D6, self.disabled))
+                    return sdf.result
+                }}
+                draw_text +: {get_color: fn() {return mix(#xFFFFFF, #x636366, self.disabled)}}
             }
             Filler{}
-            btn_record := Button{
-                text: ""
-                width: 66 height: 66
-                draw_bg +: {
-                    recording: instance(1.0)
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        let c = self.rect_size.x * 0.5
-                        sdf.circle(c, c, c - 2.0)
-                        sdf.stroke(#xD70015, 2.0)
-                        sdf.circle(c, c, c - 8.0)
-                        sdf.fill(mix(#xD70015, #xD70015, self.hover))
-                        // stop glyph while recording, solid disc when idle
-                        sdf.box(c - 9.0, c - 9.0, 18.0, 18.0, 3.0)
-                        sdf.fill(mix(#xE5484D00, #xFFFFFF, self.recording))
-                        return sdf.result
-                    }
-                }
-            }
-            Filler{}
-            btn_save := Button{
-                text: "Save episode"
-                padding: Inset{left: 34. right: 34. top: 14. bottom: 14.}
-                draw_bg +: {
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                        sdf.fill(mix(#x007AFF, #x007AFF, self.hover))
-                        return sdf.result
-                    }
-                }
-                draw_text +: {
-                    color: #xFFFFFF
-                    color_hover: #xFFFFFF
-                    color_down: #xFFFFFF
-                    text_style: mod.widgets.ux.FONT_MEDIUM{font_size: 13.0}
-                }
+            btn_save := mod.widgets.nx.Primary{height: 48 text: "Save episode"
+                draw_bg +: {pixel: fn() {
+                    let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                    sdf.box(0.5,0.5,self.rect_size.x-1.0,self.rect_size.y-1.0,10.0)
+                    sdf.fill(mix(#x0060CC,#xD1D1D6,self.disabled)); return sdf.result
+                }}
+                draw_text +: {get_color: fn() {return mix(#xFFFFFF,#x636366,self.disabled)}}
             }
         }
     }
@@ -649,19 +596,52 @@ impl RecordScreenRef {
             theme_chip(cx, &chip, light);
         }
 
+        root.widget(cx, ids!(body.right.view3d.v3_body.robot_view))
+            .set_visible(cx, st.robot_urdf.is_some());
+        root.widget(cx, ids!(body.right.view3d.v3_body.no_robot))
+            .set_visible(cx, st.robot_urdf.is_none());
+        root.label(cx, ids!(sbar.profile.label)).set_text(
+            cx,
+            if st.profile_label.is_empty() {
+                "No rig selected"
+            } else {
+                &st.profile_label
+            },
+        );
+        root.label(cx, ids!(sbar.task)).set_text(
+            cx,
+            if st.task.is_empty() {
+                "Choose a profile to set the recording task"
+            } else {
+                &st.task
+            },
+        );
         // ---- transport ------------------------------------------------------
         let rec = if st.recording { 1.0 } else { 0.0 };
         let mut btn = root.widget(cx, ids!(transport.btn_record));
         script_apply_eval!(cx, btn, { draw_bg +: { recording: #(rec) } });
         root.button(cx, ids!(transport.btn_record))
             .set_text(cx, if st.recording { "Stop" } else { "Record" });
-        root.button(cx, ids!(transport.btn_record))
-            .set_enabled(cx, (!st.busy || st.recording) && !has_take);
-        root.button(cx, ids!(transport.btn_save))
-            .set_enabled(cx, has_take && !st.busy);
-        root.button(cx, ids!(transport.btn_discard))
-            .set_enabled(cx, has_take && !st.busy);
-        root.button(cx, ids!(transport.btn_rerecord))
-            .set_enabled(cx, has_take && !st.busy);
+        for (id, enabled) in [
+            (
+                ids!(transport.btn_record) as &[LiveId],
+                st.recording || (!st.profile_label.is_empty() && !st.busy && !has_take),
+            ),
+            (
+                ids!(transport.btn_save),
+                has_take && !st.busy && !st.recording,
+            ),
+            (
+                ids!(transport.btn_discard),
+                has_take && !st.busy && !st.recording,
+            ),
+            (
+                ids!(transport.btn_rerecord),
+                has_take && !st.busy && !st.recording,
+            ),
+        ] {
+            root.button(cx, id).set_enabled(cx, enabled);
+            root.widget(cx, id).set_disabled(cx, !enabled);
+        }
     }
 }

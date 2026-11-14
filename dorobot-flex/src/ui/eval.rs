@@ -152,26 +152,8 @@ script_mod! {
                 }
             }
             Filler{}
-            btn_stop := Button{
-                text: "STOP ROLLOUT"
-                padding: Inset{left: 22. right: 22. top: 11. bottom: 11.}
-                draw_bg +: {
-                    light: instance(0.0)
-                    pixel: fn() {
-                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                        let idle = mix(#x2C2C2E, #xF2F2F7, self.light)
-                        sdf.fill_keep(mix(idle, mix(#x38383A, #xE5E5EA, self.light), self.hover))
-                        sdf.stroke(#xD70015, 1.2)
-                        return sdf.result
-                    }
-                }
-                draw_text +: {
-                    color: #xD70015
-                    color_hover: #xD70015
-                    color_down: #xD70015
-                    text_style: mod.widgets.ux.TEXT_CHIP{}
-                }
+            btn_stop := mod.widgets.nx.NxBtn{height: 44 text: "Stop rollout"
+                draw_text +: {get_color: fn() {return mix(#xC40013, #x8E8E93, self.disabled)}}
             }
         }
 
@@ -222,8 +204,8 @@ script_mod! {
                 stack := mod.widgets.ux.Card{
                     width: Fill height: Fill
                     flow: Down
-                    st_head := mod.widgets.ux.PanelHead{ title +: { text: "action vs state — per joint" } }
-                    st_body := View{
+                    st_head := mod.widgets.ux.PanelHead{ title +: { text: "Action vs state" } }
+                    st_body := ScrollYView{
                         width: Fill height: Fill flow: Down
                         padding: Inset{top: 4. bottom: 4.}
                         div_0 := DivergenceRow{ chart +: { draw_bg +: {seed: 0.0} } }
@@ -287,7 +269,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.FONT_MEDIUM{font_size: 13.0}
-                                get_color: fn() { return mix(#x248A3D, #x30D158, self.light) }
+                                get_color: fn() { return mix(#x30D158, #x248A3D, self.light) }
                             }
                         }
                     }
@@ -364,15 +346,27 @@ impl EvalScreenRef {
             theme_panel_head(cx, &head, light);
         }
 
+        root.widget(cx, ids!(body))
+            .set_visible(cx, !st.checkpoint.is_empty());
+        root.button(cx, ids!(pbar.btn_stop))
+            .set_enabled(cx, st.driving);
+        root.widget(cx, ids!(pbar.btn_stop))
+            .set_disabled(cx, !st.driving);
         // ---- policy bar ----------------------------------------------------
-        root.label(cx, ids!(pbar.ckpt.label))
-            .set_text(cx, &st.checkpoint);
+        root.label(cx, ids!(pbar.ckpt.label)).set_text(
+            cx,
+            if st.checkpoint.is_empty() {
+                "No checkpoint"
+            } else {
+                &st.checkpoint
+            },
+        );
         root.label(cx, ids!(pbar.status.label)).set_text(
             cx,
             if st.driving {
                 "policy driving"
             } else {
-                "stopped"
+                "Not driving"
             },
         );
         root.label(cx, ids!(pbar.latency))
