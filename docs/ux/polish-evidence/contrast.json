@@ -1,0 +1,93 @@
+{
+  "method": "WCAG sRGB relative luminance of the authored text/surface pairs. Not a claim of complete accessibility conformance.",
+  "pairs": [
+    {
+      "role": "primary action",
+      "foreground": "#FFFFFF",
+      "background": "#0060CC",
+      "ratio": 5.92,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "plot axis light",
+      "foreground": "#636366",
+      "background": "#F2F2F7",
+      "ratio": 5.37,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "plot axis dark",
+      "foreground": "#AEAEB2",
+      "background": "#1C1C1E",
+      "ratio": 7.69,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "secondary metadata light",
+      "foreground": "#636366",
+      "background": "#F2F2F7",
+      "ratio": 5.37,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "secondary metadata dark",
+      "foreground": "#AEAEB2",
+      "background": "#000000",
+      "ratio": 9.5,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "warning light",
+      "foreground": "#996300",
+      "background": "#FFFFFF",
+      "ratio": 5.07,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "warning dark",
+      "foreground": "#FFB340",
+      "background": "#1C1C1E",
+      "ratio": 9.54,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "selected label light",
+      "foreground": "#0060CC",
+      "background": "#E5F0FF",
+      "ratio": 5.15,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "selected label dark",
+      "foreground": "#64B5FF",
+      "background": "#19334D",
+      "ratio": 5.92,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "stop label light",
+      "foreground": "#C40013",
+      "background": "#FFFFFF",
+      "ratio": 6.26,
+      "target": 4.5,
+      "pass": true
+    },
+    {
+      "role": "stop label dark",
+      "foreground": "#FF6961",
+      "background": "#2C2C2E",
+      "ratio": 4.94,
+      "target": 4.5,
+      "pass": true
+    }
+  ]
+}

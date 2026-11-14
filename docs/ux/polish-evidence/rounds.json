@@ -1,0 +1,106 @@
+{
+  "rubric": "tools/ux/polish-rubric.json",
+  "rounds": [
+    {
+      "round": "baseline",
+      "score": 82,
+      "dimensions": [
+        16,
+        13,
+        12,
+        11,
+        13,
+        8,
+        9
+      ],
+      "decision": "reject",
+      "observations": [
+        "Disconnected header/body corners; inconsistent panel surfaces.",
+        "Low-contrast plot labels and bright blue text/actions on light surfaces.",
+        "Duplicate empty camera messages; blank record camera and joint slots.",
+        "Oversized dataset thumbnail; redundant spacing in Library action row.",
+        "Arrangement controls do not indicate their current state."
+      ]
+    },
+    {
+      "round": "1",
+      "score": 89,
+      "dimensions": [
+        17,
+        14,
+        14,
+        13,
+        13,
+        9,
+        9
+      ],
+      "decision": "reject",
+      "observations": [
+        "Panel corner inset is too small and body pixels cover the curved edge.",
+        "Record session cues clip below the fixed card height.",
+        "Episode panel title truncates prematurely due to two Fill widgets.",
+        "Empty recording sources still leave a blank region.",
+        "Timeline playhead not visible in captured reference position."
+      ]
+    },
+    {
+      "round": "2",
+      "score": 92,
+      "dimensions": [
+        18,
+        14,
+        14,
+        14,
+        13,
+        9,
+        10
+      ],
+      "decision": "reject",
+      "observations": [
+        "Recording camera empty-state detail clips at compact height.",
+        "Session cue line still clipped; fixed height must become intrinsic.",
+        "Calibration readouts consume too much width and truncate numeric ranges.",
+        "Simulated take review has no explanation for absent thumbnails."
+      ]
+    },
+    {
+      "round": "3",
+      "score": 94,
+      "dimensions": [
+        19,
+        14.5,
+        14.5,
+        14,
+        14.5,
+        9,
+        8.5
+      ],
+      "decision": "reject",
+      "observations": [
+        "Geometry checks and simulated recording flow pass.",
+        "Layout changes are functional but the toolbar caption and selected state are stale until a later backend sync; derive toolbar state from the active panel layout."
+      ]
+    },
+    {
+      "round": "final",
+      "score": 95,
+      "dimensions": [
+        19,
+        14.5,
+        14.5,
+        14.5,
+        14.5,
+        9,
+        9
+      ],
+      "decision": "pass",
+      "observations": [
+        "All 40 matrix images inspected; compact calibration, library and evaluation content remain reachable by scrolling.",
+        "Current layout caption and panel selection follow real arrangement changes.",
+        "75 UI assertions pass, including two native Replay windows and restored session state.",
+        "Remaining deductions: 3D framing, compact metadata, chart chrome and hue distinctions, indirect empty-state setup, default empty panes and layout discoverability."
+      ]
+    }
+  ],
+  "provenance": "Same model reviews original screenshots. Scores are evaluative; no independent human or external grader."
+}

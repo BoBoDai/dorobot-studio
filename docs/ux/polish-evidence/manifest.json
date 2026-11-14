@@ -1,0 +1,745 @@
+{
+  "implementation_commit": "3d72c53e0cf2b0122d2620caa866b1a3b949eba7",
+  "matrix_count": 40,
+  "capture_method": "makepad-remote grab after real pointer/keyboard input; original PNG bytes copied without pixel edits",
+  "provenance": "Matrix and workflow captures use the final control/layout implementation. Evaluate matrices and simulated Stop flow were refreshed after the final Stop-label color correction. Refinement/compact captures were refreshed afterward. Iteration captures are historical rejected candidates.",
+  "captures": [
+    {
+      "file": "compact/compact-calibration-actions.png",
+      "sha256": "e2c565dafa9cadd82533399cfcfbc57551282a9fb9cc4847a185d13154d2b7ec",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 117251,
+      "group": "compact",
+      "original_pixels": true
+    },
+    {
+      "file": "compact/compact-evaluation-last-trace.png",
+      "sha256": "4d714cdcbbf948bffac1594d029971acda97466a51e14fe6f92795016c780518",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 117862,
+      "group": "compact",
+      "original_pixels": true
+    },
+    {
+      "file": "compact/compact-library-bottom.png",
+      "sha256": "3bbfafc719b1d67b5fb6821c75f440855e03801c4399742056af1a6005919a2c",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 92101,
+      "group": "compact",
+      "original_pixels": true
+    },
+    {
+      "file": "iterations/baseline-library.png",
+      "sha256": "70866663a05831876450134098e70cd3726d171a04f89dcd86fcd5414b26282c",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 56377,
+      "group": "iterations",
+      "original_pixels": true
+    },
+    {
+      "file": "iterations/baseline-replay.png",
+      "sha256": "abf37427985bd6a7aee8ae8b6c176c33ad8a9a789d0389936e91786fb6987882",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 108163,
+      "group": "iterations",
+      "original_pixels": true
+    },
+    {
+      "file": "iterations/round-1-record.png",
+      "sha256": "346e337d37923ac37e1f9554579ab2d6522ef5fc0aaeb76a39a9f664e8249847",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 97571,
+      "group": "iterations",
+      "original_pixels": true
+    },
+    {
+      "file": "iterations/round-2-record.png",
+      "sha256": "67fdc923b0e718be08e3202feb12d3b7352ac3812c681143c8d6d487bb1227ef",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 101555,
+      "group": "iterations",
+      "original_pixels": true
+    },
+    {
+      "file": "layout/all-panels-closed.png",
+      "sha256": "45e46b774ca475914946d2f144da710edc22c766d65c29766400840f4a01bee2",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 93168,
+      "group": "layout",
+      "original_pixels": true
+    },
+    {
+      "file": "layout/compact-details-dark.png",
+      "sha256": "051f26ea15780cf4a6e542c03e7c0054c959911e730ffd3aa7b4d997086100ea",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 88181,
+      "group": "layout",
+      "original_pixels": true
+    },
+    {
+      "file": "layout/compact-details-light.png",
+      "sha256": "59c3086f417a5a650017bb37a25146f24f36e8e0de1818529fc58984724c205d",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 87908,
+      "group": "layout",
+      "original_pixels": true
+    },
+    {
+      "file": "layout/compact-last-signal.png",
+      "sha256": "76f7f2768564162cb043fbdab075e5bba20f425f10d36d64238c423e2ae6fd81",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 85396,
+      "group": "layout",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-dark-eval.png",
+      "sha256": "aab1939ad199123dceee2cafbbfcac92b530a3babaaeb0fd93e53d1e31767895",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 53525,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-dark-hardware.png",
+      "sha256": "a1c54ae7d1b66bfbd412f1c2a9b8e60d879ec13d08daa4e173b69336da4421b5",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 129844,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-dark-library.png",
+      "sha256": "dc5081d220ab3140186c45af0fd2588abdde29bbd3e026c5e2672b07b617a6a3",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 53574,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-dark-play.png",
+      "sha256": "2baeeca5e1871e3c62da6d55eaa558d921ec5cd64f42ca05e36cb10c478a797f",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 86683,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-dark-record.png",
+      "sha256": "e404a5e3ff847a0366605d182b89090b3113a1d07212c450ac0a521f134487b0",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 105360,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-light-eval.png",
+      "sha256": "4b1c9e18760158407cd2ef86c5af521457780a9bef5aadb928612a1240f719d6",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 54489,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-light-hardware.png",
+      "sha256": "350186194c9bf3c207123e715f48798a914904e194cabbf0464ee93861e445cc",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 133835,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-light-library.png",
+      "sha256": "7581fea6d306fbbacd347a20404e04aa1d0b09b13cebf40608c2178b81d508d8",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 53565,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-light-play.png",
+      "sha256": "2f9bd464606a93509e481cf284f1fcec2133f4a13d84b7b8f1b2389b7d8eb4e3",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 87244,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1024x768-light-record.png",
+      "sha256": "8605817edd750c5e1cccea85c9a0859b58556f8f3f15b7fce019c1ce66edbc74",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 107433,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-eval.png",
+      "sha256": "32289ea11e7d0886533746e24763bc247ac543daccb09fc3079c6bed378f8133",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 56704,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-hardware.png",
+      "sha256": "59506bffdd954f16d68317b0e7b8be1ee8689631698486ec9e2699a0f5200712",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 159975,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-library.png",
+      "sha256": "32c1cc11409c185dd762dced6ca582a732d6f560eb66c550c36c61213918097a",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 57422,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-play.png",
+      "sha256": "a628b0ef357e08af42f1edd2870157d24c651018d83810f5d019a92533b60b27",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 101492,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-dark-record.png",
+      "sha256": "43d3b1158edfd9cb91ceda71cb314a89f35e145c2c781194aaa38fa9f315aa58",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 113109,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-light-eval.png",
+      "sha256": "48aafb5429a11c547f788cb981fddfd5caace6e6430b24e7dbffb0ad6555f3b2",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 57790,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-light-hardware.png",
+      "sha256": "e90c9ea9466054c33a140a6fab92faf23cbd6d12e78c0c4a8d8f8b64a6c97b44",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 163798,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-light-library.png",
+      "sha256": "143bb12d2d9ffcdcb192bf16e3e3c083a683908e9f9fdf26ae18d7a28041d0ec",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 57300,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-light-play.png",
+      "sha256": "ddce7a2d60e5974cb76bce075a3a609d03957b490be30d1f6f81116b2b49047f",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 105038,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "recorded/studio-1440x900-light-record.png",
+      "sha256": "2f3fd85e2d961fc95bc8eb0ebac714d705daa10a988ab993a2d049326a587e55",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 115235,
+      "group": "recorded",
+      "original_pixels": true
+    },
+    {
+      "file": "refinement/selected-panel-controls.png",
+      "sha256": "177a117d7bfbb2436727b3e52d89170f9e75b5e0cc6f76dd346e1bcea4f45193",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 115025,
+      "group": "refinement",
+      "original_pixels": true
+    },
+    {
+      "file": "refinement/toolbar-focus-dark.png",
+      "sha256": "ea2551b2b57714bd4075bf2b72d9d19c5e42c3df6650b589e7f1732b76be65bc",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 102353,
+      "group": "refinement",
+      "original_pixels": true
+    },
+    {
+      "file": "refinement/toolbar-focus-light.png",
+      "sha256": "6692c9b7a4763545ae3e24b6c2cfb19fa88c632da678c8733c6364c1c36cd287",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 102327,
+      "group": "refinement",
+      "original_pixels": true
+    },
+    {
+      "file": "refinement/toolbar-hover-dark.png",
+      "sha256": "7a4819b034cf76bb6002588f07b65c5705b40f8c18cfc16a57acff2225e45dfb",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 101833,
+      "group": "refinement",
+      "original_pixels": true
+    },
+    {
+      "file": "refinement/toolbar-hover-light.png",
+      "sha256": "7591331c5ec7b933c272f965f79ef361100a0729c57c5313b94d7d8db7c5b6d0",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 102178,
+      "group": "refinement",
+      "original_pixels": true
+    },
+    {
+      "file": "refinement/toolbar-pressed-dark.png",
+      "sha256": "f536d6d3506a2ec2d686025186991098bc1b2f5755017771ef625a4189627c5c",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 101880,
+      "group": "refinement",
+      "original_pixels": true
+    },
+    {
+      "file": "refinement/toolbar-pressed-light.png",
+      "sha256": "b49965ceed846a817918471b5fadb759891572df8d3ce093e40bfa139d56a649",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 102341,
+      "group": "refinement",
+      "original_pixels": true
+    },
+    {
+      "file": "restart/restored-layout.png",
+      "sha256": "acd2ff15b58663dd073a992e32b5263c50b6f5aec84d6919599cd8099f2748b1",
+      "size": [
+        1536,
+        1024
+      ],
+      "bytes": 124678,
+      "group": "restart",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-eval.png",
+      "sha256": "c0633bdaa8dd702c41ad2817f267c81aabe554a57b2fcc2f4e11c64e5070fdb7",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 118428,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-hardware.png",
+      "sha256": "595edf0bf6e3b0cc2c874d0b647aa43413ae63f279a58933649582244590c5e6",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 118734,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-library.png",
+      "sha256": "1c5cf1934af773839cf158cdddc09b70c48eb71b84367af8ccf42f03f7e4db80",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 90596,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-play.png",
+      "sha256": "1bc307f31f1a591fc59d8467d7c460155a0d19b113910f37a1a1c5ecd712205b",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 98151,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-dark-record.png",
+      "sha256": "a6d6bf02c98bc64a12c9657967615a5e45544ccc0122714d3fbd1644c913f85e",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 109612,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-light-eval.png",
+      "sha256": "318c1e7d822fa594a023e5d1da529f58ea3b0074ef542879c7f4dd3da6fa63d7",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 102346,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-light-hardware.png",
+      "sha256": "b98aa4a9e7bac3867b9e7bd5de7fc38e702decd1cae880026b9334170d0d7d11",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 120279,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-light-library.png",
+      "sha256": "1a73cfc1b4508a0fa12a044e2a26ddaa6568f87c0cad2e24b93691d7e81d905a",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 90402,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-light-play.png",
+      "sha256": "db5e8179c67c2ce8438d01085cce5bb4db7c9044395ac7cf89726e63e7a50bd1",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 98803,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1024x768-light-record.png",
+      "sha256": "306ae1e4c422866f27dc87e9064750f2b42d474c36f2196a82a0c16762f73fc5",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 108633,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-eval.png",
+      "sha256": "eef5451a5a275d078f84a119eafbdb236474c4eb9a64d920c5dd53888e737e75",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 165394,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-hardware.png",
+      "sha256": "0874e47b2ca5eb1fc420163aef8892167a9cbfeb697a4e48edf4de144aed6607",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 150721,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-library.png",
+      "sha256": "d994d9590800264f25ad9142a5a937fe7c33c188ad664536d87be9e6f466371d",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 108992,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-play.png",
+      "sha256": "5b4bc87dadbf6e85165cecb126ea2276a7d02d5aa214473056f3427268869f49",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 116184,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-dark-record.png",
+      "sha256": "227ff7cc786b6a11267783f633bef885a0884f3a71d18162081b948df70b84d8",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 132414,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-light-eval.png",
+      "sha256": "a45093f5f33222448f2e80bed058d01459632d80b67f3f89d2d8cac818f9308c",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 140475,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-light-hardware.png",
+      "sha256": "543ec9b62d8af5bd784c094d078d790ea0051d893581f9fbdc02d7c39dd36575",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 177896,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-light-library.png",
+      "sha256": "691ef4a94e694fb28b324bdadcf5eb4fa1ac96b8ac7f7f57f79a373dad55ee2e",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 109115,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-light-play.png",
+      "sha256": "3ebb681ff5e7cb7c39f30e2c4f51ebfa569154fe96628295586b7a9d0fd0402c",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 116620,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated/studio-1440x900-light-record.png",
+      "sha256": "eb4a3974ba7c30d697fc94ea283df99c4fbe0ac3a191a560d397c55872336801",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 131893,
+      "group": "simulated",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated-workflow/simulated-calibration.png",
+      "sha256": "595edf0bf6e3b0cc2c874d0b647aa43413ae63f279a58933649582244590c5e6",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 118734,
+      "group": "simulated-workflow",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated-workflow/simulated-evaluation-stopped.png",
+      "sha256": "a2469022737f2c0b94ca52e5c70ff100b80746c42243f39ff57558a4859c92fa",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 116787,
+      "group": "simulated-workflow",
+      "original_pixels": true
+    },
+    {
+      "file": "simulated-workflow/simulated-take-review.png",
+      "sha256": "e6d7135c65202d4986724f8ab62907286cc81c5cd1e480b6f7d87d1e01a031c0",
+      "size": [
+        1024,
+        768
+      ],
+      "bytes": 109664,
+      "group": "simulated-workflow",
+      "original_pixels": true
+    },
+    {
+      "file": "speed/shared-speed-control.png",
+      "sha256": "a5aa44164f3b1c57d54a4df882e8adf4acb668cf7b33bef57012f3d729f65740",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 130725,
+      "group": "speed",
+      "original_pixels": true
+    },
+    {
+      "file": "workflow/before-restart.png",
+      "sha256": "5aa3f058908448f44a92ee58951a45e00295dbfd4f43f36137e180340075366b",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 130051,
+      "group": "workflow",
+      "original_pixels": true
+    },
+    {
+      "file": "workflow/custom-layout.png",
+      "sha256": "adc6d908b1759a46cbb847a4f53dde8e377951ea0d4c9884ea48160ffd1b33c1",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 122164,
+      "group": "workflow",
+      "original_pixels": true
+    },
+    {
+      "file": "workflow/native-replay-window.png",
+      "sha256": "86c9c548a93aa89efdbaff714c47981edd9a3c9a019bd9a22a3a9cf410c3ed89",
+      "size": [
+        1280,
+        900
+      ],
+      "bytes": 129036,
+      "group": "workflow",
+      "original_pixels": true
+    },
+    {
+      "file": "workflow/unconfigured-recording.png",
+      "sha256": "d05d7bd04ee4ddacf08be965a42ea6f95e752eab5b635de36fedf2ed3a437a87",
+      "size": [
+        1440,
+        900
+      ],
+      "bytes": 115247,
+      "group": "workflow",
+      "original_pixels": true
+    }
+  ]
+}
