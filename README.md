@@ -41,6 +41,13 @@ This launcher builds without FFmpeg/video decoding; the standard build below
 includes video playback. Model provenance and limits are recorded alongside
 the assets.
 
+### Validate Studio with AISLE and Nexus
+
+The [Adora Nano / AISLE validation guide](tools/aisle-validation/README.md)
+includes scripts to simulate Nano's two arms in Nexus, export AISLE recordings
+to a LeRobot-shaped dataset, and check Studio's production playback and curation
+backend. It covers the commands, generated evidence, and limits of the test.
+
 ## Overview
 
 Dorobot provides tools for visualizing robotics datasets, with a focus on **LeRobot** format datasets:
