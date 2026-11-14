@@ -47,20 +47,42 @@ script_mod! {
     mod.widgets.ux.FONT_BOLD = mod.widgets.nx.FONT_B{}
 
     // Lighter, smaller, airier than before — the previous scale read as heavy.
-    mod.widgets.ux.TEXT_H1    = mod.widgets.ux.FONT_MEDIUM{font_size: 19.0}
+    mod.widgets.ux.TEXT_H1    = mod.widgets.ux.FONT_BOLD{font_size: 22.0}
     mod.widgets.ux.TEXT_TITLE = mod.widgets.ux.FONT_MEDIUM{font_size: 13.0}
     mod.widgets.ux.TEXT_BODY  = mod.widgets.ux.FONT_REGULAR{font_size: 11.5}
-    mod.widgets.ux.TEXT_META  = mod.widgets.ux.FONT_REGULAR{font_size: 10.5}
-    mod.widgets.ux.TEXT_CHIP  = mod.widgets.ux.FONT_MEDIUM{font_size: 9.5}
+    mod.widgets.ux.TEXT_META  = mod.widgets.ux.FONT_REGULAR{font_size: 11.0}
+    mod.widgets.ux.TEXT_CHIP  = mod.widgets.ux.FONT_MEDIUM{font_size: 10.0}
     mod.widgets.ux.TEXT_NAV   = mod.widgets.ux.FONT_MEDIUM{font_size: 12.0}
+
+    // Shared toolbar treatment, including pressed, focused and selected states.
+    mod.widgets.ux.ToolButton = mod.widgets.nx.NxBtn{
+        height: 44
+        padding: Inset{left: 12. right: 12. top: 8. bottom: 8.}
+        draw_text +: {text_style: mod.widgets.ux.TEXT_BODY{}}
+        draw_bg +: {
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                let base = mix(#x242428, #xFFFFFF, self.light)
+                let tint = mix(#x19334D, #xE5F0FF, self.light)
+                let fill = mix(base, tint, max(self.on, self.hover * 0.5))
+                let pressed = mix(#x34404E, #xD5E5F9, self.light)
+                let edge = mix(#x48484A, #xD1D1D6, self.light)
+                sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, 8.0)
+                sdf.fill_keep(mix(fill, pressed, self.down))
+                sdf.stroke(mix(edge, mix(#x64B5FF, #x0060CC, self.light), self.focus), 1.0)
+                return sdf.result
+            }
+        }
+    }
 
     // -------------------------------------------------------------- surfaces --
     // Panel with a hairline border, the base for every card and rail.
     // `light` = 0 dark, 1 light. Every surface carries it so a theme switch is
     // one value pushed through the tree rather than a second widget set.
-    mod.widgets.ux.Card = RoundedView{
+    mod.widgets.ux.Card = View{
         width: Fill
         height: Fit
+        padding: 10.0
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
@@ -68,7 +90,7 @@ script_mod! {
             border_radius: 14.0
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                let fill = mix(#x2C2C2E, #xFFFFFF, self.light)
+                let fill = mix(#x1C1C1E, #xFFFFFF, self.light)
                 let edge = mix(#x38383A, #xE5E5EA, self.light)
                 sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 14.0)
                 sdf.fill_keep(fill)
@@ -81,12 +103,12 @@ script_mod! {
     // Standard panel title bar: drag dots, title, maximize, close.
     mod.widgets.ux.PanelHead = View{
         width: Fill
-        height: 34
+        height: 40
         flow: Right
         align: Align{y: 0.5}
         padding: Inset{left: 12. right: 10.}
         spacing: 9.0
-        show_bg: true
+        show_bg: false
         draw_bg +: {
             light: instance(0.0)
             pixel: fn() {
@@ -127,7 +149,6 @@ script_mod! {
                 get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
             }
         }
-        Filler{}
         btn_max := View{
             visible: false
             width: 13 height: 13
@@ -467,7 +488,7 @@ script_mod! {
         flow: Down
         padding: 0.0
         spacing: 4.0
-        show_bg: true
+        show_bg: false
         draw_bg +: {
             light: instance(0.0)
             pixel: fn() {

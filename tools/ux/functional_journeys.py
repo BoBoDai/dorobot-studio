@@ -63,6 +63,7 @@ if a.mode=='speed':
  check('2x control changes actual playback rate',1.65<rate<2.35)
  click('close_monitor',w=read()['state']['monitor_window']);click('panels_btn')
  if not read()['controls']['page_play.upper.side']['visible']:click('details_btn')
+ x,y,w,h=rect('page_play.upper.side');cmd('mouse','k=scroll',f'x={x+w/2}',f'y={y+h/2}','dx=0','dy=-500')
  if read()['state']['tag']=='Some(Good)':click('page_play.upper.side.side_body.btn_good')
  click('page_play.upper.side.side_body.btn_good');wait(lambda r:r['state']['tag']=='Some(Good)')
  nav('library');nav('play');check('good tag survives navigation',read()['state']['tag']=='Some(Good)')
@@ -174,6 +175,9 @@ else:
  click('page_play.upper.side.side_body.btn_bad');wait(lambda r:r['state']['tag']=='Some(Bad)')
  nav('library');nav('play')
  check('bad tag persists through navigation',read()['state']['tag']=='Some(Bad)')
+ # Curation lives in a scrollable inspector; a larger scrub target leaves
+ # less vertical space, so bring the action inside the viewport before input.
+ x,y,w,h=rect('page_play.upper.side');cmd('mouse','k=scroll',f'x={x+w/2}',f'y={y+h/2}','dx=0','dy=500')
  click('page_play.upper.side.side_body.btn_del');wait(lambda r:r['state']['episode']!=1)
  key('KeyZ',logo=1);time.sleep(.5)
  if not read()['controls']['page_play.upper.tree']['visible']:click('details_btn')

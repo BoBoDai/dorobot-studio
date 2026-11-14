@@ -24,11 +24,11 @@ script_mod! {
         flow: Down
 
         draw_text +: {
-            text_style: theme.font_regular{font_size: 9.0}
+            text_style: mod.widgets.flex.TEXT_SMALL{}
             dark_mode: instance(0.0)
             get_color: fn() {
                 let light_text = vec4(0.388, 0.388, 0.400, 1.0)
-                let dark_text = vec4(0.557, 0.557, 0.576, 1.0)
+                let dark_text = vec4(0.682, 0.682, 0.698, 1.0)
                 return mix(light_text, dark_text, self.dark_mode)
             }
         }
@@ -81,7 +81,7 @@ script_mod! {
                 width: 2
                 height: Fill
                 margin: Inset{left: 0.}
-                show_bg: true
+                show_bg: false
                 draw_bg.color: #xD70015
             }
 
@@ -234,6 +234,31 @@ impl Widget for Timeline {
         // Draw time ruler ticks and labels
         if self.duration > 0.0 && self.ruler_rect.size.x > 10.0 {
             self.draw_time_ruler(cx);
+            // Draw over the track after its children; a margin on an Overlay
+            // child is not a reliable indicator after resizing the window.
+            let track = self.view.view(cx, ids!(track_area)).area().rect(cx);
+            let x = track.pos.x
+                + (self.current_time / self.duration).clamp(0.0, 1.0)
+                    * (track.size.x - 2.0).max(0.0);
+            self.draw_tick.color = if dm > 0.5 {
+                vec4(1.0, 0.271, 0.227, 1.0)
+            } else {
+                vec4(0.843, 0.0, 0.082, 1.0)
+            };
+            self.draw_tick.draw_abs(
+                cx,
+                Rect {
+                    pos: dvec2(x, track.pos.y),
+                    size: dvec2(2.0, track.size.y),
+                },
+            );
+            self.draw_tick.draw_abs(
+                cx,
+                Rect {
+                    pos: dvec2((x - 3.0).max(track.pos.x), track.pos.y),
+                    size: dvec2(8.0_f64.min(track.pos.x + track.size.x - x), 4.0),
+                },
+            );
         }
 
         DrawStep::done()
@@ -286,8 +311,9 @@ impl Timeline {
             // Draw time label for major ticks
             if (time % (tick_interval * 2.0)).abs() < 0.01 || time == 0.0 {
                 let label = Self::format_ruler_time(time);
+                let label_x = (x + 3.0).min(rect.pos.x + rect.size.x - 38.0);
                 self.draw_text
-                    .draw_abs(cx, dvec2(x + 2.0, rect.pos.y + 2.0), &label);
+                    .draw_abs(cx, dvec2(label_x, rect.pos.y + 2.0), &label);
             }
 
             time += tick_interval;

@@ -23,8 +23,8 @@ script_mod! {
         head := mod.widgets.ux.PanelHead{ title +: { text: "cam" } }
         stage := View{
             width: Fill height: Fill
-            flow: Down
-            align: Align{x: 0.02 y: 0.93}
+            flow: Overlay
+            align: Align{x: 0.5 y: 0.5}
             show_bg: true
             draw_bg +: {
                 light: instance(0.0)
@@ -38,6 +38,8 @@ script_mod! {
                 }
             }
             preview := Image{ width: Fill height: Fill }
+            waiting := Label{width: Fill align: Align{x: 0.5} margin: 8.0 text: "No camera frames"
+                draw_text +: {color: #xAEAEB2 text_style: mod.widgets.ux.TEXT_META{}}}
             badge := RoundedView{
                 width: Fit height: Fit
                 padding: Inset{left: 8. right: 9. top: 3. bottom: 3.}
@@ -82,7 +84,7 @@ script_mod! {
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
-                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
             }
         }
         jv := Label{
@@ -135,7 +137,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
+            pixel: fn() { return mix(#x111114, #xF2F2F7, self.light) }
         }
 
         // ---- session bar ----
@@ -172,7 +174,7 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.FONT_MEDIUM{font_size: 17.0}
-                    get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                    get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                 }
             }
         }
@@ -191,16 +193,22 @@ script_mod! {
                     width: Fill height: Fill
                     flow: Right
                     spacing: 12.0
+                    camera_empty := mod.widgets.ux.Card{width: Fill height: Fill flow: Down align: Align{x: 0.5 y: 0.5} padding: 24.0 spacing: 10.0
+                        title := Label{width: Fill align: Align{x: 0.5} text: "Camera previews" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}}}
+                        detail := Label{width: Fill align: Align{x: 0.5} text: "Connect cameras in Hardware to preview your recording." draw_text +: {light: instance(1.0) text_style: mod.widgets.ux.TEXT_META{} get_color: fn() {return mix(#xAEAEB2,#x636366,self.light)}}}
+                    }
                     cam_0 := CameraPane{}
                     cam_1 := CameraPane{}
                 }
                 traces := mod.widgets.ux.Card{
-                    width: Fill height: 206
+                    width: Fill height: 228
                     flow: Down
                     tr_head := mod.widgets.ux.PanelHead{ title +: { text: "Joint state" } }
                     tr_body := View{
                         width: Fill height: Fill flow: Down
                         padding: Inset{top: 6. bottom: 6.}
+                        empty := Label{width: Fill margin: Inset{left: 14. top: 16. right: 14.} text: "Joint readings appear when a robot is connected."
+                            draw_text +: {light: instance(1.0) text_style: mod.widgets.ux.TEXT_META{} get_color: fn() {return mix(#xAEAEB2,#x636366,self.light)}}}
                         trace_0 := TraceRow{ wave +: { draw_bg +: {seed: 0.0} } }
                         trace_1 := TraceRow{ wave +: { draw_bg +: {seed: 1.0} } }
                         trace_2 := TraceRow{ wave +: { draw_bg +: {seed: 2.0} } }
@@ -243,17 +251,17 @@ script_mod! {
                             sky_horizon: mod.theme.color_bg_app sky_zenith: mod.theme.color_bg_app
                             ground_color: mod.theme.color_bg_container ground2_color: mod.theme.color_bg_container
                             grid_color: mod.theme.color_text_disabled}
-                        no_robot := Label{width: Fill text: "Choose a rig profile to preview your robot" draw_text.color: mod.theme.color_text}
+                        no_robot := Label{width: Fill align: Align{x: 0.5} margin: 14.0 text: "Choose a rig profile to preview your robot" draw_text.color: mod.theme.color_text}
 
                     }
                 }
                 session := mod.widgets.ux.Card{
-                    width: Fill height: 168
+                    width: Fill height: Fit
                     flow: Down
                     ss_head := mod.widgets.ux.PanelHead{ title +: { text: "Session" } }
                     ss_body := View{
-                        width: Fill height: Fill flow: Down
-                        padding: Inset{left: 14. right: 14. top: 12.}
+                        width: Fill height: Fit flow: Down
+                        padding: Inset{left: 14. right: 14. top: 8. bottom: 10.}
                         spacing: 10.0
                         prog_row := View{
                             width: Fill height: Fit flow: Right align: Align{y: 0.5}
@@ -295,7 +303,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_META{}
-                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         cues := Label{
@@ -321,6 +329,8 @@ script_mod! {
                 flow: Right
                 align: Align{y: 0.5}
                 padding: Inset{left: 14. right: 14.}
+                no_thumbnails := Label{width: Fill text: "No camera preview for this take"
+                    draw_text +: {light: instance(1.0) text_style: mod.widgets.ux.TEXT_META{} get_color: fn() {return mix(#xAEAEB2,#x636366,self.light)}}}
                 film_0 := FilmCell{}
                 film_1 := FilmCell{}
                 film_2 := FilmCell{}
@@ -496,6 +506,21 @@ impl RecordScreenRef {
         let profile_chip = root.widget(cx, ids!(sbar.profile));
         theme_chip(cx, &profile_chip, light);
 
+        root.widget(cx, ids!(body.left.cams.camera_empty))
+            .set_visible(cx, st.cameras.is_empty());
+        root.widget(cx, ids!(body.left.traces.tr_body.empty))
+            .set_visible(cx, st.joints.is_empty());
+        apply_light_in(
+            cx,
+            root,
+            &[
+                (ids!(body.left.cams.camera_empty), Themed::Bg),
+                (ids!(body.left.cams.camera_empty.detail), Themed::Text),
+                (ids!(body.left.traces.tr_body.empty), Themed::Text),
+            ],
+            light,
+        );
+
         // ---- cameras ------------------------------------------------------
         for (i, p) in CAM_IDS.iter().enumerate() {
             let pane = root.widget(cx, p);
@@ -506,8 +531,13 @@ impl RecordScreenRef {
                 Some(name) => {
                     pane.set_visible(cx, true);
                     pane.label(cx, ids!(head.title)).set_text(cx, name);
+                    let has_preview = st.previews.contains_key(name);
+                    pane.widget(cx, ids!(stage.waiting))
+                        .set_visible(cx, !has_preview);
+                    pane.widget(cx, ids!(stage.preview))
+                        .set_visible(cx, has_preview);
                     pane.widget(cx, ids!(stage.badge))
-                        .set_visible(cx, st.recording);
+                        .set_visible(cx, st.recording && has_preview);
                     if let Some(path) = st.previews.get(name) {
                         if let Ok(bytes) = std::fs::read(path) {
                             let _ = pane
@@ -577,6 +607,25 @@ impl RecordScreenRef {
         let frac = st.progress();
         let mut bar = root.widget(cx, ids!(body.right.session.ss_body.prog_bar));
         script_apply_eval!(cx, bar, { draw_bg +: { frac: #(frac) light: #(light) } });
+
+        if let Some(mut traces) = root.widget(cx, ids!(body.left.traces)).borrow_mut::<View>() {
+            traces.walk.height = Size::Fixed(if st.joints.is_empty() { 128.0 } else { 228.0 });
+        }
+        let has_thumbnails = st
+            .last_take
+            .as_ref()
+            .is_some_and(|take| !take.thumbnails.is_empty());
+        if let Some(mut review) = root.widget(cx, ids!(review)).borrow_mut::<View>() {
+            review.walk.height = Size::Fixed(if has_thumbnails { 132.0 } else { 112.0 });
+        }
+        root.widget(cx, ids!(review.rv_body.no_thumbnails))
+            .set_visible(cx, !has_thumbnails);
+        apply_light_in(
+            cx,
+            root,
+            &[(ids!(review.rv_body.no_thumbnails), Themed::Text)],
+            light,
+        );
 
         // ---- review strip ---------------------------------------------------
         let has_take = st.last_take.is_some();

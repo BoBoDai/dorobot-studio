@@ -36,7 +36,7 @@ script_mod! {
             step_back_btn := Button{
                 width: 44
                 height: 44
-                text: "<<"
+                text: "‹"
                 draw_bg +: {
                     dark_mode: instance(0.0)
                     pixel: fn() {
@@ -66,11 +66,11 @@ script_mod! {
                 height: 44
                 text: "Play"
                 draw_bg +: {
-                    color: #x007AFF
+                    color: #x0060CC
                     pixel: fn() {
                         let base = self.color
-                        let hover_color = vec4(0.000, 0.478, 1.000, 1.0)
-                        let pressed_color = vec4(0.039, 0.518, 1.000, 1.0)
+                        let hover_color = vec4(0.000, 0.329, 0.702, 1.0)
+                        let pressed_color = vec4(0.000, 0.278, 0.600, 1.0)
                         let color = mix(base, hover_color, self.hover)
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
@@ -90,7 +90,7 @@ script_mod! {
             step_fwd_btn := Button{
                 width: 44
                 height: 44
-                text: ">>"
+                text: "›"
                 draw_bg +: {
                     dark_mode: instance(0.0)
                     pixel: fn() {

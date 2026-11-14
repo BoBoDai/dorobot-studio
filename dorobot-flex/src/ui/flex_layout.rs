@@ -88,18 +88,17 @@ script_mod! {
         persistence_key: "replay-layout.json"
         panel_count: 4
         width: Fill height: Fill flow: Overlay
-        show_bg: true draw_bg.color: mod.theme.color_bg_app
+        show_bg: false
     }
-    mod.widgets.StudioPanel = View{
-        width: Fill height: Fill flow: Down show_bg: true
-        draw_bg.color: mod.theme.color_bg_container
-        head := View{width: Fill height: 44 flow: Right spacing: 2.0 align: Align{y: 0.5}
+    mod.widgets.StudioPanel = mod.widgets.ux.Card{
+        width: Fill height: Fill flow: Down
+        head := View{width: Fill height: 48 flow: Right spacing: 2.0 align: Align{y: 0.5}
             cursor: MouseCursor.Hand
-            grip := Label{width: 22 text: "⠿" draw_text.color: mod.theme.color_text_disabled}
+            grip := Label{width: 18 text: "⠿" draw_text.color: mod.theme.color_text_disabled}
             title := Label{width: Fill max_lines: 1 text_overflow: Ellipsis
-                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
-            maximize := Button{width: 44 height: 44 text: "⤢"}
-            close := Button{width: 44 height: 44 text: "×"}
+                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_NAV{}}}
+            maximize := mod.widgets.ux.ToolButton{width: 44 height: 44 text: "⤢"}
+            close := mod.widgets.ux.ToolButton{width: 44 height: 44 text: "×"}
         }
     }
 }
@@ -114,6 +113,8 @@ pub struct FlexPanels {
     panel_count: usize,
     #[rust]
     loaded: bool,
+    #[rust(-1.0)]
+    themed_light: f64,
     #[rust]
     state: PanelLayout,
     #[rust]
@@ -309,6 +310,23 @@ impl Widget for FlexPanels {
         }
     }
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        let light = crate::ui::frame::light_mode();
+        if self.themed_light != light {
+            self.themed_light = light;
+            for path in PANELS {
+                let mut panel = self.view.widget(cx, path);
+                script_apply_eval!(cx, panel, {draw_bg +: {light: #(light)}});
+                crate::ui::frame::apply_light(
+                    cx,
+                    &panel,
+                    &[
+                        (ids!(head.maximize), crate::ui::frame::Themed::Both),
+                        (ids!(head.close), crate::ui::frame::Themed::Both),
+                    ],
+                    light,
+                );
+            }
+        }
         if !self.loaded {
             self.state = PanelLayout::load(&self.persistence_key);
             for i in self.panel_count.min(4)..4 {

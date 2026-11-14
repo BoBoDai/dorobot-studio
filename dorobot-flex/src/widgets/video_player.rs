@@ -48,8 +48,8 @@ script_mod! {
         draw_bg +: {
             dark_mode: instance(0.0)
             pixel: fn() {
-                let light_bg = vec4(1.000, 1.000, 1.000, 1.0)  // #f8f8fa
-                let dark_bg = vec4(0.039, 0.035, 0.031, 1.0)   // near black
+                let light_bg = vec4(0.969, 0.969, 0.980, 1.0)
+                let dark_bg = vec4(0.133, 0.133, 0.149, 1.0)
                 return mix(light_bg, dark_bg, self.dark_mode)
             }
         }
@@ -70,17 +70,30 @@ script_mod! {
             }
 
             placeholder := View{
-                width: Fit
+                width: Fill
                 height: Fit
+                flow: Down
+                spacing: 10.0
+                padding: 16.0
                 align: Align{x: 0.5 y: 0.5}
-
+                glyph := View{width: 32 height: 28 show_bg: true
+                    draw_bg +: {pixel: fn() {
+                        let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                        sdf.box(1.0, 4.0, 30.0, 22.0, 5.0)
+                        sdf.stroke(mod.theme.color_text_disabled, 1.5)
+                        sdf.circle(16.0, 15.0, 5.0)
+                        sdf.stroke(mod.theme.color_text_disabled, 1.5)
+                        return sdf.result
+                    }}
+                }
                 placeholder_label := Label{
+                    width: Fill align: Align{x: 0.5} max_lines: 2 text_overflow: Ellipsis
                     draw_text +: {
                         text_style: mod.widgets.flex.TEXT_BODY{}
                         dark_mode: instance(0.0)
                         get_color: fn() {
                             let light_text = vec4(0.388, 0.388, 0.400, 1.0)
-                            let dark_text = vec4(0.557, 0.557, 0.576, 1.0)
+                            let dark_text = vec4(0.682, 0.682, 0.698, 1.0)
                             return mix(light_text, dark_text, self.dark_mode)
                         }
                     }

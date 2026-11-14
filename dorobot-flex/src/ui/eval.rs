@@ -29,8 +29,8 @@ script_mod! {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_CHIP{}
                 get_color: fn() {
-                    let normal = mix(#xD1D1D6, #x8E8E93, self.light)
-                    let hot = mix(#xD70015, #xFF453A, self.light)
+                    let normal = mix(#xD1D1D6, #x636366, self.light)
+                    let hot = mix(#xFF6961, #xC40013, self.light)
                     return mix(normal, hot, self.alarm)
                 }
             }
@@ -71,7 +71,7 @@ script_mod! {
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
                     let normal = mix(#xAEAEB2, #x636366, self.light)
-                    let hot = mix(#xD70015, #xFF453A, self.light)
+                    let hot = mix(#xFF6961, #xC40013, self.light)
                     return mix(normal, hot, self.alarm)
                 }
             }
@@ -111,7 +111,7 @@ script_mod! {
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
-                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
             }
         }
     }
@@ -125,7 +125,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
+            pixel: fn() { return mix(#x111114, #xF2F2F7, self.light) }
         }
 
         // ---- policy bar ----
@@ -148,12 +148,12 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_META{}
-                    get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                    get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                 }
             }
             Filler{}
             btn_stop := mod.widgets.nx.NxBtn{height: 44 text: "Stop rollout"
-                draw_text +: {get_color: fn() {return mix(#xC40013, #x8E8E93, self.disabled)}}
+                draw_text +: {get_color: fn() {return mix(mix(#xFF6961, #xC40013, self.light), #x8E8E93, self.disabled)}}
             }
         }
 
@@ -174,7 +174,10 @@ script_mod! {
                         width: Fill height: Fill flow: Down
                         ha := mod.widgets.ux.PanelHead{ title +: { text: "cam_high" } }
                         sa := View{
-                            width: Fill height: Fill show_bg: true
+                            width: Fill height: Fill show_bg: true align: Align{x: 0.5 y: 0.5}
+                            empty := Label{width: Fill align: Align{x: 0.5} text: "No camera frames"
+                                draw_text +: {light: instance(1.0) text_style: mod.widgets.ux.TEXT_META{} get_color: fn() {return mix(#xAEAEB2,#x636366,self.light)}}
+                            }
                             draw_bg +: {
                                 light: instance(0.0)
                                 pixel: fn() {
@@ -189,7 +192,10 @@ script_mod! {
                         width: Fill height: Fill flow: Down
                         hb := mod.widgets.ux.PanelHead{ title +: { text: "cam_wrist" } }
                         sb := View{
-                            width: Fill height: Fill show_bg: true
+                            width: Fill height: Fill show_bg: true align: Align{x: 0.5 y: 0.5}
+                            empty := Label{width: Fill align: Align{x: 0.5} text: "No camera frames"
+                                draw_text +: {light: instance(1.0) text_style: mod.widgets.ux.TEXT_META{} get_color: fn() {return mix(#xAEAEB2,#x636366,self.light)}}
+                            }
                             draw_bg +: {
                                 light: instance(0.0)
                                 pixel: fn() {
@@ -322,11 +328,13 @@ impl EvalScreenRef {
             root,
             &[
                 (ids!(pbar.latency), Themed::Text),
-                (ids!(pbar.btn_stop), Themed::Bg),
+                (ids!(pbar.btn_stop), Themed::Both),
                 (ids!(body.left.cams.cam_a), Themed::Bg),
                 (ids!(body.left.cams.cam_a.sa), Themed::Bg),
+                (ids!(body.left.cams.cam_a.sa.empty), Themed::Text),
                 (ids!(body.left.cams.cam_b), Themed::Bg),
                 (ids!(body.left.cams.cam_b.sb), Themed::Bg),
+                (ids!(body.left.cams.cam_b.sb.empty), Themed::Text),
                 (ids!(body.left.stack), Themed::Bg),
                 (ids!(body.right.view3d), Themed::Bg),
                 (ids!(body.right.view3d.v_body), Themed::Bg),

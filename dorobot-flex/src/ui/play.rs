@@ -8,6 +8,7 @@ use makepad_widgets::*;
 
 use crate::api::{Intent, PlaybackState, Tag};
 use crate::playback_controls::PlaybackControlsWidgetExt;
+use crate::ui::flex_layout::{FlexPanelsWidgetExt, PanelLayout};
 use crate::ui::frame::{apply_light, apply_light_in, theme_chip, theme_panel_head, Themed};
 use crate::widgets::time_series_plot::TimeSeriesPlotWidgetExt;
 use crate::widgets::timeline::TimelineWidgetExt;
@@ -35,8 +36,8 @@ script_mod! {
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 let base = mix(#x1A1F2900, #xFFFFFF00, self.light)
-                let on = mix(#x0A84FF, #xF2F2F7, self.light)
-                sdf.box(4.0, 1.0, self.rect_size.x - 8.0, self.rect_size.y - 2.0, 0.5)
+                let on = mix(#x19334D, #xE5F0FF, self.light)
+                sdf.box(4.0, 1.0, self.rect_size.x - 8.0, self.rect_size.y - 2.0, 8.0)
                 sdf.fill(mix(base, on, self.sel))
                 return sdf.result
             }
@@ -49,7 +50,7 @@ script_mod! {
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
                     let idle = mix(#xD1D1D6, #x636366, self.light)
-                    let on = mix(#xE5E5EA, #x0A84FF, self.light)
+                    let on = mix(#x64B5FF, #x0060CC, self.light)
                     return mix(idle, on, self.sel)
                 }
             }
@@ -90,7 +91,7 @@ script_mod! {
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
                     let normal = mix(#xD1D1D6, #x38383A, self.light)
-                    let alert = mix(#x996300, #xFF9F0A, self.light)
+                    let alert = mix(#xFFB340, #x996300, self.light)
                     return mix(normal, alert, self.warn)
                 }
             }
@@ -109,17 +110,17 @@ script_mod! {
                 // 0 neutral, 1 good, 2 bad, 3 primary
                 let d_ok = mix(#x2C2C2E, #x38383A, step(0.5, self.tone))
                 let d_bad = mix(d_ok, #x38383A, step(1.5, self.tone))
-                let dark_f = mix(d_bad, #x007AFF, step(2.5, self.tone))
+                let dark_f = mix(d_bad, #x0060CC, step(2.5, self.tone))
                 let l_ok = mix(#xFFFFFF, #xF2F2F7, step(0.5, self.tone))
                 let l_bad = mix(l_ok, #xF2F2F7, step(1.5, self.tone))
-                let light_f = mix(l_bad, #x007AFF, step(2.5, self.tone))
+                let light_f = mix(l_bad, #x0060CC, step(2.5, self.tone))
                 let fill = mix(dark_f, light_f, self.light)
                 let d_e = mix(#x38383A, #x30D158, step(0.5, self.tone))
                 let d_e2 = mix(d_e, #xFF453A, step(1.5, self.tone))
-                let dark_e = mix(d_e2, #x007AFF, step(2.5, self.tone))
+                let dark_e = mix(d_e2, #x0060CC, step(2.5, self.tone))
                 let l_e = mix(#xD1D1D6, #xD1D1D6, step(0.5, self.tone))
                 let l_e2 = mix(l_e, #xD70015, step(1.5, self.tone))
-                let light_e = mix(l_e2, #x007AFF, step(2.5, self.tone))
+                let light_e = mix(l_e2, #x0060CC, step(2.5, self.tone))
                 sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
                 // The tag an episode already carries reads as pressed, so the
                 // sidebar answers "what is this tagged?" without looking away.
@@ -203,29 +204,29 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
+            pixel: fn() { return mix(#x111114, #xF2F2F7, self.light) }
         }
 
         toolbar := View{width: Fill height: 44 flow: Right spacing: 8.0
-            episodes_btn := Button{height: 44 text: "Episodes"}
-            signals_btn := Button{height: 44 text: "Show signals"}
+            episodes_btn := mod.widgets.ux.ToolButton{height: 44 text: "Episodes"}
+            signals_btn := mod.widgets.ux.ToolButton{height: 44 text: "Show signals"}
             signal_nav := View{width: Fit height: 44 flow: Right spacing: 4.0 align: Align{y: 0.5} visible: false
-                signal_prev := Button{width: 44 height: 44 text: "↑"}
+                signal_prev := mod.widgets.ux.ToolButton{width: 44 height: 44 text: "↑"}
                 signal_count := Label{text: "1–2 / 6" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
-                signal_next := Button{width: 44 height: 44 text: "↓"}
+                signal_next := mod.widgets.ux.ToolButton{width: 44 height: 44 text: "↓"}
             }
             Filler{}
-            details_btn := Button{height: 44 text: "Details"}
-            panels_btn := Button{height: 44 text: "Panels"}
+            details_btn := mod.widgets.ux.ToolButton{height: 44 text: "Details"}
+            panels_btn := mod.widgets.ux.ToolButton{height: 44 text: "Panels"}
         }
         panel_tools := View{visible: false width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 6.0
-            robot_toggle := Button{height: 44 text: "3D view"}
-            camera_a_toggle := Button{height: 44 text: "Main camera"}
-            camera_b_toggle := Button{height: 44 text: "Wrist camera"}
-            error_toggle := Button{height: 44 text: "Tracking error"}
-            layout_cycle := Button{height: 44 text: "Arrange"}
-            layout_reset := Button{height: 44 text: "Reset layout"}
-            new_window := Button{height: 44 text: "Replay window"}
+            robot_toggle := mod.widgets.ux.ToolButton{height: 44 text: "3D view"}
+            camera_a_toggle := mod.widgets.ux.ToolButton{height: 44 text: "Main camera"}
+            camera_b_toggle := mod.widgets.ux.ToolButton{height: 44 text: "Wrist camera"}
+            error_toggle := mod.widgets.ux.ToolButton{height: 44 text: "Tracking error"}
+            layout_cycle := mod.widgets.ux.ToolButton{height: 44 text: "Arrange"}
+            layout_reset := mod.widgets.ux.ToolButton{height: 44 text: "Reset layout"}
+            new_window := mod.widgets.ux.ToolButton{height: 44 text: "Replay window"}
         }
         upper := View{
             width: Fill height: Fill
@@ -234,7 +235,7 @@ script_mod! {
 
             // ---- episode tree ----
             tree := mod.widgets.ux.Card{
-                width: 224 height: Fill
+                width: 240 height: Fill
                 flow: Down
                 tree_head := mod.widgets.ux.PanelHead{ title +: { text: "dataset" } }
                 tree_body := View{
@@ -274,6 +275,10 @@ script_mod! {
             grid := FlexPanels{
                 robot_panel := StudioPanel{
                     head +: {title +: {text: "3D view"}}
+                    no_robot := View{width: Fill height: Fill align: Align{x: 0.5 y: 0.5} padding: 16.0
+                        Label{width: Fill align: Align{x: 0.5} text: "No robot model in this dataset"
+                            draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                    }
                     stage_3d := RobotView{
                         keyboard_controls: false width: Fill height: Fill
                         sky_horizon: mod.theme.color_bg_app sky_zenith: mod.theme.color_bg_app
@@ -283,14 +288,10 @@ script_mod! {
                 }
                 camera_a_panel := StudioPanel{
                     head +: {title +: {text: "Main camera"}}
-                    camera_a_empty := Label{width: Fill height: Fit text: "No main-camera recording in this episode"
-                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
                     stage_a := VideoPlayer{}
                 }
                 camera_b_panel := StudioPanel{
                     head +: {title +: {text: "Wrist camera"}}
-                    camera_b_empty := Label{width: Fill height: Fit text: "No wrist-camera recording in this episode"
-                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
                     stage_b := VideoPlayer{}
                 }
                 error_panel := StudioPanel{
@@ -311,14 +312,14 @@ script_mod! {
                 // curation buttons out of reach.
                 side_body := ScrollYView{
                     width: Fill height: Fill flow: Down
-                    padding: Inset{left: 14. right: 14. top: 10.}
+                    padding: Inset{left: 10. right: 10. top: 8. bottom: 14.}
                     spacing: 2.0
                     btn_good := ActionBtn{ text: "Tag good"      draw_bg +: {tone: 1.0} draw_text +: {tone: 1.0} }
                     btn_bad := ActionBtn{ text: "Tag bad"        draw_bg +: {tone: 2.0} draw_text +: {tone: 2.0} margin: Inset{top: 8.} }
                     st_frames := StatRow{ k +: { text: "FRAMES" } }
                     st_dur := StatRow{ k +: { text: "DURATION" } }
                     st_fps := StatRow{ k +: { text: "FPS" } }
-                    st_drift := StatRow{ k +: { text: "DRIFT" } }
+                    st_drift := StatRow{ k +: { text: "Sync offset" } }
                     task_h := Label{
                         text: "TASK"
                         margin: Inset{top: 14. bottom: 4.}
@@ -355,7 +356,7 @@ script_mod! {
 
         // ---- timeline ----
         timeline := mod.widgets.ux.Card{
-            width: Fill height: 172
+            width: Fill height: 208
             flow: Down
             // No close button: the transport is not something to dismiss. The
             // head doubles as the resize grip for the footer.
@@ -391,9 +392,9 @@ script_mod! {
                         }
                     }
                     Filler{}
-                    speed_btn := Button{width: 112 height: 44 text: "Speed 1×"}
+                    speed_btn := mod.widgets.ux.ToolButton{width: 112 height: 44 text: "Speed 1×"}
                     drift_lbl := Label{
-                        text: "DRIFT"
+                        text: "Sync offset"
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_CHIP{}
@@ -402,7 +403,7 @@ script_mod! {
                     }
                 }
 
-                tl := Timeline{ width: Fill height: 52 }
+                tl := Timeline{ width: Fill height: 64 }
 
                 // One lane per joint, each on its own scale, with the command
                 // drawn over the measurement. Twelve traces sharing one axis
@@ -524,6 +525,8 @@ pub struct PlayScreen {
     signals_open: bool,
     #[rust]
     layout_width: f64,
+    #[rust]
+    toolbar_layout: Option<PanelLayout>,
     /// Episode index displayed by each row, in row order.
     #[rust]
     row_episode: Vec<u64>,
@@ -546,7 +549,7 @@ pub struct PlayScreen {
     #[rust]
     loaded_dataset: String,
     /// Footer height, dragged by its head.
-    #[rust(172f64)]
+    #[rust(208f64)]
     footer_h: f64,
     /// `(pointer y at grab, footer height at grab)` while resizing.
     #[rust]
@@ -669,7 +672,7 @@ const PLOT_WINDOW_S: f64 = 10.0;
 /// How far the footer can be dragged. The lanes share whatever is left after
 /// the transport and scrubber, so the floor keeps them legible rather than
 /// merely present.
-const FOOTER_MIN: f64 = 244.0;
+const FOOTER_MIN: f64 = 288.0;
 /// The ceiling is a share of the screen, not a constant: the inspector beside
 /// the video does not scroll, so a footer tall enough to clip it would put the
 /// curation buttons out of reach on a short window and waste room on a tall one.
@@ -755,6 +758,33 @@ impl PlayScreenRef {
         let Some(mut inner) = self.borrow_mut() else {
             return;
         };
+        if let Some(layout) = inner.view.flex_panels(cx, ids!(upper.grid)).snapshot() {
+            if inner.toolbar_layout.as_ref() != Some(&layout) {
+                inner.view.button(cx, ids!(layout_cycle)).set_text(
+                    cx,
+                    match layout.columns {
+                        1 => "Layout: Column",
+                        4 => "Layout: Row",
+                        _ => "Layout: Grid",
+                    },
+                );
+                for (id, visible) in [
+                    "robot_toggle",
+                    "camera_a_toggle",
+                    "camera_b_toggle",
+                    "error_toggle",
+                ]
+                .into_iter()
+                .zip(layout.visible)
+                {
+                    let on = if visible { 1.0 } else { 0.0 };
+                    let mut button = inner.view.widget(cx, &[LiveId::from_str(id)]);
+                    script_apply_eval!(cx, button, {draw_bg +: {on: #(on)} draw_text +: {on: #(on)}});
+                }
+                inner.toolbar_layout = Some(layout);
+            }
+        }
+
         inner.update_signal_window(cx);
         let width = inner.view.area().rect(cx).size.x;
         if width <= 0.0 || (inner.layout_width - width).abs() < 1.0 {
@@ -798,9 +828,9 @@ impl PlayScreenRef {
             },
         );
         let height = if signals {
-            inner.footer_h.max(244.0)
+            inner.footer_h.max(288.0)
         } else {
-            172.0
+            208.0
         };
         if let Some(mut card) = inner.view.widget(cx, ids!(timeline)).borrow_mut::<View>() {
             card.walk.height = Size::Fixed(height);
@@ -811,6 +841,7 @@ impl PlayScreenRef {
     pub fn restore_panel_design(&self, cx: &mut Cx) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.layout_width = -1.0;
+            inner.toolbar_layout = None;
         }
         self.adapt_layout(cx);
     }
@@ -856,6 +887,26 @@ impl PlayScreenRef {
         let root = &mut inner.view;
 
         script_apply_eval!(cx, root, { draw_bg +: { light: #(light) } });
+        for id in [
+            "episodes_btn",
+            "signals_btn",
+            "details_btn",
+            "panels_btn",
+            "signal_prev",
+            "signal_next",
+            "robot_toggle",
+            "camera_a_toggle",
+            "camera_b_toggle",
+            "error_toggle",
+            "layout_cycle",
+            "layout_reset",
+            "new_window",
+            "speed_btn",
+        ] {
+            let mut button = root.widget(cx, &[LiveId::from_str(id)]);
+            script_apply_eval!(cx, button, {draw_bg +: {light: #(light)} draw_text +: {light: #(light)}});
+        }
+
         apply_light_in(
             cx,
             root,
@@ -908,10 +959,21 @@ impl PlayScreenRef {
             let mut label = root.widget(cx, name_id);
             script_apply_eval!(cx, label, { draw_text +: { light: #(light) } });
         }
-        root.widget(cx, ids!(camera_a_empty))
-            .set_visible(cx, st.video_paths.is_empty());
-        root.widget(cx, ids!(camera_b_empty))
-            .set_visible(cx, st.video_paths.len() < 2);
+        for (path, message) in [
+            (
+                ids!(stage_a.video_area.placeholder.placeholder_label) as &[LiveId],
+                "No recording",
+            ),
+            (
+                ids!(stage_b.video_area.placeholder.placeholder_label),
+                "No recording",
+            ),
+        ] {
+            root.label(cx, path).set_text(cx, message);
+        }
+
+        root.widget(cx, ids!(upper.grid.robot_panel.no_robot)).set_visible(cx, st.robot_urdf.is_none());
+        root.widget(cx, ids!(stage_3d)).set_visible(cx, st.robot_urdf.is_some());
 
         // ---- episode tree: group headers interleaved with rows ------------
         let shown = (start + ROW_IDS.len()).min(total);
@@ -1028,6 +1090,8 @@ impl PlayScreenRef {
             let mut vw = r.widget(cx, ids!(v));
             script_apply_eval!(cx, vw, { draw_text +: { warn: #(warn) light: #(light) } });
         }
+        root.widget(cx, ids!(timeline.tl_body.controls.drift_lbl))
+            .set_visible(cx, s.drift_frames.abs() > 0.2);
         root.label(cx, ids!(upper.side.side_body.task_t))
             .set_text(cx, &s.task);
 

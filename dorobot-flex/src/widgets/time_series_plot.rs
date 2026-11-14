@@ -69,10 +69,10 @@ script_mod! {
 
             // Y-axis labels (left side)
             y_axis := View{
-                width: 40
+                width: 48
                 height: Fill
                 flow: Down
-                padding: Inset{top: 4. bottom: 4.}
+                padding: Inset{left: 6. top: 6. bottom: 6.}
 
                 show_bg: true
                 draw_bg +: {
@@ -89,8 +89,8 @@ script_mod! {
                         text_style: mod.widgets.flex.TEXT_SMALL{}
                         dark_mode: instance(0.0)
                         get_color: fn() {
-                            let light_text = vec4(0.557, 0.557, 0.576, 1.0)
-                            let dark_text = vec4(0.557, 0.557, 0.576, 1.0)
+                            let light_text = vec4(0.388, 0.388, 0.400, 1.0)
+                            let dark_text = vec4(0.682, 0.682, 0.698, 1.0)
                             return mix(light_text, dark_text, self.dark_mode)
                         }
                     }
@@ -104,8 +104,8 @@ script_mod! {
                         text_style: mod.widgets.flex.TEXT_SMALL{}
                         dark_mode: instance(0.0)
                         get_color: fn() {
-                            let light_text = vec4(0.557, 0.557, 0.576, 1.0)
-                            let dark_text = vec4(0.557, 0.557, 0.576, 1.0)
+                            let light_text = vec4(0.388, 0.388, 0.400, 1.0)
+                            let dark_text = vec4(0.682, 0.682, 0.698, 1.0)
                             return mix(light_text, dark_text, self.dark_mode)
                         }
                     }
@@ -162,7 +162,7 @@ script_mod! {
                 dark_mode: instance(0.0)
                 get_color: fn() {
                     let light_text = vec4(0.388, 0.388, 0.400, 1.0)
-                    let dark_text = vec4(0.557, 0.557, 0.576, 1.0)
+                    let dark_text = vec4(0.682, 0.682, 0.698, 1.0)
                     return mix(light_text, dark_text, self.dark_mode)
                 }
             }

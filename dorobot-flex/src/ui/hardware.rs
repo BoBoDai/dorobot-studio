@@ -58,7 +58,7 @@ script_mod! {
                     text_style: mod.widgets.ux.TEXT_CHIP{}
                     get_color: fn() {
                         let active = step(0.5, self.state) * (1.0 - step(1.5, self.state))
-                        let idle = mix(#xD1D1D6, #x8E8E93, self.light)
+                        let idle = mix(#xD1D1D6, #x636366, self.light)
                         return mix(idle, #xFFFFFF, active)
                     }
                 }
@@ -75,7 +75,7 @@ script_mod! {
                     let done = step(1.5, self.state)
                     let pending = mix(#xAEAEB2, #x636366, self.light)
                     let fin = mix(#xD1D1D6, #x38383A, self.light)
-                    let acc = mix(#x007AFF, #x0A84FF, self.light)
+                    let acc = mix(#x64B5FF, #x0060CC, self.light)
                     return mix(mix(pending, fin, done), acc, active)
                 }
             }
@@ -101,8 +101,8 @@ script_mod! {
         width: Fill height: 52
         flow: Right
         align: Align{y: 0.5}
-        spacing: 12.0
-        padding: Inset{left: 14. right: 14.}
+        spacing: 6.0
+        padding: Inset{left: 10. right: 10.}
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
@@ -145,7 +145,7 @@ script_mod! {
             }
         }
         jname := Label{
-            width: 112 max_lines: 1 text_overflow: Ellipsis
+            width: 100 max_lines: 1 text_overflow: Ellipsis
             text: "joint"
             draw_text +: {
                 light: instance(0.0)
@@ -174,14 +174,14 @@ script_mod! {
             }
         }
         readout := Label{
-            width: 104 max_lines: 1 text_overflow: Ellipsis
+            width: 128 max_lines: 1 text_overflow: Ellipsis
             text: ""
             draw_text +: {
                 warn: instance(0.0)
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
-                    let normal = mix(#xD1D1D6, #x8E8E93, self.light)
+                    let normal = mix(#xD1D1D6, #x636366, self.light)
                     let alert = mix(#xFF9F0A, #x996300, self.light)
                     return mix(normal, alert, self.warn)
                 }
@@ -199,7 +199,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
+            pixel: fn() { return mix(#x111114, #xF2F2F7, self.light) }
         }
 
         stepper := View{
@@ -341,7 +341,7 @@ script_mod! {
                                     light: instance(0.0)
                                     pixel: fn() {
                                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
+                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
                                         let idle = mix(#x2C2C2E, #xFFFFFF, self.light)
                                         let hov = mix(#x38383A, #xF2F2F7, self.light)
                                         sdf.fill_keep(mix(idle, hov, self.hover))
@@ -364,9 +364,9 @@ script_mod! {
                                     pixel: fn() {
                                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                                         let off = mix(#x38383A, #xE5E5EA, self.light)
-                                        let live = mix(off, #x007AFF, self.enabled_f)
-                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
-                                        sdf.fill(mix(live, #x007AFF, self.hover * self.enabled_f))
+                                        let live = mix(off, #x0060CC, self.enabled_f)
+                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                                        sdf.fill(mix(live, #x0060CC, self.hover * self.enabled_f))
                                         return sdf.result
                                     }
                                 }

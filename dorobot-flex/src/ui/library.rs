@@ -17,15 +17,16 @@ script_mod! {
     let DatasetCard = mod.widgets.ux.Card{
         width: Fill
         height: Fit
-        flow: Down
+        flow: Right
+        align: Align{y: 0.5}
         cursor: MouseCursor.Hand
 
         head := mod.widgets.ux.PanelHead{visible: false title +: { text: "dataset" } }
 
         thumb := View{
-            width: Fill
+            width: 104
             height: 104
-            margin: Inset{left: 9. right: 9. top: 9.}
+            margin: Inset{left: 6. right: 6. top: 6. bottom: 6.}
             show_bg: true
             draw_bg +: {
                 light: instance(0.0)
@@ -35,7 +36,7 @@ script_mod! {
                     let top = mix(#x38383A, #xF2F2F7, self.light)
                     let bot = mix(#x38383A, #xE5E5EA, self.light)
                     let g = mix(top, bot, self.pos.y)
-                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 0.5)
+                    sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0)
                     sdf.fill(g)
                     let cx0 = self.rect_size.x * 0.5
                     let cy0 = self.rect_size.y * 0.5
@@ -224,10 +225,10 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
+            pixel: fn() { return mix(#x111114, #xF2F2F7, self.light) }
         }
 
-        left_col := View{
+        left_col := ScrollYView{
             width: Fill
             height: Fill
             flow: Down
@@ -235,16 +236,16 @@ script_mod! {
 
             header := View{
                 width: Fill height: Fit
-                flow: Flow.Right{wrap: true}
+                flow: Right
                 align: Align{y: 0.5}
                 spacing: 12.0
                 padding: Inset{left: 4., bottom: 2.}
 
                 page_title := Label{
-                    text: "Datasets"
+                    text: "Your datasets"
                     draw_text +: {
                         light: instance(0.0)
-                        text_style: mod.widgets.ux.TEXT_H1{}
+                        text_style: mod.widgets.ux.TEXT_TITLE{}
                         get_color: fn() { return mix(#xE5E5EA, #x2C2C2E, self.light) }
                     }
                 }
@@ -256,8 +257,8 @@ script_mod! {
                         border_radius: 0.0
                         pixel: fn() {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            let base = #x007AFF
-                            let c = mix(base, #x007AFF, self.hover)
+                            let base = #x0060CC
+                            let c = mix(base, #x0060CC, self.hover)
                             sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
                             sdf.fill(mix(c, #x0A84FF, self.down))
                             return sdf.result
@@ -303,24 +304,22 @@ script_mod! {
                 width: Fill
                 height: Fit
                 flow: Down
-                padding: Inset{left: 12. right: 12. top: 12. bottom: 12.}
+                padding: 0.0
                 spacing: 12.0
 
                 row_a := View{
-                    width: Fill height: Fit flow: Right spacing: 12.0
+                    width: Fill height: Fit flow: Down spacing: 12.0
                     card_0 := DatasetCard{}
                     card_1 := DatasetCard{}
                     card_2 := DatasetCard{}
                 }
                 row_b := View{
-                    width: Fill height: Fit flow: Right spacing: 12.0
+                    width: Fill height: Fit flow: Down spacing: 12.0
                     card_3 := DatasetCard{}
                     card_4 := DatasetCard{}
                     card_5 := DatasetCard{}
                 }
             }
-
-            Filler{}
 
             recent := mod.widgets.ux.Card{
                 width: Fill
@@ -335,7 +334,7 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_BODY{}
-                            get_color: fn() { return mix(#x007AFF, #x0A84FF, self.light) }
+                            get_color: fn() { return mix(#x0060CC, #x0A84FF, self.light) }
                         }
                     }
                 }
@@ -375,8 +374,8 @@ script_mod! {
                             hover: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_BODY{}
                             get_color: fn() {
-                                let base = mix(#x007AFF, #x0A84FF, self.light)
-                                return mix(base, mix(#x007AFF, #x0A84FF, self.light), self.hover)
+                                let base = mix(#x0060CC, #x0A84FF, self.light)
+                                return mix(base, mix(#x0060CC, #x0A84FF, self.light), self.hover)
                             }
                         }
                     }

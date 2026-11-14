@@ -92,7 +92,7 @@ script_mod! {
                     sidebar := View{
                         width: 196 height: Fill flow: Down padding: 12.0 spacing: 12.0
                         show_bg: true draw_bg.color: mod.theme.color_bg_container
-                        Label{ width: Fill height: 52 text: "DoRobot Studio"
+                        Label{ width: Fill height: Fit margin: Inset{left: 8. top: 12. bottom: 22.} text: "DoRobot Studio"
                             draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
                         nav := mod.widgets.ux.NavRail{ width: Fill height: Fill }
                         appearance := Button{width: Fill height: 44 text: "Appearance: Light"}
@@ -101,7 +101,7 @@ script_mod! {
                     workspace := View{
                         width: Fill height: Fill flow: Down
                         page_header := View{
-                            width: Fill height: Fit flow: Down padding: 18.0 spacing: 6.0
+                            width: Fill height: Fit flow: Down padding: Inset{left: 20. right: 20. top: 18. bottom: 14.} spacing: 2.0
                             page_title := Label{width: Fill text: "Library"
                                 draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_H1{}} }
                             status := Label{width: Fill height: Fit max_lines: 2 text_overflow: Ellipsis text: ""
@@ -213,7 +213,7 @@ impl App {
     }
     /// Repaint every screen from the current backend snapshot.
     fn sync(&mut self, cx: &mut Cx) {
-        self.ui.label(cx, ids!(status)).set_text(
+        self.ui.label(cx, ids!(main_window.body.workspace.page_header.status)).set_text(
             cx,
             self.backend
                 .status()
@@ -429,6 +429,19 @@ impl MatchEvent for App {
                         "folder_pending": self.folder_request.is_some(), "status": self.backend.status(), "hub_open": self.hub_upload.is_some(), "robot_animating": self.ui.robot_view(cx, ids!(page_play.stage_3d)).is_animating(), "signals_visible": self.ui.widget(cx, ids!(page_play.timeline.tl_body.lanes)).visible()
                     }),
                     &[
+                        "page_record.body.right.session",
+                        "page_record.body.right.session.ss_body.cues",
+                        "page_record.body.left.cams.camera_empty",
+                        "page_record.body.left.cams.camera_empty.detail",
+                        "page_record.body.left.cams.cam_0.stage",
+                        "page_record.body.left.cams.cam_0.stage.waiting",
+                        "page_record.review",
+                        "page_record.review.rv_body.no_thumbnails",
+                        "page_library.left_col.grid.row_a.card_0",
+                        "page_play.timeline.tl_body.tl.track_area",
+                        "page_play.timeline.tl_body.controls.speed_btn",
+                        "page_hardware.content.camera_a_panel.content.calib.joints.joint_0.readout",
+                        "main_window.body.workspace.page_header.status",
                         "nav_library",
                         "nav_record",
                         "nav_play",
@@ -518,7 +531,7 @@ impl MatchEvent for App {
                     ],
                 );
             }
-            self.ui.label(cx, ids!(status)).set_text(
+            self.ui.label(cx, ids!(main_window.body.workspace.page_header.status)).set_text(
                 cx,
                 self.backend
                     .status()
