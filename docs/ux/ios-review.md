@@ -1,6 +1,6 @@
 # iOS-style Studio UX review
 
-**Review result: 91.5/100 for each Studio**, using the fixed [rubric](../../tools/ux/ios-rubric.json). See the evidence, deductions and scope below.
+**Historical visual review — superseded for DoRobot Studio.** The 91.5 score did not test flexible panel parity. The user identified the removed panel layout; that regression invalidates this score as application acceptance. See the functional judge loop in `functional-review.md`. The evidence below remains a record of the narrower original review.
 
 ## What changed in OctoSense
 

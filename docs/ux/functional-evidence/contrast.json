@@ -1,0 +1,37 @@
+[
+  {
+    "role": "primary action",
+    "foreground": "#FFFFFF",
+    "background": "#0060CC",
+    "contrast": 5.92,
+    "normal_text_4_5": true
+  },
+  {
+    "role": "body metadata light",
+    "foreground": "#636366",
+    "background": "#FFFFFF",
+    "contrast": 5.99,
+    "normal_text_4_5": true
+  },
+  {
+    "role": "body metadata dark",
+    "foreground": "#D1D1D6",
+    "background": "#1C1C1E",
+    "contrast": 11.18,
+    "normal_text_4_5": true
+  },
+  {
+    "role": "warning light",
+    "foreground": "#996300",
+    "background": "#FFFFFF",
+    "contrast": 5.07,
+    "normal_text_4_5": true
+  },
+  {
+    "role": "legacy plot axis",
+    "foreground": "#8E8E93",
+    "background": "#F2F2F7",
+    "contrast": 2.92,
+    "normal_text_4_5": false
+  }
+]
