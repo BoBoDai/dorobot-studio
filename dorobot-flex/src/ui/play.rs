@@ -12,8 +12,6 @@ use crate::ui::frame::{apply_light, apply_light_in, theme_chip, theme_panel_head
 use crate::widgets::time_series_plot::TimeSeriesPlotWidgetExt;
 use crate::widgets::timeline::TimelineWidgetExt;
 use crate::widgets::video_player::VideoPlayerWidgetExt;
-use makepad_app_shell::grid::panel_grid::PanelGridWidgetExt;
-use makepad_app_shell::grid::LayoutState;
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -22,7 +20,7 @@ script_mod! {
 
     // Episode row in the tree: index, duration, quality tag.
     let EpisodeRow = View{
-        width: Fill height: 26
+        width: Fill height: 44
         flow: Right
         align: Align{y: 0.5}
         spacing: 8.0
@@ -44,19 +42,18 @@ script_mod! {
             }
         }
         ep_name := Label{
-            width: 150 text: "ep 000"
+            width: Fill max_lines: 1 text_overflow: Ellipsis text: "ep 000"
             draw_text +: {
                 sel: instance(0.0)
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
-                    let idle = mix(#xD1D1D6, #x8E8E93, self.light)
+                    let idle = mix(#xD1D1D6, #x636366, self.light)
                     let on = mix(#xE5E5EA, #x0A84FF, self.light)
                     return mix(idle, on, self.sel)
                 }
             }
         }
-        Filler{}
         ep_tag := mod.widgets.ux.Chip{
             draw_bg +: {tone: 1.0}
             label +: { text: "good" draw_text +: {tone: 1.0} }
@@ -139,11 +136,11 @@ script_mod! {
             sel: instance(0.0)
             text_style: mod.widgets.ux.TEXT_BODY{}
             get_color: fn() {
-                let d_ok = mix(#xD1D1D6, #x248A3D, step(0.5, self.tone))
-                let d_bad = mix(d_ok, #xD70015, step(1.5, self.tone))
+                let d_ok = mix(#xD1D1D6, #x30D158, step(0.5, self.tone))
+                let d_bad = mix(d_ok, #xFF6961, step(1.5, self.tone))
                 let dark_c = mix(d_bad, #xFFFFFF, step(2.5, self.tone))
-                let l_ok = mix(#x38383A, #x30D158, step(0.5, self.tone))
-                let l_bad = mix(l_ok, #xFF453A, step(1.5, self.tone))
+                let l_ok = mix(#x38383A, #x248A3D, step(0.5, self.tone))
+                let l_bad = mix(l_ok, #xD70015, step(1.5, self.tone))
                 let light_c = mix(l_bad, #xFFFFFF, step(2.5, self.tone))
                 let base = mix(dark_c, light_c, self.light)
                 // A selected button fills with its own colour, so the label has
@@ -209,6 +206,12 @@ script_mod! {
             pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
         }
 
+        toolbar := View{width: Fill height: 44 flow: Right spacing: 8.0
+            episodes_btn := Button{height: 44 text: "Episodes"}
+            signals_btn := Button{height: 44 text: "Show signals"}
+            Filler{}
+            details_btn := Button{height: 44 text: "Details"}
+        }
         upper := View{
             width: Fill height: Fill
             flow: Right
@@ -216,7 +219,7 @@ script_mod! {
 
             // ---- episode tree ----
             tree := mod.widgets.ux.Card{
-                width: 268 height: Fill
+                width: 224 height: Fill
                 flow: Down
                 tree_head := mod.widgets.ux.PanelHead{ title +: { text: "dataset" } }
                 tree_body := View{
@@ -253,61 +256,26 @@ script_mod! {
                 }
             }
 
-            // ---- real drag-and-drop panel grid (makepad-app-shell) ----
-            // Panels here are draggable, maximisable and closable for real;
-            // the grid owns layout state and emits PanelAction::LayoutChanged.
-            grid := PanelGrid{
-                width: Fill height: Fill
-                window_container +: {
-                    row1 +: {
-                        s1_1 +: {
-                            title: "cam_high"
-                            content +: { stage_a := VideoPlayer{} }
-                        }
-                        s1_2 +: {
-                            title: "3D View"
-                            content +: {
-                                stage_3d := RobotView{
-                                    sky_horizon: mod.theme.color_bg_app
-                                    sky_zenith: mod.theme.color_bg_app
-                                    ground_color: mod.theme.color_bg_container
-                                    ground2_color: mod.theme.color_bg_container
-                                    grid_color: mod.theme.color_text_disabled
-                                }
-                            }
-                        }
-                        s1_3 +: { visible: false }
-                        s1_4 +: { visible: false }
-                        s1_5 +: { visible: false }
-                        s1_6 +: { visible: false }
-                        s1_7 +: { visible: false }
-                        s1_8 +: { visible: false }
-                        s1_9 +: { visible: false }
+            stage := mod.widgets.ux.Card{
+                width: Fill height: Fill flow: Down
+                stage_head := mod.widgets.ux.PanelHead{title +: {text: "Robot preview"}}
+                media := View{width: Fill height: Fill flow: Right spacing: 8.0
+                    stage_3d := RobotView{
+                        keyboard_controls: false
+                        width: Fill height: Fill
+                        sky_horizon: mod.theme.color_bg_app sky_zenith: mod.theme.color_bg_app
+                        ground_color: mod.theme.color_bg_container ground2_color: mod.theme.color_bg_container
+                        grid_color: mod.theme.color_text_disabled
                     }
-                    row2 +: {
-                        s2_1 +: {
-                            title: "cam_wrist"
-                            content +: { stage_b := VideoPlayer{} }
-                        }
-                        s2_2 +: {
-                            title: "tracking error"
-                            content +: { stage_plot := PlotPane{} }
-                        }
-                        s2_3 +: { visible: false }
-                        s2_4 +: { visible: false }
-                        s2_5 +: { visible: false }
-                        s2_6 +: { visible: false }
-                        s2_7 +: { visible: false }
-                        s2_8 +: { visible: false }
-                        s2_9 +: { visible: false }
+                    cameras := View{width: Fill height: Fill flow: Down spacing: 8.0 visible: false
+                        stage_a := VideoPlayer{}
+                        stage_b := VideoPlayer{visible: false}
                     }
-                    row3 +: { visible: false height: 0 }
                 }
             }
 
-            // ---- inspector + curation ----
             side := mod.widgets.ux.Card{
-                width: 288 height: Fill
+                width: 264 height: Fill
                 flow: Down
                 side_head := mod.widgets.ux.PanelHead{ title +: { text: "Episode" } }
                 // Scrolls, so dragging the footer up can never put the
@@ -316,6 +284,8 @@ script_mod! {
                     width: Fill height: Fill flow: Down
                     padding: Inset{left: 14. right: 14. top: 10.}
                     spacing: 2.0
+                    btn_good := ActionBtn{ text: "Tag good"      draw_bg +: {tone: 1.0} draw_text +: {tone: 1.0} }
+                    btn_bad := ActionBtn{ text: "Tag bad"        draw_bg +: {tone: 2.0} draw_text +: {tone: 2.0} margin: Inset{top: 8.} }
                     st_frames := StatRow{ k +: { text: "FRAMES" } }
                     st_dur := StatRow{ k +: { text: "DURATION" } }
                     st_fps := StatRow{ k +: { text: "FPS" } }
@@ -347,8 +317,6 @@ script_mod! {
                             get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
                         }
                     }
-                    btn_good := ActionBtn{ text: "Tag good"      draw_bg +: {tone: 1.0} draw_text +: {tone: 1.0} }
-                    btn_bad := ActionBtn{ text: "Tag bad"        draw_bg +: {tone: 2.0} draw_text +: {tone: 2.0} margin: Inset{top: 8.} }
                     btn_del := ActionBtn{ text: "Exclude episode" margin: Inset{top: 8.} }
                     btn_push := ActionBtn{ text: "Push to Hub"   draw_bg +: {tone: 3.0} draw_text +: {tone: 3.0} margin: Inset{top: 8.} }
                     Filler{}
@@ -358,7 +326,7 @@ script_mod! {
 
         // ---- timeline ----
         timeline := mod.widgets.ux.Card{
-            width: Fill height: 372
+            width: Fill height: 172
             flow: Down
             // No close button: the transport is not something to dismiss. The
             // head doubles as the resize grip for the footer.
@@ -379,7 +347,7 @@ script_mod! {
                     align: Align{y: 0.5}
                     spacing: 12.0
                     transport := PlaybackControls{
-                        width: 160 height: Fit
+                        width: 184 height: Fit
                         show_bg: false
                         // Time and speed live on the scrubber and the frame
                         // counter already; two clocks would disagree.
@@ -400,7 +368,7 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_CHIP{}
-                            get_color: fn() { return mix(#x996300, #xFF9F0A, self.light) }
+                            get_color: fn() { return mix(#xFFB340, #x996300, self.light) }
                         }
                     }
                 }
@@ -411,10 +379,10 @@ script_mod! {
                 // drawn over the measurement. Twelve traces sharing one axis
                 // told you nothing: the joints overlap, and a joint that moves
                 // a little is flattened by one that moves a lot.
-                lanes := View{
+                lanes := ScrollYView{
                     width: Fill height: Fill flow: Down spacing: 1.0
                     lane_0 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_0 := Label{
                             width: 104
                             draw_text +: {
@@ -429,7 +397,7 @@ script_mod! {
                         }
                     }
                     lane_1 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_1 := Label{
                             width: 104
                             draw_text +: {
@@ -444,7 +412,7 @@ script_mod! {
                         }
                     }
                     lane_2 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_2 := Label{
                             width: 104
                             draw_text +: {
@@ -459,7 +427,7 @@ script_mod! {
                         }
                     }
                     lane_3 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_3 := Label{
                             width: 104
                             draw_text +: {
@@ -474,7 +442,7 @@ script_mod! {
                         }
                     }
                     lane_4 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_4 := Label{
                             width: 104
                             draw_text +: {
@@ -489,7 +457,7 @@ script_mod! {
                         }
                     }
                     lane_5 := View{
-                        width: Fill height: Fill flow: Right align: Align{y: 0.5}
+                        width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_5 := Label{
                             width: 104
                             draw_text +: {
@@ -513,10 +481,14 @@ script_mod! {
 pub struct PlayScreen {
     #[deref]
     view: View,
-    /// The grid initialises its own layout, so `layout_state().is_none()` is
-    /// never true — seed ours exactly once instead, and let user drags stand.
+    #[rust(true)]
+    episodes_open: bool,
     #[rust(false)]
-    layout_seeded: bool,
+    details_open: bool,
+    #[rust(false)]
+    signals_open: bool,
+    #[rust]
+    layout_width: f64,
     /// Episode index displayed by each row, in row order.
     #[rust]
     row_episode: Vec<u64>,
@@ -539,7 +511,7 @@ pub struct PlayScreen {
     #[rust]
     loaded_dataset: String,
     /// Footer height, dragged by its head.
-    #[rust(372f64)]
+    #[rust(172f64)]
     footer_h: f64,
     /// `(pointer y at grab, footer height at grab)` while resizing.
     #[rust]
@@ -557,7 +529,7 @@ impl Widget for PlayScreen {
         match event {
             Event::MouseDown(e) => {
                 let head = self.view.widget(cx, ids!(timeline.tl_head));
-                if !head.is_empty() && head.area().rect(cx).contains(e.abs) {
+                if self.signals_open && !head.is_empty() && head.area().rect(cx).contains(e.abs) {
                     self.footer_drag = Some((e.abs.y, self.footer_h));
                 }
             }
@@ -650,7 +622,7 @@ const LANE_IDS: [(&[LiveId], &[LiveId]); 6] = [
 ];
 
 /// Must track `EpisodeRow`'s height, so a wheel notch advances whole rows.
-const ROW_H: f64 = 26.0;
+const ROW_H: f64 = 44.0;
 
 const ROW_IDS: [&[LiveId]; 13] = [
     ids!(upper.tree.tree_body.row_0),
@@ -674,15 +646,77 @@ const GRP_IDS: [&[LiveId]; 3] = [
 ];
 
 impl PlayScreenRef {
-    /// Reapply dynamic panel titles after a framework style or source reload,
-    /// retaining the user's current arrangement.
-    pub fn restore_panel_design(&self, cx: &mut Cx) {
-        if let Some(inner) = self.borrow() {
-            let grid = inner.view.panel_grid(cx, ids!(upper.grid));
-            if let Some(layout) = grid.layout_state() {
-                grid.set_layout_state(cx, layout);
+    pub fn toggle_pane(&self, cx: &mut Cx, pane: &str) {
+        if let Some(mut inner) = self.borrow_mut() {
+            match pane {
+                "details" => inner.details_open = !inner.details_open,
+                "episodes" => inner.episodes_open = !inner.episodes_open,
+                "signals" => inner.signals_open = !inner.signals_open,
+                _ => return,
             }
+            inner.layout_width = -1.0;
         }
+        self.adapt_layout(cx);
+    }
+
+    pub fn adapt_layout(&self, cx: &mut Cx) {
+        let Some(mut inner) = self.borrow_mut() else {
+            return;
+        };
+        let width = inner.view.area().rect(cx).size.x;
+        if width <= 0.0 || (inner.layout_width - width).abs() < 1.0 {
+            return;
+        }
+        inner.layout_width = width;
+        let compact = width < 1080.0;
+        let details = inner.details_open;
+        let episodes = inner.episodes_open && (!compact || !details);
+        let signals = inner.signals_open;
+        inner
+            .view
+            .widget(cx, ids!(upper.tree))
+            .set_visible(cx, episodes);
+        inner
+            .view
+            .widget(cx, ids!(upper.side))
+            .set_visible(cx, details);
+        inner
+            .view
+            .widget(cx, ids!(timeline.tl_body.lanes))
+            .set_visible(cx, signals);
+        inner
+            .view
+            .button(cx, ids!(toolbar.details_btn))
+            .set_text(cx, if details { "Hide details" } else { "Details" });
+        inner.view.button(cx, ids!(toolbar.episodes_btn)).set_text(
+            cx,
+            if episodes {
+                "Hide episodes"
+            } else {
+                "Episodes"
+            },
+        );
+        inner.view.button(cx, ids!(toolbar.signals_btn)).set_text(
+            cx,
+            if signals {
+                "Hide signals"
+            } else {
+                "Show signals"
+            },
+        );
+        let height = if signals { 300.0 } else { 172.0 };
+        inner.footer_h = height;
+        if let Some(mut card) = inner.view.widget(cx, ids!(timeline)).borrow_mut::<View>() {
+            card.walk.height = Size::Fixed(height);
+        }
+        inner.view.redraw(cx);
+    }
+    /// Theme changes reapply script defaults; restore the current pane choices.
+    pub fn restore_panel_design(&self, cx: &mut Cx) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.layout_width = -1.0;
+        }
+        self.adapt_layout(cx);
     }
 
     pub fn sync(&self, cx: &mut Cx, st: &PlaybackState) {
@@ -690,8 +724,6 @@ impl PlayScreenRef {
         let Some(mut inner) = self.borrow_mut() else {
             return;
         };
-        let need_seed = !inner.layout_seeded;
-        inner.layout_seeded = true;
 
         // Episode order and the visible window are derived from state alone, so
         // they are settled before the view is borrowed.
@@ -762,40 +794,31 @@ impl PlayScreenRef {
 
         // The app-shell panels theme through their own dark_mode instance;
         // drive it from the same value so both systems stay in step.
+        let sky = if light > 0.5 {
+            dorobot_ux::tokens::pal::VOID_L
+        } else {
+            dorobot_ux::tokens::pal::DEEP_D
+        };
+        let ground = if light > 0.5 {
+            dorobot_ux::tokens::pal::VOID_L
+        } else {
+            dorobot_ux::tokens::pal::LIFT_D
+        };
+        let mut robot = root.widget(cx, ids!(stage_3d));
+        script_apply_eval!(cx, robot, {sky_horizon: #(sky) sky_zenith: #(sky) ground_color: #(ground) ground2_color: #(ground)});
         let dark_mode = 1.0 - light;
         makepad_app_shell::theme::set_global_dark_mode(dark_mode);
         for (_, name_id) in LANE_IDS {
             let mut label = root.widget(cx, name_id);
             script_apply_eval!(cx, label, { draw_text +: { light: #(light) } });
         }
-        let grid = root.panel_grid(cx, ids!(upper.grid));
-        if !grid.is_empty() {
-            grid.apply_dark_mode(cx, dark_mode);
-            // Seed once; after that the grid owns layout so a user's drag
-            // survives the next repaint.
-            if need_seed {
-                let mut layout = LayoutState::with_panel_count(4);
-                // with_panel_count packs three to a row; this screen wants 2x2.
-                layout.row_assignments = vec![
-                    vec!["panel_0".into(), "panel_1".into()],
-                    vec!["panel_2".into(), "panel_3".into()],
-                    vec![],
-                ];
-                layout.visible_panels = ["panel_0", "panel_1", "panel_2", "panel_3"]
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect();
-                for (id, title) in [
-                    ("panel_0", "cam_high"),
-                    ("panel_1", "3D View"),
-                    ("panel_2", "cam_wrist"),
-                    ("panel_3", "tracking error"),
-                ] {
-                    layout.panel_titles.insert(id.into(), title.into());
-                }
-                grid.set_layout_state(cx, layout);
-            }
-        }
+        root.widget(cx, ids!(upper.stage.media.cameras))
+            .set_visible(cx, !st.video_paths.is_empty());
+        root.widget(cx, ids!(stage_b))
+            .set_visible(cx, st.video_paths.len() > 1);
+        let head = root.widget(cx, ids!(upper.stage.stage_head));
+        theme_panel_head(cx, &head, light);
+        apply_light_in(cx, root, &[(ids!(upper.stage), Themed::Bg)], light);
 
         // ---- episode tree: group headers interleaved with rows ------------
         let shown = (start + ROW_IDS.len()).min(total);

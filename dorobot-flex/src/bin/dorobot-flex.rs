@@ -1,9 +1,8 @@
 // DoRobot Studio: real datasets and LeRobot capture, with explicit --demo fixtures.
 
 use dorobot_flex::api::{files::FileBackend, mock::MockBackend, Backend, Intent, Screen};
-use dorobot_flex::makepad_app_shell::shell::layout::ShellLayoutWidgetRefExt;
-use dorobot_flex::makepad_app_shell::shell::header::ShellHeaderAction;
 use dorobot_flex::playback_controls::PlaybackAction;
+use dorobot_flex::preferences;
 use dorobot_flex::ui::{
     eval::EvalScreenWidgetRefExt, frame, hardware::HardwareScreenWidgetRefExt,
     library::LibraryScreenWidgetRefExt, play::PlayScreenWidgetRefExt,
@@ -11,6 +10,7 @@ use dorobot_flex::ui::{
 };
 use dorobot_flex::widgets::time_series_plot::TimeSeriesPlotAction;
 use dorobot_flex::widgets::timeline::TimelineAction;
+use makepad_urdf_player::robot_view::RobotViewWidgetRefExt;
 use makepad_widgets::*;
 
 /// Transport tick. Matches the shipping player, and is independent of the
@@ -68,93 +68,49 @@ script_mod! {
                 pass.clear_color: mod.theme.color_bg_app
 
                 body +: {
-                    flow: Down
-                    width: Fill
-                    height: Fill
-                    show_bg: true
-                    draw_bg.color: mod.theme.color_bg_app
-
-                    hub_form := View{ visible: false width: Fill height: 42 flow: Right spacing: 8.
-                        Label{ text: "Dataset repo (owner/name):" }
-                        hub_repo := TextInput{ width: Fill height: 36 }
-                        hub_go := Button{ text: "Transfer" }
-                        hub_cancel := Button{ text: "Cancel" }
+                    flow: Right width: Fill height: Fill
+                    show_bg: true draw_bg.color: mod.theme.color_bg_app
+                    sidebar := View{
+                        width: 196 height: Fill flow: Down padding: 12.0 spacing: 12.0
+                        show_bg: true draw_bg.color: mod.theme.color_bg_container
+                        Label{ width: Fill height: 52 text: "DoRobot Studio"
+                            draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
+                        nav := mod.widgets.ux.NavRail{ width: Fill height: Fill }
+                        appearance := Button{width: Fill height: 44 text: "Appearance: Light"}
                     }
-                    status := Label{ width: Fill height: Fit text: "" draw_text +: { color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{} } }
-                    // The screens sit in app-shell's ShellLayout rather than the
-                    // hand-rolled AppBar + work-row they were prototyped in, so
-                    // they inherit what the framework provides: a collapsible
-                    // rail, resizable regions, and panels that dock and persist.
-                    //
-                    // The nav rail and the pages keep their ids, so the screen
-                    // switching in `Screen::apply` still resolves.
-                    shell := ShellLayout{
-                        width: Fill
-                        height: Fill
-
-                        // No floating menu. app-shell ships a hover/pinned
-                        // overlay sidebar (stock "Quick Actions"), but this app
-                        // already has a permanent nav rail — a second menu over
-                        // the top of it is redundant. Both presentations are
-                        // hidden, and the hamburger with them, since it would
-                        // otherwise be a control that does nothing.
-                        pinned_sidebar +: { visible: false width: 0 }
-                        overlay_sidebar +: { visible: false width: 0 }
-
-                        main_container +: {
-                            header +: {
-                                hamburger_btn +: { visible: false width: 0 }
-                                title_label +: { text: "DoRobot Studio" }
-                            }
-
-                            dock_wrapper +: {
-                                dock +: {
-                                    // Region sizes. The shell defaults suit a
-                                    // three-pane IDE; this UX wants a narrow
-                                    // icon rail, no footer strip, and no right
-                                    // rail — its screens bring their own side
-                                    // content.
-                                    root +: { align: SplitterAlign.FromB(0.0) }
-                                    main_area +: { align: SplitterAlign.FromA(96.0) }
-                                    right_area +: { align: SplitterAlign.FromB(0.0) }
-
-                                    // The shell's footer grid ships seven empty
-                                    // demo panels; nothing here uses it.
-                                    footer_content: View{
-                                        width: Fill
-                                        height: Fill
-                                    }
-
-                                    left_sidebar_content: View{
-                                        width: Fill
-                                        height: Fill
-                                        nav := mod.widgets.ux.NavRail{
-                                            width: Fill
-                                            height: Fill
-                                        }
-                                    }
-
-                                    center_content: View{
-                                        width: Fill
-                                        height: Fill
-                                        pages := View{
-                                            width: Fill
-                                            height: Fill
-                                            flow: Overlay
-                                            page_library := LibraryScreen{}
-                                            page_hardware := HardwareScreen{ visible: false }
-                                            page_record := RecordScreen{ visible: false }
-                                            page_play := PlayScreen{ visible: false }
-                                            page_eval := EvalScreen{ visible: false }
-                                        }
-                                    }
-
-                                    // The screens carry their own side content
-                                    // (Library's Hardware panel, Play's inspector),
-                                    // so the shell's own rails stay empty.
-                                    right_sidebar_content: View{
-                                        width: Fill
-                                        height: Fill
+                    workspace := View{
+                        width: Fill height: Fill flow: Down
+                        page_header := View{
+                            width: Fill height: Fit flow: Down padding: 18.0 spacing: 6.0
+                            page_title := Label{width: Fill text: "Library"
+                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_H1{}} }
+                            status := Label{width: Fill height: Fit max_lines: 2 text_overflow: Ellipsis text: ""
+                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}} }
+                        }
+                        hub_form := View{ visible: false width: Fill height: Fit flow: Right spacing: 8. padding: 12.
+                            hub_repo := TextInput{width: Fill height: 44 empty_text: "Dataset repository: owner/name"}
+                            hub_go := Button{ text: "Transfer" height: 44 }
+                            hub_cancel := Button{ text: "Cancel" height: 44 }
+                        }
+                        pages := View{
+                            width: Fill height: Fill flow: Overlay
+                            page_library := LibraryScreen{}
+                            page_hardware := HardwareScreen{visible: false}
+                            page_record := RecordScreen{visible: false}
+                            page_play := PlayScreen{visible: false}
+                            page_eval := EvalScreen{visible: false}
+                            setup_page := View{
+                                visible: false width: Fill height: Fill flow: Down padding: 24.0
+                                setup_card := mod.widgets.ux.Card{
+                                    width: Fill height: Fit flow: Down padding: 28.0 spacing: 18.0
+                                    setup_title := Label{width: Fill text: "Set up your robot"
+                                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_H1{}} }
+                                    setup_description := Label{width: Fill height: Fit text: ""
+                                        draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}} }
+                                    setup_actions := View{width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 12.0
+                                        setup_rig := Button{height: 44 text: "Choose rig profile…"}
+                                        setup_rescan := Button{height: 44 text: "Check connections"}
+                                        setup_replay := Button{height: 44 text: "Open replay"}
                                     }
                                 }
                             }
@@ -186,6 +142,17 @@ pub struct App {
 }
 
 impl App {
+    fn save_session(&self) {
+        if std::env::args().any(|a| a == "--demo") {
+            return;
+        }
+        if let Some(path) = preferences::path() {
+            let state = preferences::Session::snapshot(&*self.backend, frame::light_mode() < 0.5);
+            if let Err(error) = preferences::save(&path, &state) {
+                log::warn!("Could not save UI preferences: {}", error.kind());
+            }
+        }
+    }
     /// Repaint every screen from the current backend snapshot.
     fn sync(&mut self, cx: &mut Cx) {
         self.ui.label(cx, ids!(status)).set_text(
@@ -197,10 +164,36 @@ impl App {
         self.ui
             .widget(cx, ids!(hub_form))
             .set_visible(cx, self.hub_upload.is_some());
+        if self.started {
+            self.save_session();
+        }
         let light = frame::light_mode();
         dorobot_ux::sync_appearance(cx, light > 0.5);
-        self.ui.shell_layout(cx, ids!(shell)).set_dark_mode(cx, light < 0.5);
+        self.ui.button(cx, ids!(appearance)).set_text(
+            cx,
+            if light > 0.5 {
+                "Appearance: Light"
+            } else {
+                "Appearance: Dark"
+            },
+        );
+        self.ui.label(cx, ids!(page_title)).set_text(
+            cx,
+            match self.backend.screen() {
+                Screen::Library => "Library",
+                Screen::Record => "Record",
+                Screen::Play => "Replay",
+                Screen::Hardware => "Hardware",
+                Screen::Eval => "Evaluate",
+            },
+        );
         frame::theme_chrome(cx, &self.ui, light);
+        frame::apply_light(
+            cx,
+            &self.ui,
+            &[(ids!(setup_card), frame::Themed::Bg)],
+            light,
+        );
 
         let nav = self.ui.widget(cx, ids!(nav));
         frame::sync_nav(cx, &nav, self.backend.screen());
@@ -223,6 +216,49 @@ impl App {
 
         // Overlay flow: exactly one page is visible at a time.
         let screen = self.backend.screen();
+        let setup = match screen {
+            Screen::Record => self.backend.record().profile_label.is_empty(),
+            Screen::Hardware => self.backend.record().profile_label.is_empty(),
+            Screen::Eval => self.backend.eval().checkpoint.is_empty(),
+            Screen::Play => self.backend.playback().episodes.is_empty(),
+            _ => false,
+        };
+        self.ui.widget(cx, ids!(setup_page)).set_visible(cx, setup);
+        if setup {
+            let evaluating = screen == Screen::Eval;
+            let no_recordings = screen == Screen::Play;
+            self.ui.button(cx, ids!(setup_replay)).set_text(
+                cx,
+                if no_recordings {
+                    "Open library"
+                } else {
+                    "Open replay"
+                },
+            );
+            self.ui.label(cx, ids!(setup_title)).set_text(
+                cx,
+                if no_recordings {
+                    "Choose a recording to replay"
+                } else if evaluating {
+                    "No rollout running"
+                } else {
+                    "Connect a robot to get started"
+                },
+            );
+            self.ui.label(cx, ids!(setup_description)).set_text(cx, if no_recordings {
+                "Open a LeRobot dataset folder from Library. Your episodes, robot motion and camera recordings will appear here."
+            } else if evaluating {
+                "Live policy rollout is not configured. Use Nexus Studio to validate a checkpoint, or open Replay to inspect recorded motion."
+            } else {
+                "Choose a rig profile for your robot and cameras, then check the connections before recording. You can explore recordings in Replay without connecting hardware."
+            });
+            self.ui
+                .widget(cx, ids!(setup_rig))
+                .set_visible(cx, !evaluating && !no_recordings);
+            self.ui
+                .widget(cx, ids!(setup_rescan))
+                .set_visible(cx, !evaluating && !no_recordings);
+        }
         for (path, s) in [
             (ids!(page_library) as &[LiveId], Screen::Library),
             (ids!(page_hardware), Screen::Hardware),
@@ -230,15 +266,35 @@ impl App {
             (ids!(page_play), Screen::Play),
             (ids!(page_eval), Screen::Eval),
         ] {
-            self.ui.widget(cx, path).set_visible(cx, s == screen);
+            self.ui
+                .widget(cx, path)
+                .set_visible(cx, s == screen && !setup);
         }
     }
 }
 
 impl MatchEvent for App {
     fn handle_startup(&mut self, cx: &mut Cx) {
+        let args: Vec<String> = std::env::args().collect();
+        let saved = if args.iter().any(|a| a == "--demo") {
+            None
+        } else {
+            preferences::path().and_then(|p| preferences::load(&p))
+        };
+        if let Some(saved) = &saved {
+            saved.restore(
+                &mut *self.backend,
+                !args.iter().any(|a| a == "--open" || a == "--dataset"),
+            );
+        }
         // Match the iOS sheet on first draw; --dark selects its dark appearance.
-        frame::set_light_mode(if std::env::args().any(|a| a == "--dark") { 0.0 } else { 1.0 });
+        frame::set_light_mode(
+            if args.iter().any(|a| a == "--dark") || saved.as_ref().is_some_and(|s| s.dark) {
+                0.0
+            } else {
+                1.0
+            },
+        );
 
         // Optional deep-link so the diff runner can shoot one screen per launch.
         let args: Vec<String> = std::env::args().collect();
@@ -282,6 +338,50 @@ impl MatchEvent for App {
             .is_none_or(|t| t.elapsed().as_millis() >= 100)
         {
             self.last_refresh = Some(now);
+            self.ui.play_screen(cx, ids!(page_play)).adapt_layout(cx);
+            if std::env::var_os("DOROBOT_UX_REPORT").is_some() {
+                let play = self.backend.playback();
+                dorobot_flex::ux_probe::write(
+                    cx,
+                    &self.ui,
+                    serde_json::json!({
+                        "screen": self.backend.screen().label(), "dark": frame::light_mode() < 0.5,
+                        "episode": play.selected, "playing": play.is_playing, "time": play.current_time,
+                        "frames": play.stats.frames, "tag": play.selected.and_then(|id| play.episodes.iter().find(|e| e.index == id)).map(|e| format!("{:?}", e.tag)),
+                        "status": self.backend.status(), "hub_open": self.hub_upload.is_some(), "robot_animating": self.ui.robot_view(cx, ids!(stage_3d)).is_animating(), "signals_visible": self.ui.widget(cx, ids!(page_play.timeline.tl_body.lanes)).visible()
+                    }),
+                    &[
+                        "nav_library",
+                        "nav_record",
+                        "nav_play",
+                        "nav_hardware",
+                        "nav_eval",
+                        "appearance",
+                        "setup_rig",
+                        "setup_rescan",
+                        "setup_replay",
+                        "setup_page",
+                        "episodes_btn",
+                        "details_btn",
+                        "signals_btn",
+                        "page_play.upper.tree.tree_body.row_0",
+                        "page_play.upper.tree.tree_body.row_1",
+                        "page_play.upper.tree.tree_body.row_2",
+                        "page_play.upper.side.side_body.btn_good",
+                        "page_play.upper.side.side_body.btn_bad",
+                        "page_play.timeline.tl_body.controls.transport",
+                        "play_btn",
+                        "step_back_btn",
+                        "step_fwd_btn",
+                        "page_play.timeline.tl_body.tl",
+                        "page_library.left_col.header.btn_pull",
+                        "hub_repo",
+                        "hub_cancel",
+                        "page_play.upper.side",
+                        "page_play.upper.tree",
+                    ],
+                );
+            }
             self.ui
                 .label(cx, ids!(status))
                 .set_text(cx, self.backend.status().unwrap_or("DEMO"));
@@ -324,6 +424,30 @@ impl MatchEvent for App {
     }
 
     fn handle_key_down(&mut self, cx: &mut Cx, e: &KeyEvent) {
+        if e.modifiers.logo || e.modifiers.control {
+            let target = match e.key_code {
+                KeyCode::Key1 => Some(Screen::Library),
+                KeyCode::Key2 => Some(Screen::Record),
+                KeyCode::Key3 => Some(Screen::Play),
+                KeyCode::Key4 => Some(Screen::Hardware),
+                KeyCode::Key5 => Some(Screen::Eval),
+                _ => None,
+            };
+            if let Some(target) = target {
+                self.backend.dispatch(Intent::Navigate(target));
+                self.sync(cx);
+                return;
+            }
+        }
+        if e.key_code == KeyCode::Escape && self.hub_upload.is_some() {
+            self.hub_upload = None;
+            self.sync(cx);
+            return;
+        }
+        if self.hub_upload.is_some() {
+            return;
+        }
+
         let intent = if self.backend.screen() == Screen::Play {
             match e.key_code {
                 KeyCode::Space => Some(Intent::TogglePlay),
@@ -347,7 +471,31 @@ impl MatchEvent for App {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         let mut dirty = false;
+        for (id, pane) in [
+            (ids!(episodes_btn), "episodes"),
+            (ids!(details_btn), "details"),
+            (ids!(signals_btn), "signals"),
+        ] {
+            if self.ui.button(cx, id).clicked(actions) {
+                self.ui
+                    .play_screen(cx, ids!(page_play))
+                    .toggle_pane(cx, pane);
+            }
+        }
 
+        if self.ui.button(cx, ids!(setup_replay)).clicked(actions) {
+            let target = if self.backend.screen() == Screen::Play {
+                Screen::Library
+            } else {
+                Screen::Play
+            };
+            self.backend.dispatch(Intent::Navigate(target));
+            dirty = true;
+        }
+        if self.ui.button(cx, ids!(setup_rescan)).clicked(actions) {
+            self.backend.dispatch(Intent::WizardRestartStep);
+            dirty = true;
+        }
         let nav = self.ui.widget(cx, ids!(nav));
         for (path, screen) in frame::NAV_ITEMS {
             let item = nav.widget(cx, path);
@@ -360,11 +508,7 @@ impl MatchEvent for App {
             }
         }
 
-        // The shell header captures its button actions and emits this action.
-        let header = self.ui.widget(cx, ids!(shell.main_container.header));
-        if actions.filter_widget_actions(header.widget_uid()).any(|action| {
-            matches!(action.cast::<ShellHeaderAction>(), ShellHeaderAction::ToggleDarkMode)
-        }) {
+        if self.ui.button(cx, ids!(appearance)).clicked(actions) {
             frame::toggle_light_mode();
             dirty = true;
         }
@@ -373,6 +517,7 @@ impl MatchEvent for App {
             .ui
             .button(cx, ids!(page_library.left_col.header.btn_new))
             .clicked(actions)
+            || self.ui.button(cx, ids!(setup_rig)).clicked(actions)
         {
             if let Some(path) = rfd::FileDialog::new()
                 .set_title("Choose a rig profile (tools/capture/rig.example.json)")
@@ -584,10 +729,15 @@ impl AppMain for App {
     }
 
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
+        if matches!(event, Event::Shutdown | Event::WindowClosed(_)) {
+            self.save_session();
+        }
         self.match_event(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
         if matches!(event, Event::LiveEdit | Event::ScriptReapply) && self.started {
-            self.ui.play_screen(cx, ids!(page_play)).restore_panel_design(cx);
+            self.ui
+                .play_screen(cx, ids!(page_play))
+                .restore_panel_design(cx);
             self.sync(cx);
         }
         // Scrolling the episode window produces no action, so it is picked up

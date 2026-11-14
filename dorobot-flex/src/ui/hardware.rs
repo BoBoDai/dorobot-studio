@@ -236,7 +236,8 @@ script_mod! {
                         // The real renderer, which brings its own studio gradient with
                         // it. This was a shader drawing a perspective grid with
                         // "RobotView mounts here" written across it.
-                        viewport := RobotView{ width: Fill height: Fill }
+                        viewport := RobotView{
+                        keyboard_controls: false width: Fill height: Fill }
                     }
                         }
                     }

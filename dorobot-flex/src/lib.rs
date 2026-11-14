@@ -14,8 +14,10 @@ pub use makepad_widgets;
 
 pub mod api;
 pub mod data;
+pub mod preferences;
 pub mod shared;
 pub mod ui;
+pub mod ux_probe;
 pub mod widgets;
 
 /// Still here because `ui`'s Play screen draws with it; the rest of the old

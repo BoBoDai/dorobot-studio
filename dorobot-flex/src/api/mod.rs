@@ -507,6 +507,9 @@ pub enum Intent {
 /// What every screen reads and writes. Implemented by [`mock::MockBackend`]
 /// today; real backends drop in per screen without UI changes.
 pub trait Backend {
+    fn dataset_id(&self) -> Option<&str> {
+        None
+    }
     fn status(&self) -> Option<&str> {
         None
     }

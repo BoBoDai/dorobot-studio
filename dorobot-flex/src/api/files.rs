@@ -705,6 +705,9 @@ impl FileBackend {
 }
 
 impl Backend for FileBackend {
+    fn dataset_id(&self) -> Option<&str> {
+        self.open.as_ref().map(|(id, _)| id.as_str())
+    }
     fn status(&self) -> Option<&str> {
         Some(&self.status)
     }

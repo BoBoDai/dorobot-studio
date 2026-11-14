@@ -34,8 +34,8 @@ script_mod! {
             align: Align{x: 0.5 y: 0.5}
 
             step_back_btn := Button{
-                width: 36
-                height: 28
+                width: 44
+                height: 44
                 text: "<<"
                 draw_bg +: {
                     dark_mode: instance(0.0)
@@ -62,8 +62,8 @@ script_mod! {
             }
 
             play_btn := Button{
-                width: 52
-                height: 28
+                width: 64
+                height: 44
                 text: "Play"
                 draw_bg +: {
                     color: #x007AFF
@@ -88,8 +88,8 @@ script_mod! {
             }
 
             step_fwd_btn := Button{
-                width: 36
-                height: 28
+                width: 44
+                height: 44
                 text: ">>"
                 draw_bg +: {
                     dark_mode: instance(0.0)

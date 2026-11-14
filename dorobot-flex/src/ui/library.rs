@@ -20,7 +20,7 @@ script_mod! {
         flow: Down
         cursor: MouseCursor.Hand
 
-        head := mod.widgets.ux.PanelHead{ title +: { text: "dataset" } }
+        head := mod.widgets.ux.PanelHead{visible: false title +: { text: "dataset" } }
 
         thumb := View{
             width: Fill
@@ -112,7 +112,7 @@ script_mod! {
                 border_radius: 0.0
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
+                    sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
                     sdf.fill_keep(mix(#x38383A, #xF2F2F7, self.light))
                     sdf.stroke(mix(#x38383A, #xE5E5EA, self.light), 1.0)
                     let c = mix(#xD1D1D6, #x636366, self.light)
@@ -235,7 +235,7 @@ script_mod! {
 
             header := View{
                 width: Fill height: Fit
-                flow: Right
+                flow: Flow.Right{wrap: true}
                 align: Align{y: 0.5}
                 spacing: 12.0
                 padding: Inset{left: 4., bottom: 2.}
@@ -250,7 +250,7 @@ script_mod! {
                 }
                 Filler{}
                 btn_new := Button{
-                    text: "+  New Recording Session"
+                    text: "New recording"
                     padding: Inset{left: 18. right: 18. top: 11. bottom: 11.}
                     draw_bg +: {
                         border_radius: 0.0
@@ -258,7 +258,7 @@ script_mod! {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                             let base = #x007AFF
                             let c = mix(base, #x007AFF, self.hover)
-                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
+                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
                             sdf.fill(mix(c, #x0A84FF, self.down))
                             return sdf.result
                         }
@@ -279,7 +279,7 @@ script_mod! {
                         border_radius: 0.0
                         pixel: fn() {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
+                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
                             let idle = mix(#x2C2C2E, #xFFFFFF, self.light)
                             let hov = mix(#x38383A, #xF2F2F7, self.light)
                             sdf.fill_keep(mix(idle, hov, self.hover))
@@ -295,7 +295,11 @@ script_mod! {
                 }
             }
 
+            no_datasets := Label{visible: false width: Fill height: Fit
+                text: "Open a dataset folder to review recordings, or choose New recording to set up a robot."
+                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}} }
             grid := mod.widgets.ux.Card{
+                show_bg: false
                 width: Fill
                 height: Fit
                 flow: Down
@@ -327,7 +331,7 @@ script_mod! {
                     btn_max +: { visible: false }
                     btn_close +: { visible: false }
                     view_all := Label{
-                        text: "View all"
+                        text: ""
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_BODY{}
@@ -346,6 +350,7 @@ script_mod! {
         }
 
         hardware_rail := mod.widgets.ux.Card{
+            visible: false
             width: 306
             height: Fill
             flow: Down
@@ -460,6 +465,10 @@ impl LibraryScreenRef {
             return;
         };
         let root = &mut inner.view;
+        root.widget(cx, ids!(left_col.no_datasets))
+            .set_visible(cx, state.datasets.is_empty());
+        root.widget(cx, ids!(left_col.recent))
+            .set_visible(cx, !state.sessions.is_empty());
 
         // Static chrome: page background, panels, headers, links.
         script_apply_eval!(cx, root, { draw_bg +: { light: #(light) } });

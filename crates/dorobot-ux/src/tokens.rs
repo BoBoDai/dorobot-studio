@@ -180,9 +180,9 @@ script_mod! {
     }
 
     mod.widgets.nx.T_TITLE = mod.widgets.nx.FONT_M{font_size: 13.0}
-    mod.widgets.nx.T_BODY  = mod.widgets.nx.FONT_R{font_size: 10.5}
-    mod.widgets.nx.T_META  = mod.widgets.nx.FONT_R{font_size: 9.5}
-    mod.widgets.nx.T_CAP   = mod.widgets.nx.FONT_M{font_size: 8.5}
+    mod.widgets.nx.T_BODY  = mod.widgets.nx.FONT_R{font_size: 11.5}
+    mod.widgets.nx.T_META  = mod.widgets.nx.FONT_R{font_size: 10.0}
+    mod.widgets.nx.T_CAP   = mod.widgets.nx.FONT_M{font_size: 9.0}
     mod.widgets.nx.T_MONO  = mod.widgets.nx.FONT_MONO{font_size: 10.0}
     mod.widgets.nx.T_MONO_S= mod.widgets.nx.FONT_MONO{font_size: 8.5}
     mod.widgets.nx.T_BIG   = mod.widgets.nx.FONT_M{font_size: 20.0}
