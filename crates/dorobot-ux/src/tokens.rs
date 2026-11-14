@@ -166,7 +166,7 @@ script_mod! {
     mod.widgets.nx = {}
 
     // ----------------------------------------------------------------- type --
-    // Inherit the iOS sheet's Inter face and the framework's script/CJK fallbacks.
+    // Inherit the app's PingFang iOS sheet and the framework's fallbacks.
     mod.widgets.nx.FONT_R = mod.theme.font_regular{line_spacing: 1.4}
     mod.widgets.nx.FONT_M = mod.theme.font_bold{line_spacing: 1.4}
     mod.widgets.nx.FONT_B = mod.theme.font_bold{line_spacing: 1.4}
@@ -290,6 +290,7 @@ script_mod! {
     }
 
     // --------------------------------------------------------------- buttons --
+    mod.widgets.nx.BUTTON_RADIUS = 6.0
     // Standard button: transparent fill, hairline edge; hover/active → orange.
     mod.widgets.nx.NxBtn = Button{
         width: Fit height: Fit
@@ -314,7 +315,7 @@ script_mod! {
                 let edge0 = mix(#x38383A, #xD1D1D6, self.light)
                 let vio = mix(#x0A84FF, #x007AFF, self.light)
                 let edge = mix(edge0, vio, max(self.on, self.hover))
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                 sdf.fill_keep(mix(fill, mix(#x19334D, #xE5F0FF, self.light), self.on * 0.6))
                 sdf.stroke(mix(edge, edge0, self.disabled), 1.0)
                 return sdf.result
@@ -329,7 +330,7 @@ script_mod! {
         draw_bg +: {
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                 let base = mix(#x0060CC, #x0054B3, self.hover)
                 sdf.fill(mix(base, #x004799, self.down))
                 return sdf.result
@@ -360,7 +361,7 @@ script_mod! {
                 let edge0 = mix(#x38383A, #xD1D1D6, self.light)
                 let hot = mix(#xFF453A, #xD70015, self.light)
                 let edge = mix(edge0, hot, max(self.on, self.hover))
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                 sdf.fill_keep(fill)
                 sdf.stroke(edge, 1.0)
                 return sdf.result
@@ -382,7 +383,7 @@ script_mod! {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 let fill = mix(#x2C2C2E, #xFFFFFF, self.light)
                 let hot = mix(#xFF453A, #xD70015, self.light)
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                 sdf.fill_keep(fill)
                 sdf.stroke(hot, 1.0)
                 return sdf.result

@@ -121,7 +121,7 @@ script_mod! {
                 let l_e = mix(#xD1D1D6, #xD1D1D6, step(0.5, self.tone))
                 let l_e2 = mix(l_e, #xD70015, step(1.5, self.tone))
                 let light_e = mix(l_e2, #x0060CC, step(2.5, self.tone))
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                 // The tag an episode already carries reads as pressed, so the
                 // sidebar answers "what is this tagged?" without looking away.
                 let hot = mix(fill, mix(fill * 1.55, fill * 1.22, self.light), self.sel)

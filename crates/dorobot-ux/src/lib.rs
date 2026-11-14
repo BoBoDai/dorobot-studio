@@ -40,11 +40,20 @@ use makepad_widgets::*;
 pub mod kit;
 pub mod tokens;
 
+fn ios_sheet(name: &str) -> desktop_style::StyleSheet {
+    let mut sheet = desktop_style::StyleSheet::named(name).unwrap();
+    // Install typography before framework controls inherit the theme. Keeping
+    // it in the sheet also preserves the font across appearance reloads.
+    sheet.theme.push_str(include_str!("pingfang.splash"));
+    sheet.widgets.push_str(include_str!("controls.splash"));
+    sheet
+}
+
 /// Select the iOS sheet before registering widgets, retaining an existing choice.
 pub fn install_ios(vm: &mut ScriptVm, light: bool) {
     if desktop_style::current(vm).is_none() {
         let name = if light { "ios" } else { "ios-dark" };
-        desktop_style::install(vm, desktop_style::StyleSheet::named(name).unwrap());
+        desktop_style::install(vm, ios_sheet(name));
     }
 }
 
@@ -55,7 +64,7 @@ pub fn sync_appearance(cx: &mut Cx, light: bool) {
         if desktop_style::current(vm).is_some_and(|sheet| sheet.name == name) {
             return false;
         }
-        desktop_style::install(vm, desktop_style::StyleSheet::named(name).unwrap());
+        desktop_style::install(vm, ios_sheet(name));
         true
     });
     if changed {

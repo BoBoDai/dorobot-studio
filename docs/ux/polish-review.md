@@ -1,5 +1,9 @@
 # Studio refinement review
 
+The later [PingFang and button follow-up](typography-controls-review.md) records
+the current typography, smaller button corners and its separate regression run.
+The score and evidence below remain scoped to implementation `3d72c53`.
+
 **95/100 — PASS for the tested desktop refinement scope.** The same model that
 implemented the changes reviewed the original screenshots and real-input
 results. This is a model-authored judgment, not an independent human score or

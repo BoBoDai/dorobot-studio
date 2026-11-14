@@ -1,0 +1,4 @@
+
+// Studio actions use compact rounded rectangles, with the same 44px targets.
+mod.widgets.Button.draw_bg.border_radius = 6.0
+mod.widgets.Button.padding = mod.turtle.Inset{left: 14.0 right: 14.0 top: 8.0 bottom: 8.0}

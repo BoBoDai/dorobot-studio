@@ -259,7 +259,7 @@ script_mod! {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                             let base = #x0060CC
                             let c = mix(base, #x0060CC, self.hover)
-                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                             sdf.fill(mix(c, #x0A84FF, self.down))
                             return sdf.result
                         }
@@ -280,7 +280,7 @@ script_mod! {
                         border_radius: 0.0
                         pixel: fn() {
                             let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                            sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                             let idle = mix(#x2C2C2E, #xFFFFFF, self.light)
                             let hov = mix(#x38383A, #xF2F2F7, self.light)
                             sdf.fill_keep(mix(idle, hov, self.hover))

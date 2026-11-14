@@ -38,7 +38,7 @@ script_mod! {
                 }
             }
             preview := Image{ width: Fill height: Fill }
-            waiting := Label{width: Fill align: Align{x: 0.5} margin: 8.0 text: "No camera frames"
+            waiting := Label{width: Fill align: Align{x: 0.5} margin: Inset{left: 8. right: 8.} text: "No camera frames"
                 draw_text +: {color: #xAEAEB2 text_style: mod.widgets.ux.TEXT_META{}}}
             badge := RoundedView{
                 width: Fit height: Fit
@@ -358,7 +358,7 @@ script_mod! {
                 text: "Record" width: 132 height: 48
                 draw_bg +: {recording: instance(0.0) pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, 10.0)
+                    sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, mod.widgets.nx.BUTTON_RADIUS)
                     sdf.fill(mix(#xC40013, #xD1D1D6, self.disabled))
                     return sdf.result
                 }}
@@ -368,7 +368,7 @@ script_mod! {
             btn_save := mod.widgets.nx.Primary{height: 48 text: "Save episode"
                 draw_bg +: {pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    sdf.box(0.5,0.5,self.rect_size.x-1.0,self.rect_size.y-1.0,10.0)
+                    sdf.box(0.5,0.5,self.rect_size.x-1.0,self.rect_size.y-1.0,mod.widgets.nx.BUTTON_RADIUS)
                     sdf.fill(mix(#x0060CC,#xD1D1D6,self.disabled)); return sdf.result
                 }}
                 draw_text +: {get_color: fn() {return mix(#xFFFFFF,#x636366,self.disabled)}}

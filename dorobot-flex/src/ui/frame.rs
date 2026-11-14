@@ -67,7 +67,7 @@ script_mod! {
                 let fill = mix(base, tint, max(self.on, self.hover * 0.5))
                 let pressed = mix(#x34404E, #xD5E5F9, self.light)
                 let edge = mix(#x48484A, #xD1D1D6, self.light)
-                sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, 8.0)
+                sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, mod.widgets.nx.BUTTON_RADIUS)
                 sdf.fill_keep(mix(fill, pressed, self.down))
                 sdf.stroke(mix(edge, mix(#x64B5FF, #x0060CC, self.light), self.focus), 1.0)
                 return sdf.result

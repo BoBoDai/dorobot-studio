@@ -341,7 +341,7 @@ script_mod! {
                                     light: instance(0.0)
                                     pixel: fn() {
                                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                                         let idle = mix(#x2C2C2E, #xFFFFFF, self.light)
                                         let hov = mix(#x38383A, #xF2F2F7, self.light)
                                         sdf.fill_keep(mix(idle, hov, self.hover))
@@ -365,7 +365,7 @@ script_mod! {
                                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                                         let off = mix(#x38383A, #xE5E5EA, self.light)
                                         let live = mix(off, #x0060CC, self.enabled_f)
-                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                                         sdf.fill(mix(live, #x0060CC, self.hover * self.enabled_f))
                                         return sdf.result
                                     }

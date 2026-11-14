@@ -45,7 +45,7 @@ script_mod! {
                         let base = mix(light_bg, dark_bg, self.dark_mode)
                         let hover_mix = mix(vec4(0.820, 0.820, 0.839, 1.0), vec4(0.220, 0.220, 0.227, 1.0), self.dark_mode)
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                         sdf.fill(mix(base, hover_mix, self.hover))
                         return sdf.result
                     }
@@ -73,7 +73,7 @@ script_mod! {
                         let pressed_color = vec4(0.000, 0.278, 0.600, 1.0)
                         let color = mix(base, hover_color, self.hover)
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                         sdf.fill(mix(color, pressed_color, self.down))
                         return sdf.result
                     }
@@ -99,7 +99,7 @@ script_mod! {
                         let base = mix(light_bg, dark_bg, self.dark_mode)
                         let hover_mix = mix(vec4(0.820, 0.820, 0.839, 1.0), vec4(0.220, 0.220, 0.227, 1.0), self.dark_mode)
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
                         sdf.fill(mix(base, hover_mix, self.hover))
                         return sdf.result
                     }
