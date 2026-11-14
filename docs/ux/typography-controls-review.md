@@ -1,5 +1,8 @@
 # PingFang and button refinement
 
+The main verification below covers `163ae01`; the later panel utility
+adjustment has its own targeted verification at the end.
+
 Studio now uses the installed PingFang SC face for interface text: Regular
 (400) and Semibold (600). The theme installs these faces before controls inherit
 their text styles and retains them across appearance changes. Inter remains the
@@ -42,3 +45,17 @@ not a new score or independent judge. That report's 75 assertions and 20 Rust
 tests describe its earlier implementation; the 57 checks above were rerun for
 this change. Physical hardware, authenticated transfers, other platforms and
 Nexus Studio were not revalidated.
+
+## Compact panel utilities
+
+The panel maximize and close buttons now measure 28×28 logical pixels, with
+zero padding and an explicit 28px minimum height overriding the iOS theme's
+44px minimum. Their shared title row is 40px high with 4px spacing. Other action
+buttons retain their existing sizes.
+
+Applied through JIT live reload in the existing process, without a native
+build or application restart. Sixteen targeted checks passed: retained layout
+and paused episode/frame, all eight Replay utility button dimensions,
+maximize/Escape, close/reopen, appearance switching and restoration of the
+original layout. Original light/dark captures were visually inspected.
+The earlier 57-check suite was not rerun for this localized size adjustment.

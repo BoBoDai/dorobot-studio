@@ -90,15 +90,20 @@ script_mod! {
         width: Fill height: Fill flow: Overlay
         show_bg: false
     }
+    // Desktop panel utilities should not inherit the iOS 44px touch minimum.
+    mod.widgets.PanelToolButton = mod.widgets.ux.ToolButton{
+        width: 28 height: 28 min_height: 28
+        padding: 0.0
+    }
     mod.widgets.StudioPanel = mod.widgets.ux.Card{
         width: Fill height: Fill flow: Down
-        head := View{width: Fill height: 48 flow: Right spacing: 2.0 align: Align{y: 0.5}
+        head := View{width: Fill height: 40 flow: Right spacing: 4.0 align: Align{y: 0.5}
             cursor: MouseCursor.Hand
             grip := Label{width: 18 text: "⠿" draw_text.color: mod.theme.color_text_disabled}
             title := Label{width: Fill max_lines: 1 text_overflow: Ellipsis
                 draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_NAV{}}}
-            maximize := mod.widgets.ux.ToolButton{width: 44 height: 44 text: "⤢"}
-            close := mod.widgets.ux.ToolButton{width: 44 height: 44 text: "×"}
+            maximize := mod.widgets.PanelToolButton{text: "⤢"}
+            close := mod.widgets.PanelToolButton{text: "×"}
         }
     }
 }
