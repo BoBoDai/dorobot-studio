@@ -1,7 +1,7 @@
 //! Timeline Widget with playback controls and scrubbing
 
-use makepad_widgets::*;
 use makepad_app_shell::theme::get_global_dark_mode;
+use makepad_widgets::*;
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -108,8 +108,8 @@ pub struct DrawRulerTick {
 pub enum TimelineAction {
     Play,
     Pause,
-    Seek(f64),         // Seek to time in seconds
-    ScrubEnd,          // User finished scrubbing (finger up)
+    Seek(f64), // Seek to time in seconds
+    ScrubEnd,  // User finished scrubbing (finger up)
     StepForward,
     StepBackward,
     SpeedChanged(f64),
@@ -196,7 +196,7 @@ impl Widget for Timeline {
 
         match event.hits_with_capture_overload(cx, track_area, self.is_scrubbing) {
             Hit::FingerDown(fe) => {
-                cx.set_key_focus(track_area);  // Grab focus for continued tracking
+                cx.set_key_focus(track_area); // Grab focus for continued tracking
                 self.is_scrubbing = true;
                 self.scrub_to_position(cx, fe.abs.x, track_rect);
             }
@@ -252,13 +252,13 @@ impl Timeline {
         // Aim for roughly 1 tick per 50-100 pixels
         let pixels_per_second = rect.size.x / self.duration;
         let tick_interval = if pixels_per_second > 100.0 {
-            1.0  // 1 second
+            1.0 // 1 second
         } else if pixels_per_second > 20.0 {
-            5.0  // 5 seconds
+            5.0 // 5 seconds
         } else if pixels_per_second > 5.0 {
-            10.0  // 10 seconds
+            10.0 // 10 seconds
         } else {
-            30.0  // 30 seconds
+            30.0 // 30 seconds
         };
 
         // Draw ticks
@@ -270,20 +270,24 @@ impl Timeline {
 
             // Draw tick mark
             let tick_height = if (time % (tick_interval * 2.0)).abs() < 0.01 {
-                rect.size.y * 0.6  // Major tick
+                rect.size.y * 0.6 // Major tick
             } else {
-                rect.size.y * 0.3  // Minor tick
+                rect.size.y * 0.3 // Minor tick
             };
 
-            self.draw_tick.draw_abs(cx, Rect {
-                pos: dvec2(x - 0.5, rect.pos.y + rect.size.y - tick_height),
-                size: dvec2(1.0, tick_height),
-            });
+            self.draw_tick.draw_abs(
+                cx,
+                Rect {
+                    pos: dvec2(x - 0.5, rect.pos.y + rect.size.y - tick_height),
+                    size: dvec2(1.0, tick_height),
+                },
+            );
 
             // Draw time label for major ticks
             if (time % (tick_interval * 2.0)).abs() < 0.01 || time == 0.0 {
                 let label = Self::format_ruler_time(time);
-                self.draw_text.draw_abs(cx, dvec2(x + 2.0, rect.pos.y + 2.0), &label);
+                self.draw_text
+                    .draw_abs(cx, dvec2(x + 2.0, rect.pos.y + 2.0), &label);
             }
 
             time += tick_interval;
@@ -348,7 +352,8 @@ impl Timeline {
     /// Set playback speed
     pub fn set_speed(&mut self, cx: &mut Cx, speed: f64) {
         self.playback_speed = speed;
-        self.view.label(cx, ids!(controls.speed_label))
+        self.view
+            .label(cx, ids!(controls.speed_label))
             .set_text(cx, &format!("{:.1}x", speed));
     }
 
@@ -373,12 +378,15 @@ impl Timeline {
         // Time display: MM:SS.mmm / MM:SS.mmm
         let current_str = Self::format_time(self.current_time);
         let duration_str = Self::format_time(self.duration);
-        self.view.label(cx, ids!(controls.time_display))
+        self.view
+            .label(cx, ids!(controls.time_display))
             .set_text(cx, &format!("{} / {}", current_str, duration_str));
 
         // Frame display
-        self.view.label(cx, ids!(controls.frame_display))
-            .set_text(cx, &format!("F: {} / {}", self.current_frame, self.total_frames));
+        self.view.label(cx, ids!(controls.frame_display)).set_text(
+            cx,
+            &format!("F: {} / {}", self.current_frame, self.total_frames),
+        );
     }
 
     fn format_time(seconds: f64) -> String {

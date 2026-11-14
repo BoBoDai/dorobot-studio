@@ -9,9 +9,9 @@
 
 pub mod lerobot_dataset;
 pub mod lerobot_writer;
-pub mod video_decoder;
 pub mod urdf_renderer;
+pub mod video_decoder;
 
 pub use lerobot_dataset::*;
-pub use video_decoder::*;
 pub use urdf_renderer::*;
+pub use video_decoder::*;

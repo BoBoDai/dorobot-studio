@@ -1,0 +1,14 @@
+{
+  "robot_type": "so100",
+  "follower_port": "/dev/ttyUSB0",
+  "leader_port": "/dev/ttyUSB1",
+  "follower_id": "studio_follower",
+  "leader_id": "studio_leader",
+  "cameras": {"front": 0, "wrist": 1},
+  "fps": 30,
+  "max_relative_target": 5,
+  "max_episode_seconds": 300,
+  "task": "Pick the block and place it in the box",
+  "dataset": "../../datasets/pick-block",
+  "episode_target": 50
+}

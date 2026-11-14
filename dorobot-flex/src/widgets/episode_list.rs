@@ -1,8 +1,8 @@
 //! Episode List Widget using FileTree for reliable click handling
 
-use makepad_widgets::*;
 use makepad_app_shell::theme::get_global_dark_mode;
 use makepad_widgets::file_tree::{FileTree, FileTreeAction};
+use makepad_widgets::*;
 use std::collections::HashMap;
 
 script_mod! {
@@ -331,9 +331,17 @@ impl EpisodeList {
         if let Some(file_node) = file_nodes.get(&file_node_id) {
             match &file_node.child_edges {
                 Some(child_edges) => {
-                    if file_tree.begin_folder(cx, file_node_id, &file_node.name).is_ok() {
+                    if file_tree
+                        .begin_folder(cx, file_node_id, &file_node.name)
+                        .is_ok()
+                    {
                         for child_edge in child_edges {
-                            Self::draw_file_node(cx, child_edge.file_node_id, file_tree, file_nodes);
+                            Self::draw_file_node(
+                                cx,
+                                child_edge.file_node_id,
+                                file_tree,
+                                file_nodes,
+                            );
                         }
                         file_tree.end_folder();
                     }
@@ -353,12 +361,8 @@ impl EpisodeList {
         let mut root_edges = Vec::new();
 
         // Separate data sources into videos and other data
-        let video_sources: Vec<_> = self.data_sources.iter()
-            .filter(|ds| ds.is_video)
-            .collect();
-        let data_sources: Vec<_> = self.data_sources.iter()
-            .filter(|ds| !ds.is_video)
-            .collect();
+        let video_sources: Vec<_> = self.data_sources.iter().filter(|ds| ds.is_video).collect();
+        let data_sources: Vec<_> = self.data_sources.iter().filter(|ds| !ds.is_video).collect();
 
         // === Data Sources section (shown ONCE, not per episode) ===
         if !self.data_sources.is_empty() {
@@ -378,16 +382,21 @@ impl EpisodeList {
                     self.live_id_counter += 1;
 
                     let display_name = source.name.split('.').last().unwrap_or(&source.name);
-                    let shape_str = source.shape.iter()
+                    let shape_str = source
+                        .shape
+                        .iter()
                         .map(|s| s.to_string())
                         .collect::<Vec<_>>()
                         .join("x");
 
-                    self.file_nodes.insert(video_id, FileNode {
-                        name: format!("{} [{}]", display_name, shape_str),
-                        child_edges: None,
-                        episode_index: None,
-                    });
+                    self.file_nodes.insert(
+                        video_id,
+                        FileNode {
+                            name: format!("{} [{}]", display_name, shape_str),
+                            child_edges: None,
+                            episode_index: None,
+                        },
+                    );
 
                     video_children.push(FileEdge {
                         name: display_name.to_string(),
@@ -395,11 +404,14 @@ impl EpisodeList {
                     });
                 }
 
-                self.file_nodes.insert(videos_folder_id, FileNode {
-                    name: format!("Videos ({})", video_sources.len()),
-                    child_edges: Some(video_children),
-                    episode_index: None,
-                });
+                self.file_nodes.insert(
+                    videos_folder_id,
+                    FileNode {
+                        name: format!("Videos ({})", video_sources.len()),
+                        child_edges: Some(video_children),
+                        episode_index: None,
+                    },
+                );
 
                 data_sources_children.push(FileEdge {
                     name: "Videos".to_string(),
@@ -420,7 +432,9 @@ impl EpisodeList {
                     let shape_str = if source.shape.is_empty() {
                         "scalar".to_string()
                     } else {
-                        source.shape.iter()
+                        source
+                            .shape
+                            .iter()
                             .map(|s| s.to_string())
                             .collect::<Vec<_>>()
                             .join("x")
@@ -433,11 +447,14 @@ impl EpisodeList {
                             let ch_id = LiveId(self.live_id_counter);
                             self.live_id_counter += 1;
 
-                            self.file_nodes.insert(ch_id, FileNode {
-                                name: format!("[{}] {}", idx, ch_name),
-                                child_edges: None,
-                                episode_index: None,
-                            });
+                            self.file_nodes.insert(
+                                ch_id,
+                                FileNode {
+                                    name: format!("[{}] {}", idx, ch_name),
+                                    child_edges: None,
+                                    episode_index: None,
+                                },
+                            );
 
                             channel_children.push(FileEdge {
                                 name: ch_name.clone(),
@@ -445,17 +462,23 @@ impl EpisodeList {
                             });
                         }
 
-                        self.file_nodes.insert(data_id, FileNode {
-                            name: format!("{} [{}]", source.name, shape_str),
-                            child_edges: Some(channel_children),
-                            episode_index: None,
-                        });
+                        self.file_nodes.insert(
+                            data_id,
+                            FileNode {
+                                name: format!("{} [{}]", source.name, shape_str),
+                                child_edges: Some(channel_children),
+                                episode_index: None,
+                            },
+                        );
                     } else {
-                        self.file_nodes.insert(data_id, FileNode {
-                            name: format!("{} [{}]", source.name, shape_str),
-                            child_edges: None,
-                            episode_index: None,
-                        });
+                        self.file_nodes.insert(
+                            data_id,
+                            FileNode {
+                                name: format!("{} [{}]", source.name, shape_str),
+                                child_edges: None,
+                                episode_index: None,
+                            },
+                        );
                     }
 
                     data_children.push(FileEdge {
@@ -464,11 +487,14 @@ impl EpisodeList {
                     });
                 }
 
-                self.file_nodes.insert(data_folder_id, FileNode {
-                    name: format!("Data ({})", data_sources.len()),
-                    child_edges: Some(data_children),
-                    episode_index: None,
-                });
+                self.file_nodes.insert(
+                    data_folder_id,
+                    FileNode {
+                        name: format!("Data ({})", data_sources.len()),
+                        child_edges: Some(data_children),
+                        episode_index: None,
+                    },
+                );
 
                 data_sources_children.push(FileEdge {
                     name: "Data".to_string(),
@@ -476,11 +502,14 @@ impl EpisodeList {
                 });
             }
 
-            self.file_nodes.insert(data_sources_folder_id, FileNode {
-                name: "Data Sources".to_string(),
-                child_edges: Some(data_sources_children),
-                episode_index: None,
-            });
+            self.file_nodes.insert(
+                data_sources_folder_id,
+                FileNode {
+                    name: "Data Sources".to_string(),
+                    child_edges: Some(data_sources_children),
+                    episode_index: None,
+                },
+            );
 
             root_edges.push(FileEdge {
                 name: "Data Sources".to_string(),
@@ -505,18 +534,25 @@ impl EpisodeList {
             self.live_id_to_episode.insert(episode_id, episode.index);
 
             // Format episode name
-            let duration_str = format!("{}:{:02}",
+            let duration_str = format!(
+                "{}:{:02}",
                 (episode.duration_secs / 60.0) as u32,
-                (episode.duration_secs % 60.0) as u32);
-            let episode_name = format!("Episode {} • {} • {} frames",
-                episode.index, duration_str, episode.frame_count);
+                (episode.duration_secs % 60.0) as u32
+            );
+            let episode_name = format!(
+                "Episode {} • {} • {} frames",
+                episode.index, duration_str, episode.frame_count
+            );
 
             // Episode as a simple file node (no children)
-            self.file_nodes.insert(episode_id, FileNode {
-                name: episode_name,
-                child_edges: None,
-                episode_index: Some(episode.index),
-            });
+            self.file_nodes.insert(
+                episode_id,
+                FileNode {
+                    name: episode_name,
+                    child_edges: None,
+                    episode_index: Some(episode.index),
+                },
+            );
 
             episode_edges.push(FileEdge {
                 name: format!("Episode {}", episode.index),
@@ -524,11 +560,14 @@ impl EpisodeList {
             });
         }
 
-        self.file_nodes.insert(episodes_folder_id, FileNode {
-            name: format!("Episodes ({})", episode_edges.len()),
-            child_edges: Some(episode_edges),
-            episode_index: None,
-        });
+        self.file_nodes.insert(
+            episodes_folder_id,
+            FileNode {
+                name: format!("Episodes ({})", episode_edges.len()),
+                child_edges: Some(episode_edges),
+                episode_index: None,
+            },
+        );
 
         root_edges.push(FileEdge {
             name: "Episodes".to_string(),
@@ -537,11 +576,14 @@ impl EpisodeList {
 
         // Create root node
         let root_id = live_id!(episodes_root);
-        self.file_nodes.insert(root_id, FileNode {
-            name: "Dataset".to_string(),
-            child_edges: Some(root_edges),
-            episode_index: None,
-        });
+        self.file_nodes.insert(
+            root_id,
+            FileNode {
+                name: "Dataset".to_string(),
+                child_edges: Some(root_edges),
+                episode_index: None,
+            },
+        );
     }
 
     pub fn set_episodes(&mut self, cx: &mut Cx, episodes: Vec<EpisodeInfo>) {
@@ -572,7 +614,9 @@ impl EpisodeList {
     }
 
     fn apply_filters(&mut self) {
-        self.filtered_indices = self.episodes.iter()
+        self.filtered_indices = self
+            .episodes
+            .iter()
             .enumerate()
             .filter(|(_, ep)| {
                 if let Some(task_idx) = self.task_filter {
@@ -594,11 +638,14 @@ impl EpisodeList {
 
     fn update_episode_count(&mut self, cx: &mut Cx) {
         let text = format!("{} episodes", self.filtered_indices.len());
-        self.view.label(cx, ids!(header.filter_row.episode_count)).set_text(cx, &text);
+        self.view
+            .label(cx, ids!(header.filter_row.episode_count))
+            .set_text(cx, &text);
     }
 
     pub fn filtered_episodes(&self) -> Vec<&EpisodeInfo> {
-        self.filtered_indices.iter()
+        self.filtered_indices
+            .iter()
             .map(|&i| &self.episodes[i])
             .collect()
     }

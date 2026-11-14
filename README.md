@@ -1,13 +1,34 @@
-# Dorobot
+# DoRobot Studio
 
-Robotics dataset visualization with **Makepad** UI framework.
+SO-100/SO-101 LeRobot data collection and dataset review with the **Makepad** UI framework.
+
+For the current capture workflow, build requirements, verification results and remaining hardware checks, see [the functional review and setup guide](docs/FUNCTIONAL_REVIEW.md). Production mode is the default; use `--demo` for generated fixtures.
+
+This is a standalone Git repository and Cargo workspace. Open this directory
+as the project root. The application builds without a sibling Nexus checkout;
+its shared UI crate is included in `crates/dorobot-ux`.
+
+### Adora Nano preview
+
+The Nano URDF and meshes are included in `data/adora_nano`. From this project:
+
+```sh
+./tools/run_nano_preview.sh
+```
+
+The launcher creates three synthetic joint-motion clips if needed and opens
+them in the Play screen. Space plays/pauses; Home returns to the start. These
+clips are kinematic previews, not captured data or commands for hardware.
+This launcher builds without FFmpeg/video decoding; the standard build below
+includes video playback. Model provenance and limits are recorded alongside
+the assets.
 
 ## Overview
 
 Dorobot provides tools for visualizing robotics datasets, with a focus on **LeRobot** format datasets:
 
-- **dorobot-flex**: Main application with flexible panel layout for dataset visualization
-- **dorobot-studio**: Legacy application with Rerun integration
+- **dorobot-flex**: DoRobot Studio application with capture, playback, and dataset review
+- **crates/**: Shared UI, data types, and the optional Dora bridge
 
 ## dorobot-flex
 
@@ -52,7 +73,7 @@ Panels can be rearranged by dragging their title bars. The content follows the p
 ## Project Structure
 
 ```
-dorobot/
+dorobot-studio/
 ├── Cargo.toml                    # Workspace root
 ├── dorobot-flex/                 # Main application
 │   ├── src/
@@ -66,8 +87,10 @@ dorobot/
 │   │       └── episode_list.rs  # Hierarchical episode browser
 │   └── *.md                     # Development documentation
 │
-├── dorobot-studio/              # Legacy app (Rerun integration)
+├── data/                       # Local robot descriptions and meshes
+│   └── adora_nano/             # Self-contained Nano model snapshot
 ├── crates/
+│   ├── dorobot-ux/              # Shared visual language
 │   ├── dorobot-types/           # Shared data types
 │   └── dorobot-dora-bridge/     # Dora dataflow bridge (legacy)
 └── examples/                    # URDF and Rerun examples
@@ -93,7 +116,7 @@ sudo apt install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
 ### Build and Run
 
 ```bash
-cd ~/home/dorobot
+cd dorobot-studio
 cargo run --release -p dorobot-flex
 ```
 

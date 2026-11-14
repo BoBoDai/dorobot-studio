@@ -30,7 +30,7 @@ pub enum VideoError {
 pub struct VideoFrame {
     pub width: u32,
     pub height: u32,
-    pub data: Vec<u8>,  // RGB24 format
+    pub data: Vec<u8>, // RGB24 format
     pub frame_index: u64,
     pub timestamp: f64,
 }
@@ -49,6 +49,7 @@ pub struct VideoDecoder {
     decoder: Option<DecoderState>,
     /// Last successfully decoded frame index (for sequential optimization)
     last_frame_index: Option<u64>,
+    cached: Option<VideoFrame>,
 }
 
 #[cfg(feature = "video")]
@@ -57,6 +58,7 @@ struct DecoderState {
     decoder: ffmpeg_next::decoder::Video,
     video_stream_index: usize,
     scaler: ffmpeg_next::software::scaling::Context,
+    eof: bool,
 }
 
 #[cfg(feature = "video")]
@@ -73,11 +75,12 @@ impl VideoDecoder {
         ffmpeg_next::init().map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
 
         // Open input
-        let input_ctx = ffmpeg_next::format::input(&path)
-            .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
+        let input_ctx =
+            ffmpeg_next::format::input(&path).map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
 
         // Find video stream
-        let video_stream = input_ctx.streams()
+        let video_stream = input_ctx
+            .streams()
             .best(ffmpeg_next::media::Type::Video)
             .ok_or_else(|| VideoError::Ffmpeg("No video stream found".to_string()))?;
 
@@ -88,7 +91,9 @@ impl VideoDecoder {
         let decoder_ctx = ffmpeg_next::codec::context::Context::from_parameters(codec_params)
             .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
 
-        let decoder = decoder_ctx.decoder().video()
+        let decoder = decoder_ctx
+            .decoder()
+            .video()
             .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
 
         let width = decoder.width();
@@ -96,7 +101,11 @@ impl VideoDecoder {
 
         // Get frame rate
         let fps = video_stream.avg_frame_rate();
-        let fps = if fps.1 != 0 { fps.0 as f64 / fps.1 as f64 } else { 30.0 };
+        let fps = if fps.1 != 0 {
+            fps.0 as f64 / fps.1 as f64
+        } else {
+            30.0
+        };
 
         // Get duration
         let duration = if video_stream.duration() > 0 {
@@ -105,7 +114,11 @@ impl VideoDecoder {
             input_ctx.duration() as f64 / 1_000_000.0
         };
 
-        let frame_count = (duration * fps) as u64;
+        let frame_count = if video_stream.frames() > 0 {
+            video_stream.frames() as u64
+        } else {
+            (duration * fps).round() as u64
+        };
 
         // Create scaler for RGB conversion
         let scaler = ffmpeg_next::software::scaling::Context::get(
@@ -116,13 +129,15 @@ impl VideoDecoder {
             width,
             height,
             ffmpeg_next::software::scaling::Flags::BILINEAR,
-        ).map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
+        )
+        .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
 
         // Re-open for seeking
-        let input_ctx = ffmpeg_next::format::input(&path)
-            .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
+        let input_ctx =
+            ffmpeg_next::format::input(&path).map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
 
-        let video_stream = input_ctx.streams()
+        let video_stream = input_ctx
+            .streams()
             .best(ffmpeg_next::media::Type::Video)
             .ok_or_else(|| VideoError::Ffmpeg("No video stream found".to_string()))?;
 
@@ -130,7 +145,9 @@ impl VideoDecoder {
         let decoder_ctx = ffmpeg_next::codec::context::Context::from_parameters(codec_params)
             .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
 
-        let decoder = decoder_ctx.decoder().video()
+        let decoder = decoder_ctx
+            .decoder()
+            .video()
             .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
 
         Ok(Self {
@@ -145,19 +162,31 @@ impl VideoDecoder {
                 decoder,
                 video_stream_index,
                 scaler,
+                eof: false,
             }),
             last_frame_index: None,
+            cached: None,
         })
     }
 
-    pub fn width(&self) -> u32 { self.width }
-    pub fn height(&self) -> u32 { self.height }
-    pub fn fps(&self) -> f64 { self.fps }
-    pub fn frame_count(&self) -> u64 { self.frame_count }
-    pub fn duration(&self) -> f64 { self.duration }
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+    pub fn fps(&self) -> f64 {
+        self.fps
+    }
+    pub fn frame_count(&self) -> u64 {
+        self.frame_count
+    }
+    pub fn duration(&self) -> f64 {
+        self.duration
+    }
 
     pub fn get_frame_at_time(&mut self, time: f64) -> Result<VideoFrame, VideoError> {
-        let frame_index = (time * self.fps) as u64;
+        let frame_index = (time * self.fps).round() as u64;
         self.get_frame(frame_index)
     }
 
@@ -166,7 +195,14 @@ impl VideoDecoder {
             return Err(VideoError::InvalidFrame(frame_index));
         }
 
-        let state = self.decoder.as_mut()
+        if let Some(frame) = &self.cached {
+            if frame.frame_index == frame_index {
+                return Ok(frame.clone());
+            }
+        }
+        let state = self
+            .decoder
+            .as_mut()
             .ok_or_else(|| VideoError::Ffmpeg("Decoder not initialized".to_string()))?;
 
         // Check if we need to seek or can continue sequentially
@@ -182,50 +218,72 @@ impl VideoDecoder {
 
         if need_seek {
             let timestamp = (frame_index as f64 / self.fps * 1_000_000.0) as i64;
-            state.input_ctx.seek(timestamp, timestamp..)
+            state
+                .input_ctx
+                .seek(timestamp, ..timestamp.saturating_add(1))
                 .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
 
             // Flush decoder after seek
             state.decoder.flush();
+            state.eof = false;
         }
 
         let mut decoded_frame = ffmpeg_next::frame::Video::empty();
         let mut rgb_frame = ffmpeg_next::frame::Video::empty();
 
-        for (stream, packet) in state.input_ctx.packets() {
-            if stream.index() != state.video_stream_index {
-                continue;
-            }
-
-            state.decoder.send_packet(&packet)
-                .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
-
-            while state.decoder.receive_frame(&mut decoded_frame).is_ok() {
-                let frame_pts = decoded_frame.timestamp().unwrap_or(0);
-                let time_base = f64::from(stream.time_base());
-                let frame_time = frame_pts as f64 * time_base;
-
-                // Calculate which frame index this decoded frame corresponds to
-                let decoded_index = (frame_time * self.fps) as u64;
-
-                // Skip frames until we reach or pass the target
-                if decoded_index < frame_index && !need_seek {
+        let time_base = state
+            .input_ctx
+            .stream(state.video_stream_index)
+            .map(|s| f64::from(s.time_base()))
+            .unwrap_or(1.0 / self.fps);
+        loop {
+            // Drain pending frames before feeding another packet, including the
+            // delayed B-frames after demux EOF.
+            if state.decoder.receive_frame(&mut decoded_frame).is_ok() {
+                let frame_time = decoded_frame.timestamp().unwrap_or(0) as f64 * time_base;
+                let decoded_index = (frame_time * self.fps).round().max(0.0) as u64;
+                if decoded_index < frame_index {
                     continue;
                 }
-
-                state.scaler.run(&decoded_frame, &mut rgb_frame)
+                state
+                    .scaler
+                    .run(&decoded_frame, &mut rgb_frame)
                     .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
-
-                // Update last frame index for sequential optimization
-                self.last_frame_index = Some(frame_index);
-
-                return Ok(VideoFrame {
+                let row_bytes = self.width as usize * 3;
+                let stride = rgb_frame.stride(0);
+                let mut data = Vec::with_capacity(row_bytes * self.height as usize);
+                for row in rgb_frame.data(0).chunks(stride).take(self.height as usize) {
+                    data.extend_from_slice(&row[..row_bytes]);
+                }
+                self.last_frame_index = Some(decoded_index);
+                let frame = VideoFrame {
                     width: self.width,
                     height: self.height,
-                    data: rgb_frame.data(0).to_vec(),
-                    frame_index,
+                    data,
+                    frame_index: decoded_index,
                     timestamp: frame_time,
-                });
+                };
+                self.cached = Some(frame.clone());
+                return Ok(frame);
+            }
+            if state.eof {
+                break;
+            }
+            match state.input_ctx.packets().next() {
+                Some((stream, packet)) if stream.index() == state.video_stream_index => {
+                    state
+                        .decoder
+                        .send_packet(&packet)
+                        .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
+                }
+                Some(_) => {}
+                None => {
+                    state
+                        .decoder
+                        .send_eof()
+                        .map_err(|e| VideoError::Ffmpeg(e.to_string()))?;
+                    state.eof = true;
+                }
             }
         }
 
@@ -235,6 +293,7 @@ impl VideoDecoder {
     /// Reset sequential state (call when switching episodes or videos)
     pub fn reset_sequential_state(&mut self) {
         self.last_frame_index = None;
+        self.cached = None;
     }
 }
 
@@ -259,13 +318,26 @@ pub struct PlaceholderDecoder {
 
 impl PlaceholderDecoder {
     pub fn new(width: u32, height: u32, fps: f64, frame_count: u64) -> Self {
-        Self { width, height, fps, frame_count }
+        Self {
+            width,
+            height,
+            fps,
+            frame_count,
+        }
     }
 
-    pub fn width(&self) -> u32 { self.width }
-    pub fn height(&self) -> u32 { self.height }
-    pub fn fps(&self) -> f64 { self.fps }
-    pub fn frame_count(&self) -> u64 { self.frame_count }
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+    pub fn fps(&self) -> f64 {
+        self.fps
+    }
+    pub fn frame_count(&self) -> u64 {
+        self.frame_count
+    }
 
     pub fn get_frame(&self, frame_index: u64) -> VideoFrame {
         let mut data = vec![0u8; (self.width * self.height * 3) as usize];
@@ -332,5 +404,49 @@ mod tests {
         assert_eq!(frame.width, 640);
         assert_eq!(frame.height, 480);
         assert_eq!(frame.data.len(), 640 * 480 * 3);
+    }
+}
+
+#[cfg(all(test, feature = "video"))]
+mod real_video_tests {
+    use super::*;
+    #[test]
+    fn random_seeks_tail_frames_and_rgb_stride_are_correct() {
+        let Some(ffmpeg) = std::env::var_os("DOROBOT_TEST_FFMPEG") else {
+            return;
+        };
+        let path =
+            std::env::temp_dir().join(format!("dorobot-video-review-{}.mp4", std::process::id()));
+        let status = std::process::Command::new(ffmpeg)
+            .args([
+                "-v",
+                "error",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=162x94:rate=30",
+                "-frames:v",
+                "45",
+                "-c:v",
+                "libx264",
+                "-g",
+                "30",
+                "-bf",
+                "3",
+            ])
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        let mut decoder = VideoDecoder::open(&path).unwrap();
+        for i in [0, 19, 20, 4, 44, 43, 0] {
+            let frame = decoder.get_frame(i).unwrap();
+            assert_eq!(frame.frame_index, i);
+            assert!((frame.timestamp - i as f64 / 30.0).abs() < 0.001);
+            assert_eq!(frame.data.len(), 162 * 94 * 3);
+            assert_eq!(decoder.get_frame(i).unwrap().data, frame.data);
+        }
+        std::fs::remove_file(path).unwrap();
     }
 }

@@ -313,9 +313,12 @@ impl Widget for EvalScreen {
 }
 
 const DIV_IDS: [&[LiveId]; 6] = [
-    ids!(body.left.stack.st_body.div_0), ids!(body.left.stack.st_body.div_1),
-    ids!(body.left.stack.st_body.div_2), ids!(body.left.stack.st_body.div_3),
-    ids!(body.left.stack.st_body.div_4), ids!(body.left.stack.st_body.div_5),
+    ids!(body.left.stack.st_body.div_0),
+    ids!(body.left.stack.st_body.div_1),
+    ids!(body.left.stack.st_body.div_2),
+    ids!(body.left.stack.st_body.div_3),
+    ids!(body.left.stack.st_body.div_4),
+    ids!(body.left.stack.st_body.div_5),
 ];
 const RUN_IDS: [&[LiveId]; 3] = [
     ids!(body.right.runs.r_body.run_0),
@@ -326,23 +329,30 @@ const RUN_IDS: [&[LiveId]; 3] = [
 impl EvalScreenRef {
     pub fn sync(&self, cx: &mut Cx, st: &EvalState) {
         let light = crate::ui::frame::light_mode();
-        let Some(mut inner) = self.borrow_mut() else { return };
+        let Some(mut inner) = self.borrow_mut() else {
+            return;
+        };
         let root = &mut inner.view;
 
         script_apply_eval!(cx, root, { draw_bg +: { light: #(light) } });
-        apply_light_in(cx, root, &[
-            (ids!(pbar.latency), Themed::Text),
-            (ids!(pbar.btn_stop), Themed::Bg),
-            (ids!(body.left.cams.cam_a), Themed::Bg),
-            (ids!(body.left.cams.cam_a.sa), Themed::Bg),
-            (ids!(body.left.cams.cam_b), Themed::Bg),
-            (ids!(body.left.cams.cam_b.sb), Themed::Bg),
-            (ids!(body.left.stack), Themed::Bg),
-            (ids!(body.right.view3d), Themed::Bg),
-            (ids!(body.right.view3d.v_body), Themed::Bg),
-            (ids!(body.right.runs), Themed::Bg),
-            (ids!(body.right.runs.r_body.summary), Themed::Text),
-        ], light);
+        apply_light_in(
+            cx,
+            root,
+            &[
+                (ids!(pbar.latency), Themed::Text),
+                (ids!(pbar.btn_stop), Themed::Bg),
+                (ids!(body.left.cams.cam_a), Themed::Bg),
+                (ids!(body.left.cams.cam_a.sa), Themed::Bg),
+                (ids!(body.left.cams.cam_b), Themed::Bg),
+                (ids!(body.left.cams.cam_b.sb), Themed::Bg),
+                (ids!(body.left.stack), Themed::Bg),
+                (ids!(body.right.view3d), Themed::Bg),
+                (ids!(body.right.view3d.v_body), Themed::Bg),
+                (ids!(body.right.runs), Themed::Bg),
+                (ids!(body.right.runs.r_body.summary), Themed::Text),
+            ],
+            light,
+        );
         for p in [
             ids!(body.left.cams.cam_a.ha) as &[LiveId],
             ids!(body.left.cams.cam_b.hb),
@@ -355,9 +365,16 @@ impl EvalScreenRef {
         }
 
         // ---- policy bar ----------------------------------------------------
-        root.label(cx, ids!(pbar.ckpt.label)).set_text(cx, &st.checkpoint);
-        root.label(cx, ids!(pbar.status.label))
-            .set_text(cx, if st.driving { "policy driving" } else { "stopped" });
+        root.label(cx, ids!(pbar.ckpt.label))
+            .set_text(cx, &st.checkpoint);
+        root.label(cx, ids!(pbar.status.label)).set_text(
+            cx,
+            if st.driving {
+                "policy driving"
+            } else {
+                "stopped"
+            },
+        );
         root.label(cx, ids!(pbar.latency))
             .set_text(cx, &format!("inference {:.0} ms", st.inference_ms));
         let tone = if st.driving { 1.0 } else { 0.0 };
@@ -379,7 +396,8 @@ impl EvalScreenRef {
             match st.joints.get(i) {
                 Some(j) => {
                     row.set_visible(cx, true);
-                    row.label(cx, ids!(jname)).set_text(cx, &j.name.to_uppercase());
+                    row.label(cx, ids!(jname))
+                        .set_text(cx, &j.name.to_uppercase());
                     let alarm = if j.alarm { 1.0 } else { 0.0 };
                     // Only the offending joint shows its delta, so attention
                     // lands on the joint rather than the whole run.
@@ -409,7 +427,8 @@ impl EvalScreenRef {
             match st.runs.get(i) {
                 Some(r) => {
                     row.set_visible(cx, true);
-                    row.label(cx, ids!(run_id)).set_text(cx, &format!("run {:02}", r.id));
+                    row.label(cx, ids!(run_id))
+                        .set_text(cx, &format!("run {:02}", r.id));
                     row.label(cx, ids!(run_state.label))
                         .set_text(cx, if r.success { "success" } else { "fail" });
                     row.label(cx, ids!(run_dur)).set_text(
@@ -426,10 +445,12 @@ impl EvalScreenRef {
                     script_apply_eval!(cx, cw, { draw_bg +: { tone: #(tone) } });
                     let mut cl = row.widget(cx, ids!(run_state.label));
                     script_apply_eval!(cx, cl, { draw_text +: { tone: #(tone) } });
-                    apply_light(cx, &row, &[
-                        (ids!(run_id), Themed::Text),
-                        (ids!(run_dur), Themed::Text),
-                    ], light);
+                    apply_light(
+                        cx,
+                        &row,
+                        &[(ids!(run_id), Themed::Text), (ids!(run_dur), Themed::Text)],
+                        light,
+                    );
                     let chip = row.widget(cx, ids!(run_state));
                     theme_chip(cx, &chip, light);
                 }

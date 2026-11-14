@@ -15,6 +15,7 @@
 //!
 //! Real backends replace mock ones one screen at a time; the UI does not change.
 
+pub mod capture;
 pub mod files;
 pub mod mock;
 
@@ -170,6 +171,7 @@ pub struct JointCalibration {
 #[derive(Clone, Debug, Default)]
 pub struct HardwareState {
     pub robot_label: String,
+    pub can_advance: bool,
     pub steps: Vec<WizardStep>,
     pub joints: Vec<JointCalibration>,
     /// Live angles feeding the 3D mirror, in URDF joint order.
@@ -191,7 +193,7 @@ impl HardwareState {
 
     /// The wizard only advances once every joint has been swept.
     pub fn can_continue(&self) -> bool {
-        !self.joints.is_empty() && self.joints_done() == self.joints.len()
+        self.can_advance || (!self.joints.is_empty() && self.joints_done() == self.joints.len())
     }
 }
 
@@ -228,6 +230,8 @@ pub struct LiveJoint {
 
 #[derive(Clone, Debug, Default)]
 pub struct RecordState {
+    pub robot_urdf: Option<(PathBuf, PathBuf)>,
+    pub pose: Vec<f32>,
     pub profile_label: String,
     pub task: String,
     pub episode_index: u32,
@@ -238,6 +242,8 @@ pub struct RecordState {
     pub recording: bool,
     pub sound_cues: bool,
     pub cameras: Vec<String>,
+    pub previews: BTreeMap<String, PathBuf>,
+    pub busy: bool,
     pub joints: Vec<LiveJoint>,
     pub last_take: Option<TakeReview>,
 }
@@ -255,7 +261,11 @@ impl RecordState {
     }
 
     pub fn elapsed_label(&self) -> String {
-        format!("{:02}:{:04.1}", (self.elapsed_s / 60.0) as u32, self.elapsed_s % 60.0)
+        format!(
+            "{:02}:{:04.1}",
+            (self.elapsed_s / 60.0) as u32,
+            self.elapsed_s % 60.0
+        )
     }
 }
 
@@ -326,6 +336,7 @@ pub struct PlaybackState {
     pub video_paths: BTreeMap<String, PathBuf>,
     /// Where this episode starts inside a v3.0 concatenated video file.
     pub video_frame_offset: u64,
+    pub video_frame_offsets: BTreeMap<String, u64>,
     /// `(urdf, assets_dir)` for this dataset's robot, when one ships with it.
     pub robot_urdf: Option<(PathBuf, PathBuf)>,
     /// Measured joint values per frame, for the 3D mirror. Frame-major, unlike
@@ -336,7 +347,8 @@ pub struct PlaybackState {
 impl PlaybackState {
     /// Frame the playhead currently sits on.
     pub fn frame_index(&self) -> u64 {
-        (self.current_time * self.stats.fps).max(0.0) as u64
+        ((self.current_time * self.stats.fps).max(0.0).round() as u64)
+            .min(self.stats.frames.saturating_sub(1))
     }
 
     /// Pose under the playhead, for the robot viewer.
@@ -446,11 +458,18 @@ impl Screen {
 #[derive(Clone, Debug)]
 pub enum Intent {
     Navigate(Screen),
+    ConfigureRig(PathBuf),
+    OpenFolder(PathBuf),
+    UndoExclude,
 
     // Library
     RescanDatasets,
     OpenDataset(String),
     PullFromHub,
+    HubTransfer {
+        repo: String,
+        destination: Option<PathBuf>,
+    },
     NewRecordingSession,
 
     // Hardware
@@ -474,7 +493,10 @@ pub enum Intent {
 
     // Playback & curation
     SelectEpisode(u64),
-    TagEpisode { episode: u64, tag: Option<Tag> },
+    TagEpisode {
+        episode: u64,
+        tag: Option<Tag>,
+    },
     DeleteEpisode(u64),
     PushToHub,
 
@@ -485,6 +507,9 @@ pub enum Intent {
 /// What every screen reads and writes. Implemented by [`mock::MockBackend`]
 /// today; real backends drop in per screen without UI changes.
 pub trait Backend {
+    fn status(&self) -> Option<&str> {
+        None
+    }
     fn screen(&self) -> Screen;
     fn library(&self) -> &LibraryState;
     fn hardware(&self) -> &HardwareState;

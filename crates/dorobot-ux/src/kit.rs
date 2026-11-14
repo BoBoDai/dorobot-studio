@@ -110,7 +110,13 @@ impl Widget for Spark {
             let x_of = |i: usize| rect.pos.x + i as f64 / (n - 1) as f64 * rect.size.x;
             // baseline hair
             self.draw_flat.color = t.edge();
-            self.draw_flat.draw_abs(cx, Rect { pos: dvec2(rect.pos.x, rect.pos.y + rect.size.y - 1.0), size: dvec2(rect.size.x, 1.0) });
+            self.draw_flat.draw_abs(
+                cx,
+                Rect {
+                    pos: dvec2(rect.pos.x, rect.pos.y + rect.size.y - 1.0),
+                    size: dvec2(rect.size.x, 1.0),
+                },
+            );
             // area fill: quad blending ignores alpha here, so premix an
             // opaque wash toward the panel ground instead
             let ground = t.deep();
@@ -120,7 +126,13 @@ impl Widget for Spark {
                 let y = y_of(self.data[i]);
                 let w = (rect.size.x / (n - 1) as f64).max(1.0);
                 self.draw_flat.color = fill;
-                self.draw_flat.draw_abs(cx, Rect { pos: dvec2(x, y), size: dvec2(w, (rect.pos.y + rect.size.y - 1.0 - y).max(0.0) ) });
+                self.draw_flat.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(x, y),
+                        size: dvec2(w, (rect.pos.y + rect.size.y - 1.0 - y).max(0.0)),
+                    },
+                );
             }
             // line: vertical bars connecting consecutive samples
             self.draw_flat.color = color;
@@ -130,7 +142,13 @@ impl Widget for Spark {
                 let x1 = x_of(i);
                 let y = y_of(self.data[i]);
                 let (a, b) = if prev < y { (prev, y) } else { (y, prev) };
-                self.draw_flat.draw_abs(cx, Rect { pos: dvec2(x0, a), size: dvec2((x1 - x0).max(1.0), (b - a).max(1.6)) });
+                self.draw_flat.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(x0, a),
+                        size: dvec2((x1 - x0).max(1.0), (b - a).max(1.6)),
+                    },
+                );
                 prev = y;
             }
             // threshold line, dashed
@@ -139,7 +157,13 @@ impl Widget for Spark {
                 self.draw_flat.color = t.cy();
                 let mut x = rect.pos.x;
                 while x < rect.pos.x + rect.size.x {
-                    self.draw_flat.draw_abs(cx, Rect { pos: dvec2(x, y), size: dvec2(4.0, 1.2) });
+                    self.draw_flat.draw_abs(
+                        cx,
+                        Rect {
+                            pos: dvec2(x, y),
+                            size: dvec2(4.0, 1.2),
+                        },
+                    );
                     x += 7.0;
                 }
             }
@@ -147,7 +171,13 @@ impl Widget for Spark {
             let ex = x_of(n - 1) - 2.0;
             let ey = y_of(self.data[n - 1]) - 2.0;
             self.draw_flat.color = color;
-            self.draw_flat.draw_abs(cx, Rect { pos: dvec2(ex, ey), size: dvec2(4.0, 4.0) });
+            self.draw_flat.draw_abs(
+                cx,
+                Rect {
+                    pos: dvec2(ex, ey),
+                    size: dvec2(4.0, 4.0),
+                },
+            );
         }
         DrawStep::done()
     }
@@ -214,7 +244,13 @@ impl Widget for Segsbar {
                     SegTone::Hot => t.hot(),
                     SegTone::Edge => t.edge(),
                 };
-                self.draw_flat.draw_abs(cx, Rect { pos: dvec2(x, rect.pos.y), size: dvec2(ww, rect.size.y) });
+                self.draw_flat.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(x, rect.pos.y),
+                        size: dvec2(ww, rect.size.y),
+                    },
+                );
                 x += ww + if i + 1 < n { 2.0 } else { 0.0 };
             }
         }
@@ -304,14 +340,44 @@ impl Widget for Heat {
                         }
                     }
                 };
-                self.draw_flat.draw_abs(cx, Rect { pos: dvec2(x, y), size: dvec2(cw, chh) });
+                self.draw_flat.draw_abs(
+                    cx,
+                    Rect {
+                        pos: dvec2(x, y),
+                        size: dvec2(cw, chh),
+                    },
+                );
                 if self.sel == Some((ri, ci)) {
                     self.draw_flat.color = t.ink();
                     let b = 1.6;
-                    self.draw_flat.draw_abs(cx, Rect { pos: dvec2(x, y), size: dvec2(cw, b) });
-                    self.draw_flat.draw_abs(cx, Rect { pos: dvec2(x, y + chh - b), size: dvec2(cw, b) });
-                    self.draw_flat.draw_abs(cx, Rect { pos: dvec2(x, y), size: dvec2(b, chh) });
-                    self.draw_flat.draw_abs(cx, Rect { pos: dvec2(x + cw - b, y), size: dvec2(b, chh) });
+                    self.draw_flat.draw_abs(
+                        cx,
+                        Rect {
+                            pos: dvec2(x, y),
+                            size: dvec2(cw, b),
+                        },
+                    );
+                    self.draw_flat.draw_abs(
+                        cx,
+                        Rect {
+                            pos: dvec2(x, y + chh - b),
+                            size: dvec2(cw, b),
+                        },
+                    );
+                    self.draw_flat.draw_abs(
+                        cx,
+                        Rect {
+                            pos: dvec2(x, y),
+                            size: dvec2(b, chh),
+                        },
+                    );
+                    self.draw_flat.draw_abs(
+                        cx,
+                        Rect {
+                            pos: dvec2(x + cw - b, y),
+                            size: dvec2(b, chh),
+                        },
+                    );
                 }
             }
         }
@@ -321,9 +387,18 @@ impl Widget for Heat {
 
 impl HeatRef {
     /// Real sweep results: arbitrary rows × cols, all revealed.
-    pub fn set_dyn(&self, cx: &mut Cx, grid: &[Vec<Option<f64>>], sel: Option<(usize, usize)>, light: f32) {
+    pub fn set_dyn(
+        &self,
+        cx: &mut Cx,
+        grid: &[Vec<Option<f64>>],
+        sel: Option<(usize, usize)>,
+        light: f32,
+    ) {
         if let Some(mut s) = self.borrow_mut() {
-            s.cells = grid.iter().map(|row| row.iter().map(|v| Some(*v)).collect()).collect();
+            s.cells = grid
+                .iter()
+                .map(|row| row.iter().map(|v| Some(*v)).collect())
+                .collect();
             s.sel = sel;
             s.light = light;
             s.mini = false;
@@ -413,10 +488,28 @@ impl Widget for Scrub {
         self.draw_flat.color = t.sink();
         self.draw_flat.draw_abs(cx, rect);
         self.draw_flat.color = t.edge();
-        self.draw_flat.draw_abs(cx, Rect { pos: rect.pos, size: dvec2(rect.size.x, 1.0) });
-        self.draw_flat.draw_abs(cx, Rect { pos: dvec2(rect.pos.x, rect.pos.y + rect.size.y - 1.0), size: dvec2(rect.size.x, 1.0) });
+        self.draw_flat.draw_abs(
+            cx,
+            Rect {
+                pos: rect.pos,
+                size: dvec2(rect.size.x, 1.0),
+            },
+        );
+        self.draw_flat.draw_abs(
+            cx,
+            Rect {
+                pos: dvec2(rect.pos.x, rect.pos.y + rect.size.y - 1.0),
+                size: dvec2(rect.size.x, 1.0),
+            },
+        );
         self.draw_flat.color = t.vio();
-        self.draw_flat.draw_abs(cx, Rect { pos: rect.pos, size: dvec2(rect.size.x * self.frac, rect.size.y) });
+        self.draw_flat.draw_abs(
+            cx,
+            Rect {
+                pos: rect.pos,
+                size: dvec2(rect.size.x * self.frac, rect.size.y),
+            },
+        );
         DrawStep::done()
     }
 }

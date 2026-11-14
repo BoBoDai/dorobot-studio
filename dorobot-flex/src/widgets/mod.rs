@@ -1,10 +1,10 @@
 //! Custom widgets for LeRobot visualization
 
-pub mod video_player;
+pub mod episode_list;
+pub mod robot_viewer;
 pub mod time_series_plot;
 pub mod timeline;
-pub mod robot_viewer;
-pub mod episode_list;
+pub mod video_player;
 
 use makepad_widgets::{ScriptValue, ScriptVm};
 

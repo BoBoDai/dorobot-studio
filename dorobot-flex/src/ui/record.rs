@@ -4,6 +4,7 @@
 //! procedural placeholders here: real pixels arrive when the live dora feed is
 //! wired, and the trace shader is seeded per joint so renders stay comparable.
 
+use dorobot_ux::kit::SparkWidgetRefExt;
 use makepad_widgets::*;
 
 use crate::api::{RecordState, TakeVerdict};
@@ -36,6 +37,7 @@ script_mod! {
                     return mix(lit, mix(#x2A2725, #x141312, clamp(d, 0.0, 1.0)), self.light * 0.0)
                 }
             }
+            preview := Image{ width: Fill height: Fill }
             badge := RoundedView{
                 width: Fit height: Fit
                 padding: Inset{left: 8. right: 9. top: 3. bottom: 3.}
@@ -91,30 +93,7 @@ script_mod! {
                 get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
             }
         }
-        wave := View{
-            width: Fill height: 18
-            show_bg: true
-            draw_bg +: {
-                seed: instance(0.0)
-                light: instance(0.0)
-                pixel: fn() {
-                    // Procedural trace, seeded per joint so the render is
-                    // deterministic and diffable.
-                    let x = self.pos.x
-                    let s = self.seed
-                    let y = 0.5
-                        + 0.26 * sin(x * 18.0 + s * 2.2)
-                        + 0.10 * sin(x * 47.0 + s * 5.1)
-                        + 0.05 * sin(x * 91.0 + s * 1.7)
-                    let d = abs(self.pos.y - y)
-                    let line = 1.0 - smoothstep(0.0, 0.09, d)
-                    let hue0 = mix(#xD15010, #x3E7A4A, fract(s * 0.37))
-                    let hue = mix(hue0, #xB07514, fract(s * 0.19))
-                    let bg = mix(#x1B1917, #xF2F0ED, self.light)
-                    return mix(bg, hue, line)
-                }
-            }
-        }
+        wave := Spark{ width: Fill height: 18 }
         jl := Label{
             width: 112 text: ""
             draw_text +: {
@@ -126,6 +105,7 @@ script_mod! {
     }
 
     let FilmCell = View{
+        preview := Image{ width: Fill height: Fill }
         width: 118 height: 74
         margin: Inset{right: 10.}
         show_bg: true
@@ -259,14 +239,8 @@ script_mod! {
                                 return mix(base, mix(#x2A2725, #xD8D4CF, self.light), g)
                             }
                         }
-                        Label{
-                            text: "RobotView mounts here"
-                            draw_text +: {
-                                light: instance(0.0)
-                                text_style: mod.widgets.ux.TEXT_META{}
-                                get_color: fn() { return mix(#x6B625B, #xD8D4CF, self.light) }
-                            }
-                        }
+                        robot_view := mod.widgets.RobotView{ width: Fill height: Fill }
+
                     }
                 }
                 session := mod.widgets.ux.Card{
@@ -448,6 +422,8 @@ script_mod! {
 
 #[derive(Script, ScriptHook, Widget)]
 pub struct RecordScreen {
+    #[rust]
+    loaded_urdf: Option<std::path::PathBuf>,
     #[deref]
     view: View,
 }
@@ -480,27 +456,44 @@ const FILM_IDS: [&[LiveId]; 4] = [
 impl RecordScreenRef {
     pub fn sync(&self, cx: &mut Cx, st: &RecordState) {
         let light = crate::ui::frame::light_mode();
-        let Some(mut inner) = self.borrow_mut() else { return };
-        let root = &mut inner.view;
+        let Some(mut inner) = self.borrow_mut() else {
+            return;
+        };
+        let RecordScreen {
+            view: root,
+            loaded_urdf,
+            ..
+        } = &mut *inner;
 
         script_apply_eval!(cx, root, { draw_bg +: { light: #(light) } });
-        apply_light_in(cx, root, &[
-            (ids!(sbar.task), Themed::Text),
-            (ids!(sbar.counter), Themed::Text),
-            (ids!(sbar.elapsed), Themed::Text),
-            (ids!(body.left.traces), Themed::Bg),
-            (ids!(body.right.view3d), Themed::Bg),
-            (ids!(body.right.view3d.v3_body), Themed::Bg),
-            (ids!(body.right.session), Themed::Bg),
-            (ids!(body.right.session.ss_body.prog_row.prog_label), Themed::Text),
-            (ids!(body.right.session.ss_body.prog_row.prog_val), Themed::Text),
-            (ids!(body.right.session.ss_body.prog_bar), Themed::Bg),
-            (ids!(body.right.session.ss_body.tally), Themed::Text),
-            (ids!(body.right.session.ss_body.cues), Themed::Text),
-            (ids!(review), Themed::Bg),
-            (ids!(transport.btn_discard), Themed::Both),
-            (ids!(transport.btn_rerecord), Themed::Both),
-        ], light);
+        apply_light_in(
+            cx,
+            root,
+            &[
+                (ids!(sbar.task), Themed::Text),
+                (ids!(sbar.counter), Themed::Text),
+                (ids!(sbar.elapsed), Themed::Text),
+                (ids!(body.left.traces), Themed::Bg),
+                (ids!(body.right.view3d), Themed::Bg),
+                (ids!(body.right.view3d.v3_body), Themed::Bg),
+                (ids!(body.right.session), Themed::Bg),
+                (
+                    ids!(body.right.session.ss_body.prog_row.prog_label),
+                    Themed::Text,
+                ),
+                (
+                    ids!(body.right.session.ss_body.prog_row.prog_val),
+                    Themed::Text,
+                ),
+                (ids!(body.right.session.ss_body.prog_bar), Themed::Bg),
+                (ids!(body.right.session.ss_body.tally), Themed::Text),
+                (ids!(body.right.session.ss_body.cues), Themed::Text),
+                (ids!(review), Themed::Bg),
+                (ids!(transport.btn_discard), Themed::Both),
+                (ids!(transport.btn_rerecord), Themed::Both),
+            ],
+            light,
+        );
         for p in [
             ids!(body.left.traces.tr_head) as &[LiveId],
             ids!(body.right.view3d.v3_head),
@@ -510,7 +503,34 @@ impl RecordScreenRef {
             let head = root.widget(cx, p);
             theme_panel_head(cx, &head, light);
         }
-        for p in FILM_IDS {
+        if let Some((path, assets)) = &st.robot_urdf {
+            let load = loaded_urdf.as_ref() != Some(path);
+            let viewer = root.widget(cx, ids!(body.right.view3d.v3_body.robot_view));
+            if let Some(mut v) = viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                if load {
+                    if v.load_robot(&path.to_string_lossy(), &assets.to_string_lossy())
+                        .is_ok()
+                    {
+                        *loaded_urdf = Some(path.clone());
+                    }
+                }
+                if !st.pose.is_empty() {
+                    v.set_joint_angles(cx, &st.pose);
+                }
+            };
+        }
+        for (i, p) in FILM_IDS.iter().enumerate() {
+            let path = st.last_take.as_ref().and_then(|t| t.thumbnails.get(i));
+            root.widget(cx, p).set_visible(cx, path.is_some());
+            if let Some(path) = path {
+                if let Ok(bytes) = std::fs::read(path) {
+                    let _ = root
+                        .widget(cx, p)
+                        .image(cx, ids!(preview))
+                        .load_png_from_data(cx, &bytes);
+                }
+            }
+
             let mut f = root.widget(cx, p);
             if !f.is_empty() {
                 script_apply_eval!(cx, f, { draw_bg +: { light: #(light) } });
@@ -518,10 +538,14 @@ impl RecordScreenRef {
         }
 
         // ---- session bar --------------------------------------------------
-        root.label(cx, ids!(sbar.profile.label)).set_text(cx, &st.profile_label);
-        root.label(cx, ids!(sbar.task)).set_text(cx, &format!("“{}”", st.task));
-        root.label(cx, ids!(sbar.counter)).set_text(cx, &st.counter_label());
-        root.label(cx, ids!(sbar.elapsed)).set_text(cx, &st.elapsed_label());
+        root.label(cx, ids!(sbar.profile.label))
+            .set_text(cx, &st.profile_label);
+        root.label(cx, ids!(sbar.task))
+            .set_text(cx, &format!("“{}”", st.task));
+        root.label(cx, ids!(sbar.counter))
+            .set_text(cx, &st.counter_label());
+        root.label(cx, ids!(sbar.elapsed))
+            .set_text(cx, &st.elapsed_label());
         let profile_chip = root.widget(cx, ids!(sbar.profile));
         theme_chip(cx, &profile_chip, light);
 
@@ -535,6 +559,15 @@ impl RecordScreenRef {
                 Some(name) => {
                     pane.set_visible(cx, true);
                     pane.label(cx, ids!(head.title)).set_text(cx, name);
+                    pane.widget(cx, ids!(stage.badge))
+                        .set_visible(cx, st.recording);
+                    if let Some(path) = st.previews.get(name) {
+                        if let Ok(bytes) = std::fs::read(path) {
+                            let _ = pane
+                                .image(cx, ids!(stage.preview))
+                                .load_png_from_data(cx, &bytes);
+                        }
+                    }
                     let mut c = pane.clone();
                     script_apply_eval!(cx, c, { draw_bg +: { light: #(light) } });
                     let head = pane.widget(cx, ids!(head));
@@ -555,15 +588,23 @@ impl RecordScreenRef {
                     row.set_visible(cx, true);
                     row.label(cx, ids!(jn)).set_text(cx, &j.name);
                     row.label(cx, ids!(jv))
-                        .set_text(cx, &format!("{:+.3} rad", j.value));
+                        .set_text(cx, &format!("{:+.2}", j.value));
                     row.label(cx, ids!(jl))
                         .set_text(cx, &format!("{:.3}   {:.3}", j.min, j.max));
-                    apply_light(cx, &row, &[
-                        (ids!(jn), Themed::Text),
-                        (ids!(jv), Themed::Text),
-                        (ids!(jl), Themed::Text),
-                        (ids!(wave), Themed::Bg),
-                    ], light);
+                    let values: Vec<f64> = j.history.iter().map(|v| *v as f64).collect();
+                    row.spark(cx, ids!(wave))
+                        .set(cx, &values, None, 0, light as f32);
+                    apply_light(
+                        cx,
+                        &row,
+                        &[
+                            (ids!(jn), Themed::Text),
+                            (ids!(jv), Themed::Text),
+                            (ids!(jl), Themed::Text),
+                            (ids!(wave), Themed::Bg),
+                        ],
+                        light,
+                    );
                 }
                 None => row.set_visible(cx, false),
             }
@@ -573,11 +614,19 @@ impl RecordScreenRef {
         root.label(cx, ids!(body.right.session.ss_body.prog_row.prog_val))
             .set_text(cx, &format!("{} / {}", st.saved, st.episode_target));
         root.label(cx, ids!(body.right.session.ss_body.tally))
-            .set_text(cx, &format!("Saved {} · Discarded {}", st.saved, st.discarded));
-        root.label(cx, ids!(body.right.session.ss_body.cues)).set_text(
-            cx,
-            if st.sound_cues { "SOUND CUES  ON" } else { "SOUND CUES  OFF" },
-        );
+            .set_text(
+                cx,
+                &format!("Saved {} · Discarded {}", st.saved, st.discarded),
+            );
+        root.label(cx, ids!(body.right.session.ss_body.cues))
+            .set_text(
+                cx,
+                if st.sound_cues {
+                    "SOUND CUES  ON"
+                } else {
+                    "SOUND CUES  OFF"
+                },
+            );
         let frac = st.progress();
         let mut bar = root.widget(cx, ids!(body.right.session.ss_body.prog_bar));
         script_apply_eval!(cx, bar, { draw_bg +: { frac: #(frac) light: #(light) } });
@@ -590,7 +639,8 @@ impl RecordScreenRef {
                 TakeVerdict::ReadyToSave => ("ready to save", 1.0),
                 TakeVerdict::Warning => ("check warnings", 4.0),
             };
-            root.label(cx, ids!(review.rv_body.verdict.label)).set_text(cx, txt);
+            root.label(cx, ids!(review.rv_body.verdict.label))
+                .set_text(cx, txt);
             let chip = root.widget(cx, ids!(review.rv_body.verdict));
             let mut c = chip.clone();
             script_apply_eval!(cx, c, { draw_bg +: { tone: #(tone) } });
@@ -603,6 +653,15 @@ impl RecordScreenRef {
         let rec = if st.recording { 1.0 } else { 0.0 };
         let mut btn = root.widget(cx, ids!(transport.btn_record));
         script_apply_eval!(cx, btn, { draw_bg +: { recording: #(rec) } });
-        root.button(cx, ids!(transport.btn_save)).set_enabled(cx, has_take);
+        root.button(cx, ids!(transport.btn_record))
+            .set_text(cx, if st.recording { "Stop" } else { "Record" });
+        root.button(cx, ids!(transport.btn_record))
+            .set_enabled(cx, (!st.busy || st.recording) && !has_take);
+        root.button(cx, ids!(transport.btn_save))
+            .set_enabled(cx, has_take && !st.busy);
+        root.button(cx, ids!(transport.btn_discard))
+            .set_enabled(cx, has_take && !st.busy);
+        root.button(cx, ids!(transport.btn_rerecord))
+            .set_enabled(cx, has_take && !st.busy);
     }
 }

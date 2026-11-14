@@ -75,6 +75,7 @@ impl DatasetSpec {
 /// Creates and appends to a LeRobot dataset on disk.
 pub struct DatasetWriter {
     root: PathBuf,
+    _lock: File,
     spec: DatasetSpec,
     episodes: Vec<EpisodeEntry>,
     tasks: Vec<String>,
@@ -85,6 +86,7 @@ struct EpisodeEntry {
     index: u64,
     length: u64,
     task_index: usize,
+    stats: serde_json::Value,
 }
 
 impl DatasetWriter {
@@ -98,10 +100,106 @@ impl DatasetWriter {
                 root.display()
             )));
         }
+        if !spec.fps.is_finite()
+            || spec.fps <= 0.0
+            || spec.joint_names.is_empty()
+            || spec.camera_keys.iter().any(|k| {
+                k.is_empty() || k.contains('/') || k.contains('\\') || k == "." || k == ".."
+            })
+        {
+            return Err(DatasetError::InvalidFormat(
+                "invalid fps, joint names, or camera key".into(),
+            ));
+        }
         fs::create_dir_all(root.join("meta"))?;
-        let w = Self { root, spec, episodes: Vec::new(), tasks: Vec::new() };
+        let lock = lock_dataset(&root)?;
+        if root.join("meta/info.json").is_file() {
+            return Err(DatasetError::InvalidFormat("dataset already exists".into()));
+        }
+        let w = Self {
+            root,
+            _lock: lock,
+            spec,
+            episodes: Vec::new(),
+            tasks: Vec::new(),
+        };
         w.write_meta()?;
         Ok(w)
+    }
+
+    /// Resume a compatible v2 dataset without truncating existing recordings.
+    pub fn resume(root: impl AsRef<Path>, spec: DatasetSpec) -> Result<Self, DatasetError> {
+        let lock = lock_dataset(root.as_ref())?;
+        recover_commit(root.as_ref())?;
+        let ds = super::LeRobotDataset::open(&root)?;
+        if !ds.has_per_episode_videos()
+            || ds.info.robot_type != spec.robot_type
+            || ds.info.fps != spec.fps
+            || ds
+                .info
+                .features
+                .get("observation.state")
+                .and_then(|f| f.names.as_ref())
+                != Some(&spec.joint_names)
+        {
+            return Err(DatasetError::InvalidFormat(
+                "recording profile differs from the existing v2 dataset".into(),
+            ));
+        }
+        let mut cameras: Vec<_> = ds
+            .info
+            .features
+            .iter()
+            .filter(|(_, v)| v.dtype == "video")
+            .map(|(k, _)| k.clone())
+            .collect();
+        let mut expected = spec.camera_keys.clone();
+        cameras.sort();
+        expected.sort();
+        if cameras != expected {
+            return Err(DatasetError::InvalidFormat(
+                "camera configuration differs".into(),
+            ));
+        }
+        let mut tasks = ds.tasks.clone();
+        tasks.sort_by_key(|t| t.task_index);
+        if tasks
+            .iter()
+            .enumerate()
+            .any(|(i, t)| t.task_index != i as u64)
+        {
+            return Err(DatasetError::InvalidFormat(
+                "non-contiguous task table".into(),
+            ));
+        }
+        let mut stats = BTreeMap::new();
+        if let Ok(text) = fs::read_to_string(root.as_ref().join("meta/episodes_stats.jsonl")) {
+            for line in text.lines().filter(|l| !l.trim().is_empty()) {
+                let v: serde_json::Value = serde_json::from_str(line)?;
+                if let Some(i) = v["episode_index"].as_u64() {
+                    stats.insert(i, v["stats"].clone());
+                }
+            }
+        }
+        let episodes = ds
+            .episodes
+            .iter()
+            .map(|e| EpisodeEntry {
+                index: e.episode_index,
+                length: e.length,
+                task_index: e.tasks.first().copied().unwrap_or(0) as usize,
+                stats: stats
+                    .remove(&e.episode_index)
+                    .unwrap_or_else(|| serde_json::json!({})),
+            })
+            .collect();
+        Ok(Self {
+            root: root.as_ref().to_path_buf(),
+            _lock: lock,
+            spec,
+            episodes,
+            tasks: tasks.into_iter().map(|t| t.task).collect(),
+        })
     }
 
     pub fn root(&self) -> &Path {
@@ -123,18 +221,24 @@ impl DatasetWriter {
     pub fn begin_episode(&mut self, task: &str) -> Result<EpisodeWriter, DatasetError> {
         let index = self.next_episode_index();
         let task_index = self.task_index(task);
-        let staging = self.root.join(".staging").join(episode_stem(index));
-        if staging.exists() {
-            fs::remove_dir_all(&staging)?;
-        }
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let staging = self
+            .root
+            .join(".staging")
+            .join(format!("{}-{nonce}", episode_stem(index)));
         fs::create_dir_all(&staging)?;
         Ok(EpisodeWriter {
             index,
             task_index,
             staging,
             frames: Vec::new(),
+            timestamps: Vec::new(),
             videos: BTreeMap::new(),
             state_dim: self.spec.state_dim(),
+            camera_stats: BTreeMap::new(),
         })
     }
 
@@ -149,32 +253,94 @@ impl DatasetWriter {
                 "refusing to commit an episode with no frames".into(),
             ));
         }
+        if ep.index != self.next_episode_index()
+            || !ep.staging.starts_with(self.root.join(".staging"))
+        {
+            return Err(DatasetError::InvalidFormat(
+                "staged episode is stale or belongs to another dataset".into(),
+            ));
+        }
+        if self
+            .spec
+            .camera_keys
+            .iter()
+            .any(|k| !ep.videos.contains_key(k))
+        {
+            return Err(DatasetError::InvalidFormat(
+                "every configured camera must produce a video".into(),
+            ));
+        }
+        for (key, file) in &ep.videos {
+            if !self.spec.camera_keys.contains(key)
+                || !file.is_file()
+                || file.metadata()?.len() == 0
+            {
+                return Err(DatasetError::InvalidFormat(format!(
+                    "missing or undeclared camera video: {key}"
+                )));
+            }
+        }
         let index = ep.index;
 
         // 1. frames -> data/chunk-NNN/episode_NNNNNN.parquet
         let data_dir = self.root.join("data").join(chunk_dir(index));
         fs::create_dir_all(&data_dir)?;
         let parquet_path = data_dir.join(format!("{}.parquet", episode_stem(index)));
-        write_episode_parquet(&parquet_path, &ep, self.spec.fps)?;
+        if parquet_path.exists() {
+            return Err(DatasetError::InvalidFormat(
+                "episode file already exists; refusing overwrite".into(),
+            ));
+        }
+        let staged_parquet = ep.staging.join("frames.parquet");
+        write_episode_parquet(
+            &staged_parquet,
+            &ep,
+            self.spec.fps,
+            self.episodes.iter().map(|e| e.length).sum(),
+        )?;
 
-        // 2. staged video files -> videos/chunk-NNN/<key>/episode_NNNNNN.mp4
+        let mut files = vec![parquet_path.clone()];
+        let mut copies = Vec::new();
         for (key, staged) in &ep.videos {
             let dst_dir = self.root.join("videos").join(chunk_dir(index)).join(key);
             fs::create_dir_all(&dst_dir)?;
             let dst = dst_dir.join(format!("{}.mp4", episode_stem(index)));
-            // Rename first; fall back to copy when staging is on another device.
-            if fs::rename(staged, &dst).is_err() {
-                fs::copy(staged, &dst)?;
-                let _ = fs::remove_file(staged);
+            if dst.exists() {
+                return Err(DatasetError::InvalidFormat(
+                    "camera file already exists; refusing overwrite".into(),
+                ));
             }
+            files.push(dst.clone());
+            copies.push((staged, dst));
         }
-
-        self.episodes.push(EpisodeEntry {
-            index,
-            length: ep.frames.len() as u64,
-            task_index: ep.task_index,
-        });
-        self.write_meta()?;
+        begin_commit(&self.root, &files)?;
+        let previous_len = self.episodes.len();
+        let result = (|| -> Result<(), DatasetError> {
+            for (source, dst) in copies {
+                fs::copy(source, &dst)?;
+                File::open(dst)?.sync_all()?;
+            }
+            File::open(&staged_parquet)?.sync_all()?;
+            fs::rename(staged_parquet, parquet_path)?;
+            self.episodes.push(EpisodeEntry {
+                index,
+                length: ep.frames.len() as u64,
+                task_index: ep.task_index,
+                stats: episode_stats(
+                    &ep,
+                    self.spec.fps,
+                    self.episodes.iter().map(|e| e.length).sum(),
+                ),
+            });
+            self.write_meta()?;
+            fs::remove_file(self.root.join("meta/.dorobot-commit.json"))?;
+            Ok(())
+        })();
+        if let Err(e) = result {
+            self.episodes.truncate(previous_len);
+            recover_commit(&self.root)?;
+            return Err(e);
+        }
 
         let _ = fs::remove_dir_all(&ep.staging);
         Ok(index)
@@ -196,59 +362,49 @@ impl DatasetWriter {
 
         let total_frames: u64 = self.episodes.iter().map(|e| e.length).sum();
         let dim = self.spec.state_dim();
-        let names = serde_json::to_string(&self.spec.joint_names).unwrap_or_else(|_| "[]".into());
-
-        let mut features = String::new();
-        features.push_str(&format!(
-            r#""observation.state":{{"dtype":"float32","shape":[{dim}],"names":{names}}},"#
-        ));
-        features.push_str(&format!(
-            r#""action":{{"dtype":"float32","shape":[{dim}],"names":{names}}}"#
-        ));
+        let mut features = serde_json::json!({
+            "observation.state": {"dtype":"float32", "shape":[dim], "names":self.spec.joint_names},
+            "action": {"dtype":"float32", "shape":[dim], "names":self.spec.joint_names},
+            "timestamp": {"dtype":"float64", "shape":[1], "names":null},
+            "frame_index": {"dtype":"int64", "shape":[1], "names":null},
+            "episode_index": {"dtype":"int64", "shape":[1], "names":null},
+            "index": {"dtype":"int64", "shape":[1], "names":null},
+            "task_index": {"dtype":"int64", "shape":[1], "names":null}
+        });
         for key in &self.spec.camera_keys {
-            features.push_str(&format!(
-                r#","{key}":{{"dtype":"video","shape":[480,640,3],"names":["height","width","channel"]}}"#
-            ));
+            features[key] = serde_json::json!({"dtype":"video", "shape":[480,640,3], "names":["height","width","channel"], "info":{"video.fps":self.spec.fps,"video.codec":"mpeg4","video.pix_fmt":"yuv420p","video.is_depth_map":false,"has_audio":false}});
         }
+        let info = serde_json::json!({
+            "codebase_version":"v2.1", "robot_type":self.spec.robot_type, "fps":self.spec.fps,
+            "total_episodes":self.episodes.len(), "total_frames":total_frames,
+            "total_tasks":self.tasks.len(), "total_videos":self.episodes.len()*self.spec.camera_keys.len(),
+            "total_chunks":self.episodes.last().map(|e| e.index / CHUNK_SIZE + 1).unwrap_or(0),
+            "chunks_size":CHUNK_SIZE, "features":features,
+            "splits":{"train":format!("0:{}",self.episodes.len())},
+            "data_path":"data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
+            "video_path":"videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4"
+        });
+        // Publish info last, so it never advertises an episode before the index.
+        let info_text = serde_json::to_vec_pretty(&info)?;
 
-        let info = format!(
-            r#"{{
-  "codebase_version": "v2.1",
-  "robot_type": "{robot}",
-  "fps": {fps},
-  "total_episodes": {eps},
-  "total_frames": {frames},
-  "total_tasks": {tasks},
-  "total_videos": {videos},
-  "chunks_size": {chunks},
-  "features": {{{features}}}
-}}
-"#,
-            robot = self.spec.robot_type,
-            fps = self.spec.fps,
-            eps = self.episodes.len(),
-            frames = total_frames,
-            tasks = self.tasks.len(),
-            videos = self.episodes.len() * self.spec.camera_keys.len(),
-            chunks = CHUNK_SIZE,
-            features = features,
-        );
-        fs::write(meta.join("info.json"), info)?;
-
-        let mut episodes_jsonl = File::create(meta.join("episodes.jsonl"))?;
+        let mut episodes_jsonl = File::create(meta.join(".episodes.jsonl.tmp"))?;
         for e in &self.episodes {
-            let task = self.tasks.get(e.task_index).map(String::as_str).unwrap_or("");
+            let task = self
+                .tasks
+                .get(e.task_index)
+                .map(String::as_str)
+                .unwrap_or("");
             writeln!(
                 episodes_jsonl,
                 r#"{{"episode_index": {}, "tasks": [{}], "length": {}, "task": {}}}"#,
                 e.index,
-                e.task_index,
+                serde_json::to_string(task)?,
                 e.length,
                 serde_json::to_string(task).unwrap_or_else(|_| "\"\"".into()),
             )?;
         }
 
-        let mut tasks_jsonl = File::create(meta.join("tasks.jsonl"))?;
+        let mut tasks_jsonl = File::create(meta.join(".tasks.jsonl.tmp"))?;
         for (i, t) in self.tasks.iter().enumerate() {
             writeln!(
                 tasks_jsonl,
@@ -257,8 +413,124 @@ impl DatasetWriter {
                 serde_json::to_string(t).unwrap_or_else(|_| "\"\"".into())
             )?;
         }
+        let mut stats_file = File::create(meta.join(".episodes_stats.jsonl.tmp"))?;
+        for e in &self.episodes {
+            writeln!(
+                stats_file,
+                "{}",
+                serde_json::json!({"episode_index":e.index,"stats":e.stats})
+            )?;
+        }
+        stats_file.sync_all()?;
+        fs::rename(
+            meta.join(".episodes_stats.jsonl.tmp"),
+            meta.join("episodes_stats.jsonl"),
+        )?;
+        episodes_jsonl.sync_all()?;
+        tasks_jsonl.sync_all()?;
+        fs::rename(meta.join(".tasks.jsonl.tmp"), meta.join("tasks.jsonl"))?;
+        fs::rename(
+            meta.join(".episodes.jsonl.tmp"),
+            meta.join("episodes.jsonl"),
+        )?;
+        fs::write(meta.join(".info.json.tmp"), info_text)?;
+        fs::rename(meta.join(".info.json.tmp"), meta.join("info.json"))?;
         Ok(())
     }
+}
+
+// Journal metadata before publishing any episode bytes. Reopening a writer
+// rolls an interrupted commit back; the original capture remains in staging.
+const META_FILES: &[&str] = &[
+    "info.json",
+    "episodes.jsonl",
+    "tasks.jsonl",
+    "episodes_stats.jsonl",
+];
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CommitJournal {
+    metadata: BTreeMap<String, Option<Vec<u8>>>,
+    files: Vec<PathBuf>,
+}
+fn begin_commit(root: &Path, files: &[PathBuf]) -> Result<(), DatasetError> {
+    let mut metadata = BTreeMap::new();
+    for name in META_FILES {
+        let path = root.join("meta").join(name);
+        metadata.insert(
+            name.to_string(),
+            if path.exists() {
+                Some(fs::read(path)?)
+            } else {
+                None
+            },
+        );
+    }
+    let journal = CommitJournal {
+        metadata,
+        files: files
+            .iter()
+            .map(|p| p.strip_prefix(root).unwrap().to_path_buf())
+            .collect(),
+    };
+    let temp = root.join("meta/.dorobot-commit.tmp");
+    let mut f = File::create(&temp)?;
+    f.write_all(&serde_json::to_vec(&journal)?)?;
+    f.sync_all()?;
+    fs::rename(temp, root.join("meta/.dorobot-commit.json"))?;
+    Ok(())
+}
+fn recover_commit(root: &Path) -> Result<(), DatasetError> {
+    let path = root.join("meta/.dorobot-commit.json");
+    if !path.is_file() {
+        return Ok(());
+    }
+    let journal: CommitJournal = serde_json::from_slice(&fs::read(&path)?)?;
+    if journal
+        .metadata
+        .keys()
+        .any(|k| !META_FILES.contains(&k.as_str()))
+        || journal.files.iter().any(|p| {
+            p.is_absolute()
+                || p.components()
+                    .any(|c| matches!(c, std::path::Component::ParentDir))
+        })
+    {
+        return Err(DatasetError::InvalidFormat(
+            "invalid commit recovery journal".into(),
+        ));
+    }
+    for (name, bytes) in journal.metadata {
+        let dst = root.join("meta").join(name);
+        if let Some(bytes) = bytes {
+            let temp = dst.with_extension("recovery.tmp");
+            fs::write(&temp, bytes)?;
+            File::open(&temp)?.sync_all()?;
+            fs::rename(temp, dst)?;
+        } else if dst.is_file() {
+            fs::remove_file(dst)?;
+        }
+    }
+    for file in journal.files {
+        let p = root.join(file);
+        if p.is_file() {
+            fs::remove_file(p)?;
+        }
+    }
+    fs::remove_file(path)?;
+    Ok(())
+}
+
+fn lock_dataset(root: &Path) -> Result<File, DatasetError> {
+    let file = File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(root.join(".dorobot-writer.lock"))?;
+    file.try_lock().map_err(|e| {
+        DatasetError::InvalidFormat(format!("dataset is being recorded by another writer: {e}"))
+    })?;
+    Ok(file)
 }
 
 /// A single episode being recorded into staging.
@@ -267,11 +539,17 @@ pub struct EpisodeWriter {
     task_index: usize,
     staging: PathBuf,
     frames: Vec<FrameRecord>,
+    timestamps: Vec<Option<f64>>,
     videos: BTreeMap<String, PathBuf>,
     state_dim: usize,
+    camera_stats: BTreeMap<String, serde_json::Value>,
 }
 
 impl EpisodeWriter {
+    pub fn set_camera_stats(&mut self, stats: BTreeMap<String, serde_json::Value>) {
+        self.camera_stats = stats;
+    }
+
     pub fn index(&self) -> u64 {
         self.index
     }
@@ -290,6 +568,33 @@ impl EpisodeWriter {
     /// Append one frame. Dimension mismatches are rejected at push time rather
     /// than producing a dataset that fails to load later.
     pub fn push(&mut self, frame: FrameRecord) -> Result<(), DatasetError> {
+        self.push_at(frame, None)
+    }
+
+    pub fn push_at(
+        &mut self,
+        frame: FrameRecord,
+        timestamp: Option<f64>,
+    ) -> Result<(), DatasetError> {
+        if frame
+            .state
+            .iter()
+            .chain(&frame.action)
+            .any(|v| !v.is_finite())
+            || timestamp.is_some_and(|t| {
+                !t.is_finite()
+                    || t < 0.0
+                    || self
+                        .timestamps
+                        .last()
+                        .and_then(|t| *t)
+                        .is_some_and(|last| t <= last)
+            })
+        {
+            return Err(DatasetError::InvalidFormat(
+                "non-finite frame or non-monotonic timestamp".into(),
+            ));
+        }
         if frame.state.len() != self.state_dim || frame.action.len() != self.state_dim {
             return Err(DatasetError::InvalidFormat(format!(
                 "frame {} has state {} / action {}, expected {}",
@@ -300,6 +605,7 @@ impl EpisodeWriter {
             )));
         }
         self.frames.push(frame);
+        self.timestamps.push(timestamp);
         Ok(())
     }
 
@@ -325,6 +631,57 @@ impl EpisodeWriter {
     }
 }
 
+fn episode_stats(ep: &EpisodeWriter, fps: f64, start: u64) -> serde_json::Value {
+    fn stats(rows: Vec<Vec<f64>>) -> serde_json::Value {
+        let n = rows.len();
+        let dim = rows.first().map(|r| r.len()).unwrap_or(0);
+        let mut min = vec![f64::INFINITY; dim];
+        let mut max = vec![f64::NEG_INFINITY; dim];
+        let mut mean = vec![0.0; dim];
+        let mut variance = vec![0.0; dim];
+        for row in &rows {
+            for i in 0..dim {
+                min[i] = min[i].min(row[i]);
+                max[i] = max[i].max(row[i]);
+                mean[i] += row[i] / n as f64;
+            }
+        }
+        for row in &rows {
+            for i in 0..dim {
+                variance[i] += (row[i] - mean[i]).powi(2) / n as f64;
+            }
+        }
+        serde_json::json!({"min":min,"max":max,"mean":mean,"std":variance.iter().map(|v|v.sqrt()).collect::<Vec<_>>(),"count":[n]})
+    }
+    let n = ep.frames.len();
+    let mut out = serde_json::json!({});
+    out["observation.state"] = stats(
+        ep.frames
+            .iter()
+            .map(|f| f.state.iter().map(|v| *v as f64).collect())
+            .collect(),
+    );
+    out["action"] = stats(
+        ep.frames
+            .iter()
+            .map(|f| f.action.iter().map(|v| *v as f64).collect())
+            .collect(),
+    );
+    out["timestamp"] = stats(
+        (0..n)
+            .map(|i| vec![ep.timestamps[i].unwrap_or(i as f64 / fps)])
+            .collect(),
+    );
+    out["frame_index"] = stats((0..n).map(|i| vec![i as f64]).collect());
+    out["index"] = stats((0..n).map(|i| vec![(start + i as u64) as f64]).collect());
+    out["episode_index"] = stats(vec![vec![ep.index as f64]; n]);
+    out["task_index"] = stats(vec![vec![ep.task_index as f64]; n]);
+    for (key, value) in &ep.camera_stats {
+        out[key] = value.clone();
+    }
+    out
+}
+
 /// Write the frame table.
 ///
 /// Types are dictated by the reader, not by taste: it downcasts `frame_index`
@@ -335,6 +692,7 @@ fn write_episode_parquet(
     path: &Path,
     ep: &EpisodeWriter,
     fps: f64,
+    start_index: u64,
 ) -> Result<(), DatasetError> {
     let n = ep.frames.len();
     let dim = ep.state_dim as i32;
@@ -352,15 +710,22 @@ fn write_episode_parquet(
         Field::new("episode_index", DataType::Int64, false),
         vec_field("observation.state"),
         vec_field("action"),
+        Field::new("index", DataType::Int64, false),
+        Field::new("task_index", DataType::Int64, false),
     ]));
 
     let frame_index = Int64Array::from((0..n as i64).collect::<Vec<_>>());
-    let timestamp =
-        Float64Array::from((0..n).map(|i| i as f64 / fps.max(1e-6)).collect::<Vec<_>>());
+    let timestamp = Float64Array::from(
+        (0..n)
+            .map(|i| ep.timestamps[i].unwrap_or(i as f64 / fps))
+            .collect::<Vec<_>>(),
+    );
     let episode_index = Int64Array::from(vec![ep.index as i64; n]);
 
-    let mut state_b = FixedSizeListBuilder::new(Float32Builder::with_capacity(n * dim as usize), dim);
-    let mut action_b = FixedSizeListBuilder::new(Float32Builder::with_capacity(n * dim as usize), dim);
+    let mut state_b =
+        FixedSizeListBuilder::new(Float32Builder::with_capacity(n * dim as usize), dim);
+    let mut action_b =
+        FixedSizeListBuilder::new(Float32Builder::with_capacity(n * dim as usize), dim);
     for f in &ep.frames {
         state_b.values().append_slice(&f.state);
         state_b.append(true);
@@ -378,6 +743,10 @@ fn write_episode_parquet(
             Arc::new(episode_index),
             Arc::new(state),
             Arc::new(action),
+            Arc::new(Int64Array::from(
+                (start_index as i64..start_index as i64 + n as i64).collect::<Vec<_>>(),
+            )),
+            Arc::new(Int64Array::from(vec![ep.task_index as i64; n])),
         ],
     )
     .map_err(|e| DatasetError::InvalidFormat(format!("building record batch: {e}")))?;
@@ -404,7 +773,7 @@ mod tests {
         DatasetSpec {
             robot_type: "so101".into(),
             fps: 30.0,
-            camera_keys: vec!["observation.images.cam_high".into()],
+            camera_keys: vec![],
             joint_names: vec![
                 "shoulder_pan".into(),
                 "shoulder_lift".into(),
@@ -451,7 +820,11 @@ mod tests {
         assert_eq!(f0.action.len(), 3);
         // timestamps derive from fps, so drift is zero for a clean write
         let last = data.frames.last().unwrap();
-        assert!((last.timestamp - 47.0 / 30.0).abs() < 1e-6, "ts {}", last.timestamp);
+        assert!(
+            (last.timestamp - 47.0 / 30.0).abs() < 1e-6,
+            "ts {}",
+            last.timestamp
+        );
     }
 
     #[test]
@@ -461,7 +834,11 @@ mod tests {
         for _ in 0..3 {
             let mut ep = w.begin_episode("same task").unwrap();
             for _ in 0..5 {
-                ep.push(FrameRecord { state: vec![0.0; 3], action: vec![0.0; 3] }).unwrap();
+                ep.push(FrameRecord {
+                    state: vec![0.0; 3],
+                    action: vec![0.0; 3],
+                })
+                .unwrap();
             }
             w.commit(ep).unwrap();
         }
@@ -479,11 +856,18 @@ mod tests {
         let root = tmp("discard");
         let mut w = DatasetWriter::create(&root, spec()).unwrap();
         let mut ep = w.begin_episode("throwaway").unwrap();
-        ep.push(FrameRecord { state: vec![1.0; 3], action: vec![1.0; 3] }).unwrap();
+        ep.push(FrameRecord {
+            state: vec![1.0; 3],
+            action: vec![1.0; 3],
+        })
+        .unwrap();
         let staging = ep.staging.clone();
         w.discard(ep).unwrap();
         assert!(!staging.exists());
-        assert!(!root.join("data").exists(), "discard must not touch the dataset");
+        assert!(
+            !root.join("data").exists(),
+            "discard must not touch the dataset"
+        );
     }
 
     #[test]
@@ -491,7 +875,12 @@ mod tests {
         let root = tmp("reject");
         let mut w = DatasetWriter::create(&root, spec()).unwrap();
         let mut ep = w.begin_episode("t").unwrap();
-        assert!(ep.push(FrameRecord { state: vec![0.0; 2], action: vec![0.0; 3] }).is_err());
+        assert!(ep
+            .push(FrameRecord {
+                state: vec![0.0; 2],
+                action: vec![0.0; 3]
+            })
+            .is_err());
         assert!(w.commit(ep).is_err(), "empty episode must not commit");
     }
 
@@ -500,8 +889,62 @@ mod tests {
         let root = tmp("warn");
         let mut w = DatasetWriter::create(&root, spec()).unwrap();
         let mut ep = w.begin_episode("t").unwrap();
-        ep.push(FrameRecord { state: vec![0.0; 3], action: vec![0.0; 3] }).unwrap();
+        ep.push(FrameRecord {
+            state: vec![0.0; 3],
+            action: vec![0.0; 3],
+        })
+        .unwrap();
         let warnings = ep.warnings(1);
-        assert!(warnings.iter().any(|w| w.contains("0 of 1 cameras")), "{warnings:?}");
+        assert!(
+            warnings.iter().any(|w| w.contains("0 of 1 cameras")),
+            "{warnings:?}"
+        );
+    }
+    #[test]
+    fn lock_resume_and_interrupted_commit_recovery() {
+        let root = tmp("recovery");
+        let mut w = DatasetWriter::create(&root, spec()).unwrap();
+        assert!(DatasetWriter::resume(&root, spec()).is_err());
+        let mut ep = w.begin_episode("quoted \"task\" \\ test").unwrap();
+        ep.push_at(
+            FrameRecord {
+                state: vec![1., 2., 3.],
+                action: vec![2., 3., 4.],
+            },
+            Some(0.01),
+        )
+        .unwrap();
+        ep.push_at(
+            FrameRecord {
+                state: vec![2., 3., 4.],
+                action: vec![3., 4., 5.],
+            },
+            Some(0.06),
+        )
+        .unwrap();
+        w.commit(ep).unwrap();
+        let stats: serde_json::Value = serde_json::from_str(
+            fs::read_to_string(root.join("meta/episodes_stats.jsonl"))
+                .unwrap()
+                .trim(),
+        )
+        .unwrap();
+        assert_eq!(
+            stats["stats"]["observation.state"]["mean"],
+            serde_json::json!([1.5, 2.5, 3.5])
+        );
+        let orphan = root.join("data/chunk-000/episode_000001.parquet");
+        begin_commit(&root, &[orphan.clone()]).unwrap();
+        fs::write(&orphan, b"incomplete").unwrap();
+        fs::write(root.join("meta/info.json"), b"incomplete").unwrap();
+        drop(w);
+        let w = DatasetWriter::resume(&root, spec()).unwrap();
+        assert_eq!(w.next_episode_index(), 1);
+        assert!(!orphan.exists());
+        let ds = LeRobotDataset::open(&root).unwrap();
+        let data = ds.load_episode(0).unwrap();
+        assert_eq!(data.frames[1].timestamp, 0.06);
+        drop(w);
+        fs::remove_dir_all(root).unwrap();
     }
 }

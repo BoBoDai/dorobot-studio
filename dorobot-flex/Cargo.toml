@@ -1,5 +1,6 @@
 [package]
 name = "dorobot-flex"
+default-run = "dorobot-flex"
 version.workspace = true
 edition = "2021"
 description = "DoRobot Studio with Flex Layout Shell"
@@ -40,3 +41,6 @@ ffmpeg-next = { workspace = true, optional = true }
 [features]
 default = ["video"]
 video = ["ffmpeg-next"]
+
+[dev-dependencies]
+urdf-rs = "0.9"

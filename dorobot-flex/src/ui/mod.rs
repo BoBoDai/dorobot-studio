@@ -6,12 +6,12 @@
 
 use makepad_widgets::*;
 
+pub mod eval;
 pub mod frame;
 pub mod hardware;
+pub mod library;
 pub mod play;
 pub mod record;
-pub mod eval;
-pub mod library;
 
 /// Register every UI module. Tokens must come first — screens reference them.
 pub fn script_mod(vm: &mut ScriptVm) -> ScriptValue {

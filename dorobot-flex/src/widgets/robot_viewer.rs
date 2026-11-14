@@ -4,10 +4,8 @@
 //! The kiss3d renderer runs in a background thread and streams
 //! rendered frames as textures to this Makepad widget.
 
+use crate::data::urdf_renderer::{create_shared_state, CameraCommand, SharedRendererState};
 use makepad_widgets::*;
-use crate::data::urdf_renderer::{
-    CameraCommand, SharedRendererState, create_shared_state,
-};
 
 #[cfg(feature = "urdf")]
 use crate::data::urdf_renderer::start_renderer_thread;
@@ -461,9 +459,15 @@ impl RobotViewer {
             self.update_joint_names(cx, &joint_names);
 
             // Hide loading, show viewport
-            self.view.view(cx, ids!(viewport.loading)).set_visible(cx, false);
-            self.view.view(cx, ids!(viewport.placeholder)).set_visible(cx, false);
-            self.view.view(cx, ids!(viewport.error_view)).set_visible(cx, false);
+            self.view
+                .view(cx, ids!(viewport.loading))
+                .set_visible(cx, false);
+            self.view
+                .view(cx, ids!(viewport.placeholder))
+                .set_visible(cx, false);
+            self.view
+                .view(cx, ids!(viewport.error_view))
+                .set_visible(cx, false);
         }
 
         // Update texture if we have a new frame
@@ -473,9 +477,15 @@ impl RobotViewer {
     }
 
     /// Update the displayed frame texture
-    fn update_frame_texture(&mut self, cx: &mut Cx, frame: &crate::data::urdf_renderer::RenderedFrame) {
+    fn update_frame_texture(
+        &mut self,
+        cx: &mut Cx,
+        frame: &crate::data::urdf_renderer::RenderedFrame,
+    ) {
         // Convert RGBA to BGRA u32 for Makepad texture
-        let bgra_data: Vec<u32> = frame.data.chunks(4)
+        let bgra_data: Vec<u32> = frame
+            .data
+            .chunks(4)
             .map(|rgba| {
                 let r = rgba[0] as u32;
                 let g = rgba[1] as u32;
@@ -485,19 +495,24 @@ impl RobotViewer {
             })
             .collect();
 
-        let texture = Texture::new_with_format(cx, TextureFormat::VecBGRAu8_32 {
-            data: Some(bgra_data),
-            width: frame.width,
-            height: frame.height,
-            updated: TextureUpdated::Full,
-        });
+        let texture = Texture::new_with_format(
+            cx,
+            TextureFormat::VecBGRAu8_32 {
+                data: Some(bgra_data),
+                width: frame.width,
+                height: frame.height,
+                updated: TextureUpdated::Full,
+            },
+        );
 
         // Set texture on image widget
         let image = self.view.image(cx, ids!(viewport.frame_image));
         image.set_texture(cx, Some(texture));
 
         // Make image visible
-        self.view.image(cx, ids!(viewport.frame_image)).set_visible(cx, true);
+        self.view
+            .image(cx, ids!(viewport.frame_image))
+            .set_visible(cx, true);
 
         self.view.redraw(cx);
     }
@@ -516,21 +531,25 @@ impl RobotViewer {
         for (i, name_id) in name_ids.iter().enumerate() {
             let name = names.get(i).map(|s| s.as_str()).unwrap_or("");
             // Shorten long names
-            let short_name = if name.len() > 8 {
-                &name[..8]
-            } else {
-                name
-            };
+            let short_name = if name.len() > 8 { &name[..8] } else { name };
             self.view.label(cx, *name_id).set_text(cx, short_name);
         }
     }
 
     /// Show error message
     fn show_error(&mut self, cx: &mut Cx, error: &str) {
-        self.view.label(cx, ids!(viewport.error_view.error_label)).set_text(cx, error);
-        self.view.view(cx, ids!(viewport.error_view)).set_visible(cx, true);
-        self.view.view(cx, ids!(viewport.loading)).set_visible(cx, false);
-        self.view.view(cx, ids!(viewport.placeholder)).set_visible(cx, false);
+        self.view
+            .label(cx, ids!(viewport.error_view.error_label))
+            .set_text(cx, error);
+        self.view
+            .view(cx, ids!(viewport.error_view))
+            .set_visible(cx, true);
+        self.view
+            .view(cx, ids!(viewport.loading))
+            .set_visible(cx, false);
+        self.view
+            .view(cx, ids!(viewport.placeholder))
+            .set_visible(cx, false);
         self.view.redraw(cx);
     }
 
@@ -541,10 +560,18 @@ impl RobotViewer {
         self.has_robot = false;
 
         // Show loading indicator
-        self.view.view(cx, ids!(viewport.loading)).set_visible(cx, true);
-        self.view.view(cx, ids!(viewport.placeholder)).set_visible(cx, false);
-        self.view.view(cx, ids!(viewport.error_view)).set_visible(cx, false);
-        self.view.image(cx, ids!(viewport.frame_image)).set_visible(cx, false);
+        self.view
+            .view(cx, ids!(viewport.loading))
+            .set_visible(cx, true);
+        self.view
+            .view(cx, ids!(viewport.placeholder))
+            .set_visible(cx, false);
+        self.view
+            .view(cx, ids!(viewport.error_view))
+            .set_visible(cx, false);
+        self.view
+            .image(cx, ids!(viewport.frame_image))
+            .set_visible(cx, false);
 
         // Initialize renderer if not already done
         if self.renderer_state.is_none() {
@@ -597,17 +624,27 @@ impl RobotViewer {
         self.has_robot = false;
         self.urdf_path = None;
 
-        self.view.view(cx, ids!(viewport.placeholder)).set_visible(cx, true);
-        self.view.view(cx, ids!(viewport.loading)).set_visible(cx, false);
-        self.view.view(cx, ids!(viewport.error_view)).set_visible(cx, false);
-        self.view.image(cx, ids!(viewport.frame_image)).set_visible(cx, false);
+        self.view
+            .view(cx, ids!(viewport.placeholder))
+            .set_visible(cx, true);
+        self.view
+            .view(cx, ids!(viewport.loading))
+            .set_visible(cx, false);
+        self.view
+            .view(cx, ids!(viewport.error_view))
+            .set_visible(cx, false);
+        self.view
+            .image(cx, ids!(viewport.frame_image))
+            .set_visible(cx, false);
 
         self.view.redraw(cx);
     }
 
     /// Set placeholder text
     pub fn set_placeholder_text(&mut self, cx: &mut Cx, text: &str) {
-        self.view.label(cx, ids!(viewport.placeholder.placeholder_label)).set_text(cx, text);
+        self.view
+            .label(cx, ids!(viewport.placeholder.placeholder_label))
+            .set_text(cx, text);
     }
 }
 
