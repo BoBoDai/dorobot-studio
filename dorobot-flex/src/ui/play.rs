@@ -209,6 +209,11 @@ script_mod! {
         toolbar := View{width: Fill height: 44 flow: Right spacing: 8.0
             episodes_btn := Button{height: 44 text: "Episodes"}
             signals_btn := Button{height: 44 text: "Show signals"}
+            signal_nav := View{width: Fit height: 44 flow: Right spacing: 4.0 align: Align{y: 0.5} visible: false
+                signal_prev := Button{width: 44 height: 44 text: "↑"}
+                signal_count := Label{text: "1–2 / 6" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                signal_next := Button{width: 44 height: 44 text: "↓"}
+            }
             Filler{}
             details_btn := Button{height: 44 text: "Details"}
         }
@@ -379,8 +384,9 @@ script_mod! {
                 // drawn over the measurement. Twelve traces sharing one axis
                 // told you nothing: the joints overlap, and a joint that moves
                 // a little is flattened by one that moves a lot.
-                lanes := ScrollYView{
-                    width: Fill height: Fill flow: Down spacing: 1.0
+                lanes := View{
+                    width: Fill height: Fill
+                    content := View{width: Fill height: Fit flow: Down spacing: 1.0
                     lane_0 := View{
                         width: Fill height: 44 flow: Right align: Align{y: 0.5}
                         name_0 := Label{
@@ -471,6 +477,7 @@ script_mod! {
                             header +: { visible: false }
                         }
                     }
+                    }
                 }
             }
         }
@@ -483,6 +490,10 @@ pub struct PlayScreen {
     view: View,
     #[rust(true)]
     episodes_open: bool,
+    #[rust]
+    signal_first: usize,
+    #[rust]
+    signal_rows: usize,
     #[rust(false)]
     details_open: bool,
     #[rust(false)]
@@ -516,6 +527,42 @@ pub struct PlayScreen {
     /// `(pointer y at grab, footer height at grab)` while resizing.
     #[rust]
     footer_drag: Option<(f64, f64)>,
+}
+
+impl PlayScreen {
+    fn update_signal_window(&mut self, cx: &mut Cx) {
+        self.view
+            .widget(cx, ids!(toolbar.signal_nav))
+            .set_visible(cx, self.signals_open);
+        if !self.signals_open {
+            return;
+        }
+        let lanes = self.view.widget(cx, ids!(timeline.tl_body.lanes));
+        let height = lanes.area().rect(cx).size.y;
+        self.signal_rows = ((height / 45.0).floor() as usize).clamp(1, 6);
+        self.signal_first = self.signal_first.min(6 - self.signal_rows);
+        for i in 0..6 {
+            let path = format!("timeline.tl_body.lanes.content.lane_{i}");
+            let ids: Vec<_> = path.split('.').map(LiveId::from_str).collect();
+            self.view.widget(cx, &ids).set_visible(
+                cx,
+                i >= self.signal_first && i < self.signal_first + self.signal_rows,
+            );
+        }
+        self.view
+            .widget(cx, ids!(toolbar.signal_nav))
+            .set_visible(cx, self.signals_open);
+        self.view
+            .label(cx, ids!(toolbar.signal_nav.signal_count))
+            .set_text(
+                cx,
+                &format!(
+                    "{}–{} / 6",
+                    self.signal_first + 1,
+                    self.signal_first + self.signal_rows
+                ),
+            );
+    }
 }
 
 impl Widget for PlayScreen {
@@ -557,6 +604,17 @@ impl Widget for PlayScreen {
         }
 
         if let Event::Scroll(e) = event {
+            let lanes = self.view.widget(cx, ids!(timeline.tl_body.lanes));
+            if self.signals_open && lanes.area().rect(cx).contains(e.abs) && e.scroll.y.abs() > 0.0
+            {
+                let step = if e.scroll.y > 0.0 { 1 } else { -1 };
+                self.signal_first = (self.signal_first as i64 + step)
+                    .clamp(0, 6usize.saturating_sub(self.signal_rows.max(1)) as i64)
+                    as usize;
+                self.update_signal_window(cx);
+                self.view.redraw(cx);
+                e.handled_y.set(true);
+            }
             let max = self.total_rows.saturating_sub(ROW_IDS.len());
             let tree = self.view.widget(cx, ids!(upper.tree));
             if max > 0 && !tree.is_empty() && tree.area().rect(cx).contains(e.abs) {
@@ -596,28 +654,28 @@ const FOOTER_MAX_FRAC: f64 = 0.55;
 /// Footer lanes, one per joint.
 const LANE_IDS: [(&[LiveId], &[LiveId]); 6] = [
     (
-        ids!(timeline.tl_body.lanes.lane_0.plot_0),
-        ids!(timeline.tl_body.lanes.lane_0.name_0),
+        ids!(timeline.tl_body.lanes.content.lane_0.plot_0),
+        ids!(timeline.tl_body.lanes.content.lane_0.name_0),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_1.plot_1),
-        ids!(timeline.tl_body.lanes.lane_1.name_1),
+        ids!(timeline.tl_body.lanes.content.lane_1.plot_1),
+        ids!(timeline.tl_body.lanes.content.lane_1.name_1),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_2.plot_2),
-        ids!(timeline.tl_body.lanes.lane_2.name_2),
+        ids!(timeline.tl_body.lanes.content.lane_2.plot_2),
+        ids!(timeline.tl_body.lanes.content.lane_2.name_2),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_3.plot_3),
-        ids!(timeline.tl_body.lanes.lane_3.name_3),
+        ids!(timeline.tl_body.lanes.content.lane_3.plot_3),
+        ids!(timeline.tl_body.lanes.content.lane_3.name_3),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_4.plot_4),
-        ids!(timeline.tl_body.lanes.lane_4.name_4),
+        ids!(timeline.tl_body.lanes.content.lane_4.plot_4),
+        ids!(timeline.tl_body.lanes.content.lane_4.name_4),
     ),
     (
-        ids!(timeline.tl_body.lanes.lane_5.plot_5),
-        ids!(timeline.tl_body.lanes.lane_5.name_5),
+        ids!(timeline.tl_body.lanes.content.lane_5.plot_5),
+        ids!(timeline.tl_body.lanes.content.lane_5.name_5),
     ),
 ];
 
@@ -646,6 +704,16 @@ const GRP_IDS: [&[LiveId]; 3] = [
 ];
 
 impl PlayScreenRef {
+    pub fn shift_signals(&self, cx: &mut Cx, step: i64) {
+        if let Some(mut inner) = self.borrow_mut() {
+            inner.signal_first = (inner.signal_first as i64 + step)
+                .clamp(0, 6usize.saturating_sub(inner.signal_rows.max(1)) as i64)
+                as usize;
+            inner.update_signal_window(cx);
+            inner.view.redraw(cx);
+        }
+    }
+
     pub fn toggle_pane(&self, cx: &mut Cx, pane: &str) {
         if let Some(mut inner) = self.borrow_mut() {
             match pane {
@@ -663,6 +731,7 @@ impl PlayScreenRef {
         let Some(mut inner) = self.borrow_mut() else {
             return;
         };
+        inner.update_signal_window(cx);
         let width = inner.view.area().rect(cx).size.x;
         if width <= 0.0 || (inner.layout_width - width).abs() < 1.0 {
             return;

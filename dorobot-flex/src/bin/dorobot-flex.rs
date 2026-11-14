@@ -375,6 +375,10 @@ impl MatchEvent for App {
                         "episodes_btn",
                         "details_btn",
                         "signals_btn",
+                        "signal_prev",
+                        "signal_next",
+                        "page_play.timeline.tl_body.lanes.content.lane_0",
+                        "page_play.timeline.tl_body.lanes.content.lane_5",
                         "page_play.upper.tree.tree_body.row_0",
                         "page_play.upper.tree.tree_body.row_1",
                         "page_play.upper.tree.tree_body.row_2",
@@ -523,6 +527,13 @@ impl MatchEvent for App {
                     }
                     _ => {}
                 }
+            }
+        }
+        for (id, step) in [(ids!(signal_prev), -1), (ids!(signal_next), 1)] {
+            if self.ui.button(cx, id).clicked(actions) {
+                self.ui
+                    .play_screen(cx, ids!(page_play))
+                    .shift_signals(cx, step);
             }
         }
         for (id, pane) in [
