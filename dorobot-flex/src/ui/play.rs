@@ -388,7 +388,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_0 := TimeSeriesPlot{
@@ -403,7 +403,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_1 := TimeSeriesPlot{
@@ -418,7 +418,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_2 := TimeSeriesPlot{
@@ -433,7 +433,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_3 := TimeSeriesPlot{
@@ -448,7 +448,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_4 := TimeSeriesPlot{
@@ -463,7 +463,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                             }
                         }
                         plot_5 := TimeSeriesPlot{

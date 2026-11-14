@@ -108,9 +108,9 @@ script_mod! {
                                     setup_description := Label{width: Fill height: Fit text: ""
                                         draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}} }
                                     setup_actions := View{width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 12.0
-                                        setup_rig := Button{height: 44 text: "Choose rig profile…"}
-                                        setup_rescan := Button{height: 44 text: "Check connections"}
-                                        setup_replay := Button{height: 44 text: "Open replay"}
+                                        setup_rig := mod.widgets.nx.Primary{height: 44 text: "Choose rig profile…"}
+                                        setup_rescan := mod.widgets.nx.NxBtn{height: 44 text: "Check connections"}
+                                        setup_replay := mod.widgets.nx.NxBtn{height: 44 text: "Open replay"}
                                     }
                                 }
                             }
@@ -120,6 +120,11 @@ script_mod! {
             }
         }
     }
+}
+
+enum FolderRequest {
+    Dataset,
+    Download(String),
 }
 
 #[derive(Script, ScriptHook)]
@@ -139,6 +144,8 @@ pub struct App {
     last_refresh: Option<std::time::Instant>,
     #[rust]
     hub_upload: Option<bool>,
+    #[rust]
+    folder_request: Option<FolderRequest>,
 }
 
 impl App {
@@ -191,7 +198,11 @@ impl App {
         frame::apply_light(
             cx,
             &self.ui,
-            &[(ids!(setup_card), frame::Themed::Bg)],
+            &[
+                (ids!(setup_card), frame::Themed::Bg),
+                (ids!(setup_rescan), frame::Themed::Both),
+                (ids!(setup_replay), frame::Themed::Both),
+            ],
             light,
         );
 
@@ -471,6 +482,49 @@ impl MatchEvent for App {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         let mut dirty = false;
+        // The HAL opens Cocoa panels on its main thread and returns asynchronously.
+        // Keep the original operation until either selection or cancellation arrives.
+        for action in actions {
+            if let Some(dialog) = action.downcast_ref::<FileDialogAction>() {
+                match dialog {
+                    FileDialogAction::FileSelected { id, paths }
+                        if *id == live_id!(rig_profile) =>
+                    {
+                        if let Some(path) = paths.first() {
+                            self.backend.dispatch(Intent::ConfigureRig(path.clone()));
+                            self.backend.dispatch(Intent::NewRecordingSession);
+                            dirty = true;
+                        }
+                    }
+                    FileDialogAction::FolderSelected(path) => {
+                        match self.folder_request.take() {
+                            Some(FolderRequest::Dataset) => {
+                                self.backend.dispatch(Intent::OpenFolder(path.clone()))
+                            }
+                            Some(FolderRequest::Download(repo)) => {
+                                let name = repo.split('/').last().unwrap_or("dataset");
+                                if !name.is_empty()
+                                    && name != "."
+                                    && name != ".."
+                                    && !name.contains('\\')
+                                {
+                                    let destination = Some(path.join(name));
+                                    self.backend
+                                        .dispatch(Intent::HubTransfer { repo, destination });
+                                    self.hub_upload = None;
+                                }
+                            }
+                            None => {}
+                        }
+                        dirty = true;
+                    }
+                    FileDialogAction::FolderCancelled => {
+                        self.folder_request = None;
+                    }
+                    _ => {}
+                }
+            }
+        }
         for (id, pane) in [
             (ids!(episodes_btn), "episodes"),
             (ids!(details_btn), "details"),
@@ -519,15 +573,12 @@ impl MatchEvent for App {
             .clicked(actions)
             || self.ui.button(cx, ids!(setup_rig)).clicked(actions)
         {
-            if let Some(path) = rfd::FileDialog::new()
-                .set_title("Choose a rig profile (tools/capture/rig.example.json)")
-                .add_filter("Rig profile", &["json"])
-                .pick_file()
-            {
-                self.backend.dispatch(Intent::ConfigureRig(path));
-                self.backend.dispatch(Intent::NewRecordingSession);
-                dirty = true;
-            }
+            cx.open_select_file_dialog(
+                FileDialog::new()
+                    .set_id(live_id!(rig_profile))
+                    .set_title("Choose a rig profile".into())
+                    .add_filter("Rig profile".into(), vec!["json".into()]),
+            );
         }
         if self
             .ui
@@ -543,12 +594,11 @@ impl MatchEvent for App {
             .button(cx, ids!(page_library.left_col.header.btn_open))
             .clicked(actions)
         {
-            if let Some(path) = rfd::FileDialog::new()
-                .set_title("Open LeRobot dataset or dataset library")
-                .pick_folder()
-            {
-                self.backend.dispatch(Intent::OpenFolder(path));
-                dirty = true;
+            if self.folder_request.is_none() {
+                self.folder_request = Some(FolderRequest::Dataset);
+                cx.open_select_folder_dialog(
+                    FileDialog::new().set_title("Open LeRobot dataset or dataset library".into()),
+                );
             }
         }
         for (path, intent) in [
@@ -592,17 +642,11 @@ impl MatchEvent for App {
                         destination: None,
                     });
                     self.hub_upload = None;
-                } else if let Some(parent) = rfd::FileDialog::new()
-                    .set_title("Choose download parent folder")
-                    .pick_folder()
-                {
-                    let name = repo.split('/').last().unwrap_or("dataset");
-                    if name != "." && name != ".." && !name.contains('\\') {
-                        let destination = Some(parent.join(name));
-                        self.backend
-                            .dispatch(Intent::HubTransfer { repo, destination });
-                        self.hub_upload = None;
-                    }
+                } else if self.folder_request.is_none() {
+                    self.folder_request = Some(FolderRequest::Download(repo));
+                    cx.open_select_folder_dialog(
+                        FileDialog::new().set_title("Choose download parent folder".into()),
+                    );
                 }
                 dirty = true;
             }

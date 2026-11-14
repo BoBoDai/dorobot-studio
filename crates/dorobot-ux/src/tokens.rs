@@ -322,6 +322,22 @@ script_mod! {
         }
     }
 
+    // One prominent action per task, with a distinct pressed state.
+    mod.widgets.nx.Primary = mod.widgets.nx.NxBtn{
+        height: 44
+        padding: Inset{left: 16. right: 16. top: 8. bottom: 8.}
+        draw_bg +: {
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
+                let base = mix(#x0060CC, #x0054B3, self.hover)
+                sdf.fill(mix(base, #x004799, self.down))
+                return sdf.result
+            }
+        }
+        draw_text +: {get_color: fn() {return #xFFFFFF}}
+    }
+
     // Small inline action button.
     mod.widgets.nx.Mini = mod.widgets.nx.NxBtn{
         padding: Inset{left: 7. right: 7. top: 2. bottom: 2.}

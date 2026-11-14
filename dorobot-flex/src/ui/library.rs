@@ -68,7 +68,7 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_META{}
-                    get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                    get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                 }
             }
             chips := View{
@@ -204,7 +204,7 @@ script_mod! {
                 draw_text +: {
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_META{}
-                    get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
+                    get_color: fn() { return mix(#xD1D1D6, #x636366, self.light) }
                 }
             }
             sstate := mod.widgets.ux.Chip{
@@ -270,7 +270,7 @@ script_mod! {
                         text_style: mod.widgets.ux.TEXT_BODY{}
                     }
                 }
-                btn_open := Button{ text: "Open folder…" }
+                btn_open := mod.widgets.nx.NxBtn{ text: "Open folder…" }
                 btn_pull := Button{
                     text: "Pull from Hub"
                     padding: Inset{left: 18. right: 18. top: 11. bottom: 11.}
@@ -478,6 +478,7 @@ impl LibraryScreenRef {
             &[
                 (ids!(left_col.header.page_title), Themed::Text),
                 (ids!(left_col.header.btn_new), Themed::Both),
+                (ids!(left_col.header.btn_open), Themed::Both),
                 (ids!(left_col.header.btn_pull), Themed::Both),
                 (ids!(left_col.grid), Themed::Bg),
                 (ids!(left_col.recent), Themed::Bg),

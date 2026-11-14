@@ -246,7 +246,7 @@ script_mod! {
                 light: instance(0.0)
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                    let c = mix(#xD1D1D6, #x8E8E93, self.light)
+                    let c = mix(#xD1D1D6, #x636366, self.light)
                     sdf.move_to(2.0, 5.0)  sdf.line_to(18.0, 5.0)  sdf.stroke(c, 1.3)
                     sdf.move_to(2.0, 10.0) sdf.line_to(18.0, 10.0) sdf.stroke(c, 1.3)
                     sdf.move_to(2.0, 15.0) sdf.line_to(18.0, 15.0) sdf.stroke(c, 1.3)
@@ -301,9 +301,9 @@ script_mod! {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.circle(8.5, 7.0, 5.4)
-                        sdf.stroke(mix(#xD1D1D6, #x8E8E93, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         sdf.move_to(5.5, 13.0) sdf.line_to(11.5, 13.0)
-                        sdf.stroke(mix(#xD1D1D6, #x8E8E93, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         return sdf.result
                     }
                 }
@@ -316,9 +316,9 @@ script_mod! {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.circle(8.5, 8.5, 7.2)
-                        sdf.stroke(mix(#xD1D1D6, #x8E8E93, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         sdf.circle(8.5, 12.0, 0.9)
-                        sdf.fill(mix(#xD1D1D6, #x8E8E93, self.light))
+                        sdf.fill(mix(#xD1D1D6, #x636366, self.light))
                         return sdf.result
                     }
                 }
@@ -333,9 +333,9 @@ script_mod! {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.circle(8.5, 8.5, 6.6)
-                        sdf.stroke(mix(#xD1D1D6, #x8E8E93, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         sdf.circle(8.5, 8.5, 2.4)
-                        sdf.stroke(mix(#xD1D1D6, #x8E8E93, self.light), 1.2)
+                        sdf.stroke(mix(#xD1D1D6, #x636366, self.light), 1.2)
                         return sdf.result
                     }
                 }
