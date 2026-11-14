@@ -20,8 +20,8 @@ script_mod! {
         draw_bg +: {
             dark_mode: instance(0.0)
             pixel: fn() {
-                let light_bg = vec4(0.984, 0.980, 0.973, 1.0)
-                let dark_bg = vec4(0.078, 0.075, 0.071, 1.0)
+                let light_bg = vec4(1.000, 1.000, 1.000, 1.0)
+                let dark_bg = vec4(0.110, 0.110, 0.118, 1.0)
                 return mix(light_bg, dark_bg, self.dark_mode)
             }
         }
@@ -38,8 +38,8 @@ script_mod! {
             draw_bg +: {
                 dark_mode: instance(0.0)
                 pixel: fn() {
-                    let light_bg = vec4(0.949, 0.941, 0.929, 1.0)
-                    let dark_bg = vec4(0.106, 0.098, 0.090, 1.0)
+                    let light_bg = vec4(0.949, 0.949, 0.969, 1.0)
+                    let dark_bg = vec4(0.110, 0.110, 0.118, 1.0)
                     return mix(light_bg, dark_bg, self.dark_mode)
                 }
             }
@@ -54,7 +54,7 @@ script_mod! {
                 filter_label := Label{
                     draw_text +: {
                         text_style: mod.widgets.flex.TEXT_SMALL{}
-                        color: #x6B625B
+                        color: #x8E8E93
                     }
                     text: "Episodes"
                 }
@@ -64,7 +64,7 @@ script_mod! {
                 episode_count := Label{
                     draw_text +: {
                         text_style: mod.widgets.flex.TEXT_SMALL{}
-                        color: #x7A7169
+                        color: #x8E8E93
                     }
                     text: "0 episodes"
                 }
@@ -85,7 +85,7 @@ script_mod! {
             filler +: {
                 dark_mode: instance(0.0)
                 pixel: fn() {
-                    return mix(#xFBFAF8, #x141312, self.dark_mode)
+                    return mix(#xFFFFFF, #x1C1C1E, self.dark_mode)
                 }
             }
 
@@ -103,9 +103,9 @@ script_mod! {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.rect(0., 0., self.rect_size.x, self.rect_size.y)
-                        let base = mix(#xFBFAF8, #x141312, self.dark_mode)
-                        let hovered = mix(#xF2F0ED, #x1B1917, self.dark_mode)
-                        let selected = mix(#xE8E5E1, #x2A2725, self.dark_mode)
+                        let base = mix(#xFFFFFF, #x1C1C1E, self.dark_mode)
+                        let hovered = mix(#xF2F2F7, #x2C2C2E, self.dark_mode)
+                        let selected = mix(#xE5E5EA, #x38383A, self.dark_mode)
                         sdf.fill(mix(mix(base, hovered, self.hover), selected, self.active))
                         return sdf.result
                     }
@@ -115,13 +115,13 @@ script_mod! {
                     text_style +: {font_size: 10.0}
                     dark_mode: instance(0.0)
                     get_color: fn() {
-                        return mix(#x5E564E, #xCFC9C2, self.dark_mode)
+                        return mix(#x636366, #xD1D1D6, self.dark_mode)
                     }
                 }
 
                 draw_icon +: {
-                    color: #x7A7169
-                    color_active: #x7A7169
+                    color: #x8E8E93
+                    color_active: #x8E8E93
                 }
             }
 
@@ -134,9 +134,9 @@ script_mod! {
                     pixel: fn() {
                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                         sdf.rect(0., 0., self.rect_size.x, self.rect_size.y)
-                        let base = mix(#xFBFAF8, #x141312, self.dark_mode)
-                        let hovered = mix(#xF2F0ED, #x1B1917, self.dark_mode)
-                        let selected = mix(#xE8E5E1, #x2A2725, self.dark_mode)
+                        let base = mix(#xFFFFFF, #x1C1C1E, self.dark_mode)
+                        let hovered = mix(#xF2F2F7, #x2C2C2E, self.dark_mode)
+                        let selected = mix(#xE5E5EA, #x38383A, self.dark_mode)
                         sdf.fill(mix(mix(base, hovered, self.hover), selected, self.active))
                         return sdf.result
                     }
@@ -146,15 +146,15 @@ script_mod! {
                     text_style +: {font_size: 10.0}
                     dark_mode: instance(0.0)
                     get_color: fn() {
-                        let base = mix(#x5E564E, #xCFC9C2, self.dark_mode)
-                        let sel = mix(#x2A2725, #xF2F0EC, self.dark_mode)
+                        let base = mix(#x636366, #xD1D1D6, self.dark_mode)
+                        let sel = mix(#x38383A, #xF5F5F7, self.dark_mode)
                         return mix(base, sel, self.active)
                     }
                 }
 
                 draw_icon +: {
-                    color: #xD15010
-                    color_active: #xD15010
+                    color: #x007AFF
+                    color_active: #x007AFF
                 }
             }
 

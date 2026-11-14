@@ -55,3 +55,7 @@ __pycache__/
 /docs/completion-evidence/
 /docs/audit-*/
 /docs/verification-*.json
+
+# Local Makepad runner state
+/.makepad/
+/.makepad-jit/

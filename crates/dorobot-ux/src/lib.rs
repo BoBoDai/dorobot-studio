@@ -15,7 +15,7 @@
 //!
 //! Two modules, deliberately:
 //!
-//! * [`tokens`] — the factory-industrial palette, type scale and DSL
+//! * [`tokens`] — the iOS semantic palette, type scale and DSL
 //!   prototypes (`mod.widgets.nx.*`), plus [`tokens::pal`], the Rust-side
 //!   mirror for colours pushed through `script_apply_eval!`.
 //! * [`kit`] — the custom-drawn widgets that no makepad primitive covers:
@@ -39,6 +39,29 @@ use makepad_widgets::*;
 
 pub mod kit;
 pub mod tokens;
+
+/// Select the iOS sheet before registering widgets, retaining an existing choice.
+pub fn install_ios(vm: &mut ScriptVm, light: bool) {
+    if desktop_style::current(vm).is_none() {
+        let name = if light { "ios" } else { "ios-dark" };
+        desktop_style::install(vm, desktop_style::StyleSheet::named(name).unwrap());
+    }
+}
+
+/// Keep framework controls and Studio's custom charts on the same appearance.
+pub fn sync_appearance(cx: &mut Cx, light: bool) {
+    let name = if light { "ios" } else { "ios-dark" };
+    let changed = cx.with_vm(|vm| {
+        if desktop_style::current(vm).is_some_and(|sheet| sheet.name == name) {
+            return false;
+        }
+        desktop_style::install(vm, desktop_style::StyleSheet::named(name).unwrap());
+        true
+    });
+    if changed {
+        cx.request_style_reload();
+    }
+}
 
 /// Register the tokens and the widget kit, in dependency order: `kit`'s
 /// prototypes reference `nx` type styles, so the tokens must land first.

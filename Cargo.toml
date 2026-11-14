@@ -21,7 +21,7 @@ dorobot-ux = { path = "crates/dorobot-ux" }
 dorobot-dora-bridge = { path = "crates/dorobot-dora-bridge" }
 
 # Makepad
-makepad-widgets = { git = "https://github.com/makepad/makepad", branch = "dev" }
+makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "44d8220f12acfa46157019267e119e0866dd6b05", default-features = false, features = ["dock", "glass", "nav_menus"] }
 # Pinned by rev: the makepad-dev branch carries the dev-script port.
 # theme-hook: exposes mod.widgets.shell.* tokens and script_mod_with_theme,
 # which is how dorobot-flex supplies the nexus palette to the shell chrome.
@@ -64,3 +64,15 @@ mesh-loader = "0.1"
 
 # File dialogs
 rfd = "0.15"
+
+# Keep the layout and URDF renderer on the same JIT-capable Makepad revision.
+[patch."https://github.com/makepad/makepad"]
+makepad-widgets = { git = "https://github.com/OctoSense-org/makepad.git", rev = "44d8220f12acfa46157019267e119e0866dd6b05" }
+makepad-xr = { git = "https://github.com/OctoSense-org/makepad.git", rev = "44d8220f12acfa46157019267e119e0866dd6b05" }
+
+[patch."https://github.com/dorobot-org/makepad-urdf-viewer"]
+makepad-urdf-player = { path = "vendor/makepad-urdf-player" }
+
+# Match the framework macro source when file dialogs also depend on bitflags.
+[patch.crates-io]
+bitflags = { git = "https://github.com/OctoSense-org/makepad.git", rev = "44d8220f12acfa46157019267e119e0866dd6b05" }

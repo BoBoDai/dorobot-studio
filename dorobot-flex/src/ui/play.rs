@@ -37,7 +37,7 @@ script_mod! {
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 let base = mix(#x1A1F2900, #xFFFFFF00, self.light)
-                let on = mix(#xEF6F2E, #xF2F0ED, self.light)
+                let on = mix(#x0A84FF, #xF2F2F7, self.light)
                 sdf.box(4.0, 1.0, self.rect_size.x - 8.0, self.rect_size.y - 2.0, 0.5)
                 sdf.fill(mix(base, on, self.sel))
                 return sdf.result
@@ -50,8 +50,8 @@ script_mod! {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
-                    let idle = mix(#xD8D4CF, #x6B625B, self.light)
-                    let on = mix(#xE8E5E1, #xEF6F2E, self.light)
+                    let idle = mix(#xD1D1D6, #x8E8E93, self.light)
+                    let on = mix(#xE5E5EA, #x0A84FF, self.light)
                     return mix(idle, on, self.sel)
                 }
             }
@@ -69,7 +69,7 @@ script_mod! {
         draw_text +: {
             light: instance(0.0)
             text_style: mod.widgets.ux.TEXT_CHIP{}
-            get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+            get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
         }
     }
 
@@ -82,7 +82,7 @@ script_mod! {
             draw_text +: {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+                get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
             }
         }
         v := Label{
@@ -92,8 +92,8 @@ script_mod! {
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_META{}
                 get_color: fn() {
-                    let normal = mix(#xD8D4CF, #x2A2725, self.light)
-                    let alert = mix(#xB07514, #xF0A330, self.light)
+                    let normal = mix(#xD1D1D6, #x38383A, self.light)
+                    let alert = mix(#x996300, #xFF9F0A, self.light)
                     return mix(normal, alert, self.warn)
                 }
             }
@@ -110,20 +110,20 @@ script_mod! {
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 // 0 neutral, 1 good, 2 bad, 3 primary
-                let d_ok = mix(#x1B1917, #x2A2725, step(0.5, self.tone))
-                let d_bad = mix(d_ok, #x2A2725, step(1.5, self.tone))
-                let dark_f = mix(d_bad, #xD15010, step(2.5, self.tone))
-                let l_ok = mix(#xFFFFFF, #xF2F0ED, step(0.5, self.tone))
-                let l_bad = mix(l_ok, #xF2F0ED, step(1.5, self.tone))
-                let light_f = mix(l_bad, #xD15010, step(2.5, self.tone))
+                let d_ok = mix(#x2C2C2E, #x38383A, step(0.5, self.tone))
+                let d_bad = mix(d_ok, #x38383A, step(1.5, self.tone))
+                let dark_f = mix(d_bad, #x007AFF, step(2.5, self.tone))
+                let l_ok = mix(#xFFFFFF, #xF2F2F7, step(0.5, self.tone))
+                let l_bad = mix(l_ok, #xF2F2F7, step(1.5, self.tone))
+                let light_f = mix(l_bad, #x007AFF, step(2.5, self.tone))
                 let fill = mix(dark_f, light_f, self.light)
-                let d_e = mix(#x2A2725, #x6FAB78, step(0.5, self.tone))
-                let d_e2 = mix(d_e, #xE54048, step(1.5, self.tone))
-                let dark_e = mix(d_e2, #xD15010, step(2.5, self.tone))
-                let l_e = mix(#xD8D4CF, #xD8D4CF, step(0.5, self.tone))
-                let l_e2 = mix(l_e, #xC43B36, step(1.5, self.tone))
-                let light_e = mix(l_e2, #xD15010, step(2.5, self.tone))
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 0.5)
+                let d_e = mix(#x38383A, #x30D158, step(0.5, self.tone))
+                let d_e2 = mix(d_e, #xFF453A, step(1.5, self.tone))
+                let dark_e = mix(d_e2, #x007AFF, step(2.5, self.tone))
+                let l_e = mix(#xD1D1D6, #xD1D1D6, step(0.5, self.tone))
+                let l_e2 = mix(l_e, #xD70015, step(1.5, self.tone))
+                let light_e = mix(l_e2, #x007AFF, step(2.5, self.tone))
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 10.0)
                 // The tag an episode already carries reads as pressed, so the
                 // sidebar answers "what is this tagged?" without looking away.
                 let hot = mix(fill, mix(fill * 1.55, fill * 1.22, self.light), self.sel)
@@ -139,16 +139,16 @@ script_mod! {
             sel: instance(0.0)
             text_style: mod.widgets.ux.TEXT_BODY{}
             get_color: fn() {
-                let d_ok = mix(#xD8D4CF, #x3E7A4A, step(0.5, self.tone))
-                let d_bad = mix(d_ok, #xC43B36, step(1.5, self.tone))
+                let d_ok = mix(#xD1D1D6, #x248A3D, step(0.5, self.tone))
+                let d_bad = mix(d_ok, #xD70015, step(1.5, self.tone))
                 let dark_c = mix(d_bad, #xFFFFFF, step(2.5, self.tone))
-                let l_ok = mix(#x2A2725, #x6FAB78, step(0.5, self.tone))
-                let l_bad = mix(l_ok, #xE54048, step(1.5, self.tone))
+                let l_ok = mix(#x38383A, #x30D158, step(0.5, self.tone))
+                let l_bad = mix(l_ok, #xFF453A, step(1.5, self.tone))
                 let light_c = mix(l_bad, #xFFFFFF, step(2.5, self.tone))
                 let base = mix(dark_c, light_c, self.light)
                 // A selected button fills with its own colour, so the label has
                 // to leave that colour to stay legible on it.
-                return mix(base, mix(#xF2F0ED, #x141312, self.light), self.sel)
+                return mix(base, mix(#xF2F2F7, #x1C1C1E, self.light), self.sel)
             }
         }
     }
@@ -162,8 +162,8 @@ script_mod! {
             light: instance(0.0)
             pixel: fn() {
                 let d = length(self.pos - vec2(0.5, 0.45))
-                return mix(mix(#x1B1917, #x0A0908, clamp(d, 0.0, 1.0)),
-                           mix(#xF2F0ED, #xE8E5E1, clamp(d, 0.0, 1.0)), self.light)
+                return mix(mix(#x2C2C2E, #x000000, clamp(d, 0.0, 1.0)),
+                           mix(#xF2F2F7, #xE5E5EA, clamp(d, 0.0, 1.0)), self.light)
             }
         }
     }
@@ -183,8 +183,8 @@ script_mod! {
                 let dx = (p.x - self.rect_size.x * 0.5) / max(p.y - horizon, 1.0)
                 let vline = (1.0 - step(0.02, fract(dx * 2.5 + 0.5))) * below
                 let g = clamp(hline + vline, 0.0, 1.0) * 0.45
-                let base = mix(#x141312, #xF2F0ED, self.light)
-                return mix(base, mix(#x2A2725, #xD8D4CF, self.light), g)
+                let base = mix(#x1C1C1E, #xF2F2F7, self.light)
+                return mix(base, mix(#x38383A, #xD1D1D6, self.light), g)
             }
         }
     }
@@ -206,7 +206,7 @@ script_mod! {
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
-            pixel: fn() { return mix(#x141312, #xFBFAF8, self.light) }
+            pixel: fn() { return mix(#x1C1C1E, #xFFFFFF, self.light) }
         }
 
         upper := View{
@@ -266,7 +266,15 @@ script_mod! {
                         }
                         s1_2 +: {
                             title: "3D View"
-                            content +: { stage_3d := RobotView{} }
+                            content +: {
+                                stage_3d := RobotView{
+                                    sky_horizon: mod.theme.color_bg_app
+                                    sky_zenith: mod.theme.color_bg_app
+                                    ground_color: mod.theme.color_bg_container
+                                    ground2_color: mod.theme.color_bg_container
+                                    grid_color: mod.theme.color_text_disabled
+                                }
+                            }
                         }
                         s1_3 +: { visible: false }
                         s1_4 +: { visible: false }
@@ -318,7 +326,7 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_CHIP{}
-                            get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+                            get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
                         }
                     }
                     task_t := Label{
@@ -327,7 +335,7 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_BODY{}
-                            get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
+                            get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
                         }
                     }
                     cur_h := Label{
@@ -336,7 +344,7 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_CHIP{}
-                            get_color: fn() { return mix(#x7A7169, #xD8D4CF, self.light) }
+                            get_color: fn() { return mix(#xAEAEB2, #x636366, self.light) }
                         }
                     }
                     btn_good := ActionBtn{ text: "Tag good"      draw_bg +: {tone: 1.0} draw_text +: {tone: 1.0} }
@@ -383,7 +391,7 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_META{}
-                            get_color: fn() { return mix(#xD8D4CF, #x2A2725, self.light) }
+                            get_color: fn() { return mix(#xD1D1D6, #x38383A, self.light) }
                         }
                     }
                     Filler{}
@@ -392,7 +400,7 @@ script_mod! {
                         draw_text +: {
                             light: instance(0.0)
                             text_style: mod.widgets.ux.TEXT_CHIP{}
-                            get_color: fn() { return mix(#xB07514, #xF0A330, self.light) }
+                            get_color: fn() { return mix(#x996300, #xFF9F0A, self.light) }
                         }
                     }
                 }
@@ -412,7 +420,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
                             }
                         }
                         plot_0 := TimeSeriesPlot{
@@ -427,7 +435,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
                             }
                         }
                         plot_1 := TimeSeriesPlot{
@@ -442,7 +450,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
                             }
                         }
                         plot_2 := TimeSeriesPlot{
@@ -457,7 +465,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
                             }
                         }
                         plot_3 := TimeSeriesPlot{
@@ -472,7 +480,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
                             }
                         }
                         plot_4 := TimeSeriesPlot{
@@ -487,7 +495,7 @@ script_mod! {
                             draw_text +: {
                                 light: instance(0.0)
                                 text_style: mod.widgets.ux.TEXT_CHIP{}
-                                get_color: fn() { return mix(#xD8D4CF, #x7A7169, self.light) }
+                                get_color: fn() { return mix(#xD1D1D6, #x8E8E93, self.light) }
                             }
                         }
                         plot_5 := TimeSeriesPlot{
@@ -666,6 +674,17 @@ const GRP_IDS: [&[LiveId]; 3] = [
 ];
 
 impl PlayScreenRef {
+    /// Reapply dynamic panel titles after a framework style or source reload,
+    /// retaining the user's current arrangement.
+    pub fn restore_panel_design(&self, cx: &mut Cx) {
+        if let Some(inner) = self.borrow() {
+            let grid = inner.view.panel_grid(cx, ids!(upper.grid));
+            if let Some(layout) = grid.layout_state() {
+                grid.set_layout_state(cx, layout);
+            }
+        }
+    }
+
     pub fn sync(&self, cx: &mut Cx, st: &PlaybackState) {
         let light = crate::ui::frame::light_mode();
         let Some(mut inner) = self.borrow_mut() else {
@@ -745,6 +764,10 @@ impl PlayScreenRef {
         // drive it from the same value so both systems stay in step.
         let dark_mode = 1.0 - light;
         makepad_app_shell::theme::set_global_dark_mode(dark_mode);
+        for (_, name_id) in LANE_IDS {
+            let mut label = root.widget(cx, name_id);
+            script_apply_eval!(cx, label, { draw_text +: { light: #(light) } });
+        }
         let grid = root.panel_grid(cx, ids!(upper.grid));
         if !grid.is_empty() {
             grid.apply_dark_mode(cx, dark_mode);

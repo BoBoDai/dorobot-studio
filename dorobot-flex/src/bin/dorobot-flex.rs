@@ -2,6 +2,7 @@
 
 use dorobot_flex::api::{files::FileBackend, mock::MockBackend, Backend, Intent, Screen};
 use dorobot_flex::makepad_app_shell::shell::layout::ShellLayoutWidgetRefExt;
+use dorobot_flex::makepad_app_shell::shell::header::ShellHeaderAction;
 use dorobot_flex::playback_controls::PlaybackAction;
 use dorobot_flex::ui::{
     eval::EvalScreenWidgetRefExt, frame, hardware::HardwareScreenWidgetRefExt,
@@ -64,12 +65,14 @@ script_mod! {
             main_window := Window{
                 window.title: "DoRobot Studio"
                 window.inner_size: vec2(1536, 1024)
-                pass.clear_color: #x141312
+                pass.clear_color: mod.theme.color_bg_app
 
                 body +: {
                     flow: Down
                     width: Fill
                     height: Fill
+                    show_bg: true
+                    draw_bg.color: mod.theme.color_bg_app
 
                     hub_form := View{ visible: false width: Fill height: 42 flow: Right spacing: 8.
                         Label{ text: "Dataset repo (owner/name):" }
@@ -77,7 +80,7 @@ script_mod! {
                         hub_go := Button{ text: "Transfer" }
                         hub_cancel := Button{ text: "Cancel" }
                     }
-                    status := Label{ width: Fill height: Fit text: "" draw_text +: { color: #xD8D4CF text_style: mod.widgets.ux.TEXT_META{} } }
+                    status := Label{ width: Fill height: Fit text: "" draw_text +: { color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{} } }
                     // The screens sit in app-shell's ShellLayout rather than the
                     // hand-rolled AppBar + work-row they were prototyped in, so
                     // they inherit what the framework provides: a collapsible
@@ -195,6 +198,8 @@ impl App {
             .widget(cx, ids!(hub_form))
             .set_visible(cx, self.hub_upload.is_some());
         let light = frame::light_mode();
+        dorobot_ux::sync_appearance(cx, light > 0.5);
+        self.ui.shell_layout(cx, ids!(shell)).set_dark_mode(cx, light < 0.5);
         frame::theme_chrome(cx, &self.ui, light);
 
         let nav = self.ui.widget(cx, ids!(nav));
@@ -232,11 +237,8 @@ impl App {
 
 impl MatchEvent for App {
     fn handle_startup(&mut self, cx: &mut Cx) {
-        // Dark is the product's look; set through the widget because the
-        // global is recomputed from ShellLayout's own state on first draw.
-        self.ui
-            .shell_layout(cx, ids!(shell))
-            .set_dark_mode(cx, true);
+        // Match the iOS sheet on first draw; --dark selects its dark appearance.
+        frame::set_light_mode(if std::env::args().any(|a| a == "--dark") { 0.0 } else { 1.0 });
 
         // Optional deep-link so the diff runner can shoot one screen per launch.
         let args: Vec<String> = std::env::args().collect();
@@ -358,13 +360,13 @@ impl MatchEvent for App {
             }
         }
 
-        // Gear in the app bar toggles dark/light.
-        let gear = self.ui.widget(cx, ids!(app_bar.actions.gear));
-        if !gear.is_empty() {
-            if frame::view_clicked(actions, gear.widget_uid()) {
-                frame::toggle_light_mode();
-                dirty = true;
-            }
+        // The shell header captures its button actions and emits this action.
+        let header = self.ui.widget(cx, ids!(shell.main_container.header));
+        if actions.filter_widget_actions(header.widget_uid()).any(|action| {
+            matches!(action.cast::<ShellHeaderAction>(), ShellHeaderAction::ToggleDarkMode)
+        }) {
+            frame::toggle_light_mode();
+            dirty = true;
         }
 
         if self
@@ -559,6 +561,7 @@ impl MatchEvent for App {
 
 impl AppMain for App {
     fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
+        dorobot_ux::install_ios(vm, !std::env::args().any(|a| a == "--dark"));
         makepad_widgets::script_mod(vm);
         // Shared tokens first: flex's styles alias onto them.
         dorobot_ux::script_mod(vm);
@@ -583,6 +586,10 @@ impl AppMain for App {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event) {
         self.match_event(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
+        if matches!(event, Event::LiveEdit | Event::ScriptReapply) && self.started {
+            self.ui.play_screen(cx, ids!(page_play)).restore_panel_design(cx);
+            self.sync(cx);
+        }
         // Scrolling the episode window produces no action, so it is picked up
         // here rather than in handle_actions, which would not run for it.
         if self.ui.play_screen(cx, ids!(page_play)).take_scrolled() {

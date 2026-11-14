@@ -8,6 +8,24 @@ This is a standalone Git repository and Cargo workspace. Open this directory
 as the project root. The application builds without a sibling Nexus checkout;
 its shared UI crate is included in `crates/dorobot-ux`.
 
+### iOS appearance and Makepad JIT
+
+The desktop app uses OctoSense's current Makepad iOS light/dark style sheets,
+with blue accents, grouped surfaces and rounded controls. Start it through the
+Relax Rust JIT:
+
+```sh
+./tools/run_jit.sh
+./tools/run_jit.sh --check
+./tools/run_jit.sh --dark
+```
+
+The first launch builds a pinned runner in your user cache; later launches
+reuse it. Rust, Cargo, Git, Python 3 and a platform C compiler are required.
+The default JIT launch omits FFmpeg. With FFmpeg installed, use
+`./tools/run_jit.sh --video` for video decoding. See [JIT setup and validation](docs/JIT.md)
+for runtime versions, source editing and tested limits.
+
 ### Adora Nano preview
 
 The Nano URDF and meshes are included in `data/adora_nano`. From this project:
@@ -16,7 +34,7 @@ The Nano URDF and meshes are included in `data/adora_nano`. From this project:
 ./tools/run_nano_preview.sh
 ```
 
-The launcher creates three synthetic joint-motion clips if needed and opens
+The JIT launcher creates three synthetic joint-motion clips if needed and opens
 them in the Play screen. Space plays/pauses; Home returns to the start. These
 clips are kinematic previews, not captured data or commands for hardware.
 This launcher builds without FFmpeg/video decoding; the standard build below
@@ -100,7 +118,7 @@ dorobot-studio/
 
 ### Prerequisites
 
-- Rust toolchain (1.75+)
+- A current stable Rust toolchain
 - FFmpeg development libraries (for video decoding)
 
 On macOS:
