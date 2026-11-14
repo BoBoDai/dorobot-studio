@@ -378,8 +378,7 @@ script_mod! {
                     transport := PlaybackControls{
                         width: 184 height: Fit
                         show_bg: false
-                        // Time and speed live on the scrubber and the frame
-                        // counter already; two clocks would disagree.
+                        // The shared transport row owns the clock and speed control.
                         time_row +: { visible: false }
                         speed_row +: { visible: false }
                     }
@@ -392,6 +391,7 @@ script_mod! {
                         }
                     }
                     Filler{}
+                    speed_btn := Button{width: 112 height: 44 text: "Speed 1×"}
                     drift_lbl := Label{
                         text: "DRIFT"
                         draw_text +: {
@@ -1149,6 +1149,8 @@ impl PlayScreenRef {
         tl.set_current_time(cx, st.current_time);
         tl.set_playing(cx, st.is_playing);
         tl.set_speed(cx, st.speed);
+        root.button(cx, ids!(timeline.tl_body.controls.speed_btn))
+            .set_text(cx, &format!("Speed {}×", st.speed));
         root.playback_controls(cx, ids!(timeline.tl_body.controls.transport))
             .set_playing(cx, st.is_playing);
         root.label(cx, ids!(timeline.tl_body.controls.frame_lbl))

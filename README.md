@@ -88,7 +88,8 @@ Drag a panel title to rearrange its content. Drag a divider to resize the grid;
 use the panel's expand button to maximize it, and Escape to restore the grid.
 **Replay → Panels** reopens closed views, changes the arrangement, resets the
 layout, or opens a separate native **Replay window**. Both windows share the
-selected episode and playback; their panel layouts are independent. Closing
+selected episode and playback; their panel layouts are independent. The **Speed**
+control cycles through 0.25×, 0.5×, 1× and 2× in both windows and survives restart. Closing
 the extra window preserves the main task. Layouts and navigation width are
 saved locally. Hardware uses the same panel behavior and has **Restore panels**.
 

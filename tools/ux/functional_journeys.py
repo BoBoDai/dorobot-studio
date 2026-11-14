@@ -7,7 +7,7 @@ from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--pid',required=True);p.add_argument('--remote',required=True)
 p.add_argument('--report',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
-p.add_argument('--mode',choices=['replay','demo','restart','layout'],default='replay')
+p.add_argument('--mode',choices=['replay','demo','restart','layout','speed'],default='replay')
 a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True);checks=[]
 def cmd(*args,w=0):
  r=subprocess.run([a.remote,'app',a.pid,*args,f'w={w}'],capture_output=True,text=True,check=True)
@@ -47,7 +47,31 @@ def contained(child,parent):
  x,y,w,h=rect(child);a,b,c,d=rect(parent)
  return w>0 and h>0 and x>=a-.5 and y>=b-.5 and x+w<=a+c+.5 and y+h<=b+d+.5
 
-if a.mode=='layout':
+if a.mode=='speed':
+ nav('play')
+ if not read()['controls']['panel_tools']['visible']:click('panels_btn')
+ click('new_window');wait(lambda r:r['state']['monitor_open'])
+ for _ in range(4):
+  if read()['state']['speed']==1:break
+  click('speed_btn')
+ for speed in [2,.25,.5,1]:
+  click('speed_btn');wait(lambda r:r['state']['speed']==speed)
+  check(f'{speed}x playback speed is shared by both windows',read()['controls']['speed_btn']['text']==read()['controls']['monitor_play.speed_btn']['text'])
+ click('speed_btn');key('Home');click('play_btn');wait(lambda r:r['state']['playing'])
+ start=read()['state']['time'];at=time.monotonic();time.sleep(1.5)
+ rate=(read()['state']['time']-start)/(time.monotonic()-at);click('play_btn');wait(lambda r:not r['state']['playing'])
+ check('2x control changes actual playback rate',1.65<rate<2.35)
+ click('close_monitor',w=read()['state']['monitor_window']);click('panels_btn')
+ if not read()['controls']['page_play.upper.side']['visible']:click('details_btn')
+ if read()['state']['tag']=='Some(Good)':click('page_play.upper.side.side_body.btn_good')
+ click('page_play.upper.side.side_body.btn_good');wait(lambda r:r['state']['tag']=='Some(Good)')
+ nav('library');nav('play');check('good tag survives navigation',read()['state']['tag']=='Some(Good)')
+ x,y,w,h=rect('page_play.upper.side');cmd('mouse','k=scroll',f'x={x+w/2}',f'y={y+h/2}','dx=0','dy=500')
+ click('page_play.upper.side.side_body.btn_push');wait(lambda r:r['state']['hub_open'])
+ click('hub_cancel');wait(lambda r:not r['state']['hub_open'])
+ check('cancel upload form retains episode and tag',read()['state']['tag']=='Some(Good)')
+ shot('shared-speed-control')
+elif a.mode=='layout':
  nav('play')
  if not read()['controls']['panel_tools']['visible']:click('panels_btn')
  click('layout_reset')
@@ -75,6 +99,7 @@ elif a.mode=='restart':
  wait(lambda r:r['state']['screen']=='Play')
  check('restart restores panel order, sizes and visibility',layout()==expected['layout'])
  check('restart restores episode and paused playhead',read()['state']['episode']==expected['episode'] and abs(read()['state']['time']-expected['time'])<.01 and not read()['state']['playing'])
+ if 'speed' in expected:check('restart restores playback speed without starting playback',read()['state']['speed']==expected['speed'] and not read()['state']['playing'])
  check('restart preserves curation tag',read()['state']['tag']==expected['tag'])
  check('restart restores navigation width',abs(rect('sidebar')[2]-expected['sidebar_width'])<1)
  shot('restored-layout')

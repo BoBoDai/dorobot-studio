@@ -421,7 +421,7 @@ impl MatchEvent for App {
                     serde_json::json!({
                         "screen": self.backend.screen().label(), "dark": frame::light_mode() < 0.5,
                         "episode": play.selected, "playing": play.is_playing, "time": play.current_time,
-                        "frames": play.stats.frames, "tag": play.selected.and_then(|id| play.episodes.iter().find(|e| e.index == id)).map(|e| format!("{:?}", e.tag)),
+                        "speed": play.speed, "frames": play.stats.frames, "tag": play.selected.and_then(|id| play.episodes.iter().find(|e| e.index == id)).map(|e| format!("{:?}", e.tag)),
                         "monitor_open": self.monitor_open, "monitor_window": self.ui.window(cx, ids!(replay_window)).window_id().map(|w|w.id()),
                         "monitor_layout": self.ui.flex_panels(cx, ids!(monitor_play.upper.grid)).snapshot(),
                         "panel_layout": self.ui.flex_panels(cx, ids!(page_play.upper.grid)).snapshot(),
@@ -503,6 +503,8 @@ impl MatchEvent for App {
                         "page_play.upper.side.side_body.btn_good",
                         "page_play.upper.side.side_body.btn_bad",
                         "page_play.timeline.tl_body.controls.transport",
+                        "speed_btn",
+                        "monitor_play.speed_btn",
                         "play_btn",
                         "step_back_btn",
                         "step_fwd_btn",
@@ -692,6 +694,20 @@ impl MatchEvent for App {
             }
             if root.button(cx, ids!(layout_reset)).clicked(actions) {
                 grid.reset(cx);
+            }
+            if root.button(cx, ids!(speed_btn)).clicked(actions) {
+                let speed = self.backend.playback().speed;
+                let next = if speed < 0.5 {
+                    0.5
+                } else if speed < 1.0 {
+                    1.0
+                } else if speed < 2.0 {
+                    2.0
+                } else {
+                    0.25
+                };
+                self.backend.dispatch(Intent::SetSpeed(next));
+                dirty = true;
             }
             if root.button(cx, ids!(layout_cycle)).clicked(actions) {
                 grid.cycle_layout(cx);

@@ -20,6 +20,7 @@ p.add_argument('--report', type=Path, required=True)
 p.add_argument('--out', type=Path, required=True)
 p.add_argument('--sizes', default='1440x900,1024x768')
 p.add_argument('--appearances', default='light,dark')
+p.add_argument('--screens', help='Comma-separated subset of screen names for affected-view checks')
 a = p.parse_args()
 a.out.mkdir(parents=True, exist_ok=True)
 
@@ -59,6 +60,10 @@ def appearance(want):
 
 screens = ([('Library','nav_library'), ('Record','nav_record'), ('Play','nav_play'), ('Hardware','nav_hardware'), ('Eval','nav_eval')]
            if a.app == 'studio' else [(n, f'tab{i}') for i,n in enumerate(['Home','Scenes','Robots','Train','Inspect','Validate','Runs','Deploy'])])
+if a.screens:
+    wanted = set(a.screens.split(','))
+    screens = [(name, control) for name, control in screens if name in wanted]
+    if len(screens) != len(wanted): raise ValueError('Unknown screen in --screens')
 state_key = 'screen' if a.app == 'studio' else 'mode'
 receipts = []
 for size in a.sizes.split(','):

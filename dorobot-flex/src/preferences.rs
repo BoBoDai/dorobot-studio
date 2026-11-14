@@ -15,8 +15,14 @@ pub struct Session {
     pub dataset_path: Option<PathBuf>,
     pub episode: Option<u64>,
     pub time: f64,
+    #[serde(default = "default_speed")]
+    pub speed: f64,
     #[serde(default = "default_sidebar_width")]
     pub sidebar_width: f64,
+}
+
+fn default_speed() -> f64 {
+    1.0
 }
 
 fn default_sidebar_width() -> f64 {
@@ -37,6 +43,7 @@ impl Session {
                 .and_then(|d| d.path.canonicalize().ok()),
             episode: backend.playback().selected,
             time: backend.playback().current_time,
+            speed: backend.playback().speed,
             sidebar_width: default_sidebar_width(),
         }
     }
@@ -72,6 +79,9 @@ impl Session {
                     backend.dispatch(Intent::SelectEpisode(episode));
                     if self.time.is_finite() {
                         backend.dispatch(Intent::Seek(self.time));
+                        if self.speed.is_finite() && self.speed > 0.0 {
+                            backend.dispatch(Intent::SetSpeed(self.speed));
+                        }
                     }
                 }
             }
@@ -129,6 +139,7 @@ mod tests {
             dataset_path: None,
             episode: Some(2),
             time: 1.5,
+            speed: 2.0,
             sidebar_width: 224.0,
         };
         save(&path, &session).unwrap();
