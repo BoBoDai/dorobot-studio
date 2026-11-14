@@ -12,6 +12,7 @@ pub struct Session {
     pub dark: bool,
     pub screen: String,
     pub dataset: Option<String>,
+    pub dataset_path: Option<PathBuf>,
     pub episode: Option<u64>,
     pub time: f64,
 }
@@ -22,6 +23,12 @@ impl Session {
             dark,
             screen: backend.screen().label().into(),
             dataset: backend.dataset_id().map(str::to_owned),
+            dataset_path: backend
+                .library()
+                .datasets
+                .iter()
+                .find(|d| Some(d.id.as_str()) == backend.dataset_id())
+                .and_then(|d| d.path.canonicalize().ok()),
             episode: backend.playback().selected,
             time: backend.playback().current_time,
         }
@@ -29,6 +36,11 @@ impl Session {
 
     pub fn restore(&self, backend: &mut dyn Backend, restore_dataset: bool) {
         if restore_dataset {
+            if let Some(path) = &self.dataset_path {
+                if path.is_dir() {
+                    backend.dispatch(Intent::OpenFolder(path.clone()));
+                }
+            }
             if let Some(id) = &self.dataset {
                 if backend.library().datasets.iter().any(|d| &d.id == id) {
                     backend.dispatch(Intent::OpenDataset(id.clone()));
@@ -36,7 +48,13 @@ impl Session {
             }
         }
         // Never apply the old playhead to an explicitly opened, different dataset.
-        if backend.dataset_id() == self.dataset.as_deref() && self.dataset.is_some() {
+        let same_path = self.dataset_path.as_ref().is_none_or(|saved| {
+            backend.library().datasets.iter().any(|d| {
+                Some(d.id.as_str()) == backend.dataset_id()
+                    && d.path.canonicalize().ok().as_ref() == Some(saved)
+            })
+        });
+        if same_path && backend.dataset_id() == self.dataset.as_deref() && self.dataset.is_some() {
             if let Some(episode) = self.episode {
                 if backend
                     .playback()
@@ -101,6 +119,7 @@ mod tests {
             dark: true,
             screen: "Play".into(),
             dataset: Some("sample".into()),
+            dataset_path: None,
             episode: Some(2),
             time: 1.5,
         };
