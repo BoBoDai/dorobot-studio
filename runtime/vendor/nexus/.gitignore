@@ -1,0 +1,16 @@
+*.lock
+!flake.lock
+.vscode
+.idea
+.DS_Store
+dist
+dist2d
+dist3d
+assets/**/*.bin
+publish/
+*.spv
+manifest.json
+__pycache__
+target
+.claude
+*.ptx

@@ -35,7 +35,7 @@ def main():
         manifest[relative] = hashlib.sha256(content).hexdigest()
         if private in content:
             errors.append(f"Personal build path: {relative}")
-        if f.suffix == ".pyc" or f.name in {".env", ".DS_Store", "session.json"}:
+        if f.suffix in {".py", ".pyc", ".pyo"} or f.name in {".env", ".DS_Store", "session.json"}:
             errors.append(f"Local state/cache: {relative}")
         if macho(f):
             native.append(relative)
@@ -45,25 +45,21 @@ def main():
             loads = subprocess.check_output(["otool", "-arch", "arm64", "-l", str(f)], text=True)
             deployment += re.findall(r"\bminos ([\d.]+)", loads)
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
-    python = resources / "runtime/python/bin/python3"
-    env = dict(os.environ, PATH=str(resources / "runtime/bin") + ":/usr/bin:/bin", PYTHONDONTWRITEBYTECODE="1", PYTHONNOUSERSITE="1")
+    env = dict(os.environ, PATH=str(resources / "runtime/bin") + ":/usr/bin:/bin")
     version = subprocess.check_output([str(resources / "runtime/bin/dora"), "--version"], text=True, env=env).strip()
     if version != "dora-cli " + release["dora"]:
         errors.append("Dora CLI version mismatch")
-    code = '''import json, sys, importlib.metadata as m
-assert sys.version.split()[0] == "3.13.5"
-import dora, nexus3d, cv2, pyarrow, serial
-sys.path.insert(0, sys.argv[1])
-from aisle.sim.nexus_backend import _ensure_nexus, _new_scene, NexusRobot
-print(json.dumps({name:m.version(name) for name in ["dora-rs", "dora-rs-cli", "dimforge-nexus3d", "opencv-python-headless", "pyarrow", "pyserial"]}))
-'''
-    versions = json.loads(subprocess.check_output([str(python), "-I", "-B", "-c", code, str(resources / "aisle/src")], text=True, env=env))
+    executable = resources / "runtime/bin/dorobot-nano-runtime"
+    runtime_version = subprocess.check_output([str(executable), "--version"], text=True, env=env).strip()
+    if runtime_version != "dorobot-nano-runtime " + release["version"]:
+        errors.append("Native runtime version mismatch")
+    if (resources / "runtime/python").exists() or not macho(executable):
+        errors.append("Native runtime is missing or Python is still bundled")
+    versions = {"dora-cli": release["dora"], "nexus": release["nexus"], "runtime": "Rust", "python": False}
     highest = max(deployment, key=lambda s: tuple(map(int, s.split("."))), default="unknown")
     declared = plistlib.loads((app / "Contents/Info.plist").read_bytes())["LSMinimumSystemVersion"]
     if highest != "unknown" and tuple(map(int, highest.split("."))) > tuple(map(int, declared.split("."))):
         errors.append(f"Deployment target {highest} exceeds declared minimum {declared}")
-    if versions["dora-rs"] != release["dora"] or versions["dimforge-nexus3d"] != release["nexus"]:
-        errors.append("Python runtime versions differ from the release manifest")
     result = {"passed": not errors, "version": release["version"], "files": len(manifest),
               "native_files": len(native), "highest_macos_deployment_target": highest,
               "dependencies": versions, "errors": errors, "sha256": manifest}

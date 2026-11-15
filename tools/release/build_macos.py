@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build a relocatable Nano RC; build-time tools are not needed by recipients.
 
-Requires macOS arm64, Rust, uv, Python 3.13.5 (uv python install), and FFmpeg
+Requires macOS arm64, Rust, cargo-gpu, a native Dora CLI, and FFmpeg
 headers/libraries exposed through PKG_CONFIG_PATH. All subprocesses use argv.
 """
 import argparse
@@ -11,7 +11,6 @@ import os
 from pathlib import Path
 import platform
 import plistlib
-import runpy
 import re
 import shutil
 import subprocess
@@ -84,29 +83,28 @@ def relocate_ffmpeg(binary, frameworks):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--aisle", type=Path, required=True)
-    p.add_argument("--uv", default="uv")
-    p.add_argument("--python-home", type=Path)
+    p.add_argument("--dora", type=Path, required=True, help="Native dora-cli 1.0.1 binary")
     p.add_argument("--target", type=Path, default=ROOT / "target/rc")
     p.add_argument("--out", type=Path, default=ROOT / "dist")
     p.add_argument("--build-root", type=Path, default=Path("/tmp/dorobot-rc-build"))
     p.add_argument("--ffmpeg-source", type=Path, required=True, help="Unmodified FFmpeg 8.0.3 source archive")
     p.add_argument("--skip-build", action="store_true")
-    p.add_argument("--reuse-python", action="store_true", help="Reuse an already installed locked runtime")
     a = p.parse_args()
     if sys.platform != "darwin" or platform.machine() != "arm64":
         p.error("Build this target on macOS Apple Silicon")
-    aisle = a.aisle.resolve()
-    if output("git", "-C", aisle, "rev-parse", "HEAD") != CONFIG["aisle"]["revision"]:
-        p.error("AISLE must match the pinned release revision")
-    if output("git", "-C", aisle, "status", "--porcelain", "--untracked-files=no"):
-        p.error("AISLE tracked runtime files must be clean")
+    if output(a.dora, "--version") != "dora-cli 1.0.1" or not macho(a.dora):
+        p.error("Provide the native dora-cli 1.0.1 executable")
     a.out = a.out.resolve()
     a.target = a.target.resolve()
     env = os.environ.copy()
-    env.update(CARGO_TARGET_DIR=str(a.target), MAKEPAD_PACKAGE_DIR="../Resources/makepad",
-               RUSTFLAGS=f"--remap-path-prefix={Path.home()}=/build -C link-arg=-Wl,-headerpad_max_install_names")
+    # A compile-check shortcut must never produce a distributable without shaders.
+    env.pop("KHAL_SKIP_SPIRV", None)
+    env.update(CARGO_TARGET_DIR=str(a.target), MAKEPAD_PACKAGE_DIR="../Resources/makepad", MACOSX_DEPLOYMENT_TARGET="14.0",
+               RUSTFLAGS=f"--remap-path-prefix={Path.home()}=/build -C link-arg=-Wl,-headerpad_max_install_names",
+               RUSTGPU_RUSTFLAGS=f"--remap-path-prefix={Path.home()}=/build")
     if not a.skip_build:
+        if output("cargo", "gpu", "--version").split()[:2] != ["cargo-gpu", "0.10.0"]:
+            p.error("Install the pinned shader launcher: cargo install cargo-gpu --version 0.10.0 --locked --no-default-features")
         # Makepad embeds CARGO_MANIFEST_DIR in script metadata. Rust path remapping
         # alone cannot remove it, so compile a clean staging copy under /tmp.
         build_root = a.build_root.resolve()
@@ -130,12 +128,13 @@ def main():
                 link.symlink_to(original_cargo / name, target_is_directory=True)
         env["CARGO_HOME"] = str(cargo_home)
         run("cargo", "build", "--offline", "--locked", "--release", "-p", "dorobot-flex", "--bin", "dorobot-flex", cwd=source, env=env)
+        run("cargo", "build", "--offline", "--locked", "--release", "--manifest-path", source / "runtime/Cargo.toml", cwd=source, env=env)
     app = a.out / "DoRobot Studio.app"
     contents = app / "Contents"
     resources = contents / "Resources"
     binary = contents / "MacOS/dorobot-flex"
     frameworks = contents / "Frameworks"
-    for stale in [frameworks, resources / "makepad"]:
+    for stale in [frameworks, resources / "makepad", resources / "runtime", resources / "aisle", resources / "studio", resources / "ThirdPartyNotices"]:
         if stale.exists():
             shutil.rmtree(stale)
     for d in [resources, binary.parent, frameworks]:
@@ -143,6 +142,17 @@ def main():
     shutil.copy2(a.target / "release/dorobot-flex", binary)
     run("strip", "-x", binary)
     relocate_ffmpeg(binary, frameworks)
+    runtime_bin = resources / "runtime/bin"
+    runtime_bin.mkdir(parents=True)
+    native = runtime_bin / "dorobot-nano-runtime"
+    shutil.copy2(a.target / "release/dorobot-nano-runtime", native)
+    shutil.copy2(a.dora, runtime_bin / "dora")
+    for executable in [native, runtime_bin / "dora"]:
+        run("strip", "-x", executable)
+        relocate_ffmpeg(executable, frameworks)
+        run("install_name_tool", "-delete_rpath", "@executable_path/../Frameworks", executable)
+        run("install_name_tool", "-add_rpath", "@executable_path/../../../Frameworks", executable)
+
     for lib in frameworks.glob("lib*.dylib"):
         name = re.sub(r"\.\d+(?=\.dylib$)", "", lib.name)
         if name != lib.name and not (frameworks / name).exists():
@@ -159,10 +169,14 @@ def main():
         (pcdir / pc.name).write_text("\n".join(
             key + "=" + replacements[key] if (key := line.split("=", 1)[0]) in replacements else line
             for line in lines) + "\n")
-    tracked(ROOT, resources / "studio", ["data", "tools/aisle-validation", "tools/capture", "robots/adora_nano_feetech"])
-    # Tests/docs are small and useful for diagnosing an RC; never copy ignored runs.
-    tracked(aisle, resources / "aisle", ["src/aisle", "pyproject.toml", "uv.lock", "README.md", "LICENSE", "LICENSE.md"])
-    meta = json.loads(output("cargo", "metadata", "--locked", "--format-version", "1", "--manifest-path", ROOT / "Cargo.toml"))
+    tracked(ROOT, resources / "studio", ["data"])
+    profile = resources / "studio/robots/adora_nano_feetech"
+    profile.mkdir(parents=True)
+    shutil.copy2(ROOT / "robots/adora_nano_feetech/profile.json", profile / "profile.json")
+    meta = json.loads(output("cargo", "metadata", "--offline", "--locked", "--filter-platform", "aarch64-apple-darwin", "--format-version", "1", "--manifest-path", ROOT / "Cargo.toml"))
+    native_meta = json.loads(output("cargo", "metadata", "--offline", "--locked", "--filter-platform", "aarch64-apple-darwin", "--format-version", "1", "--manifest-path", ROOT / "runtime/Cargo.toml"))
+    seen = {pkg["id"] for pkg in meta["packages"]}
+    meta["packages"].extend(pkg for pkg in native_meta["packages"] if pkg["id"] not in seen)
     notices = resources / "ThirdPartyNotices"
     notices.mkdir(exist_ok=True)
     archive = a.ffmpeg_source.resolve()
@@ -172,16 +186,15 @@ def main():
     shutil.copy2(archive, notices / "ffmpeg-8.0.3.tar.xz")
     shutil.copy2(ROOT / "tools/release/build_ffmpeg.sh", notices / "build_ffmpeg.sh")
     (notices / "README.txt").write_text(
-        "Python distribution licenses are included in each package's dist-info directory and Python LICENSE.\n"
         "Rust package license texts and metadata are in rust/ and rust-packages.json.\n"
         "FFmpeg 8.0.3 is dynamically linked; its complete unmodified source, license texts and build recipe are included here.\n"
-        "AISLE source is included at the pinned revision in ../aisle. That revision has no top-level license declaration; no license is inferred or added.\n"
+        "The AISLE Nano scene integration is ported to Rust. Pinned Nexus, Khal and Vortx sources and provenance are in the source release. No Python runtime or bindings are included.\n"
         "Studio workspace metadata declares MIT. Nano resource provenance is in ../studio/data/adora_nano/provenance.json.\n")
     packages = []
     for pkg in meta["packages"]:
         folder = Path(pkg["manifest_path"]).parent
         name = pkg["name"].replace("-", "_")
-        if (folder / "resources").is_dir():
+        if (name == "makepad" or name.startswith("makepad_")) and (folder / "resources").is_dir():
             shutil.copytree(folder / "resources", resources / "makepad" / name / "resources", dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns(".DS_Store", "__pycache__"))
         packages.append({"name": pkg["name"], "version": pkg["version"], "license": pkg.get("license"), "source": pkg.get("source")})
@@ -202,55 +215,30 @@ def main():
         if old.exists() or old.is_symlink():
             old.unlink()
     (notices / "rust-packages.json").write_text(json.dumps(packages, indent=2) + "\n")
-    pyhome = resources / "runtime/python"
-    if not (a.reuse_python and (pyhome / "bin/python3").exists()):
-        if pyhome.exists():
-            shutil.rmtree(pyhome)
-        source = a.python_home or Path(output(a.uv, "python", "find", CONFIG["python"])).resolve().parent.parent
-        shutil.copytree(source, pyhome, symlinks=True, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        python = pyhome / "bin/python3"
-        run(a.uv, "pip", "install", "--python", python, "--system", "--break-system-packages", "--no-config", "--only-binary", ":all:",
-            "--require-hashes", "-r", ROOT / "tools/release/requirements.lock")
-    for config in (pyhome / "lib/python3.13").glob("_sysconfigdata_*.py"):
-        values = runpy.run_path(str(config))["build_time_vars"]
-        prefix = values["prefix"]
-        values = {k: v.replace(prefix, "__DOROBOT_RUNTIME_PREFIX__") if isinstance(v, str) else v for k, v in values.items()}
-        config.write_text("# Relocatable Python build configuration.\nimport sys\nbuild_time_vars = " + repr(values) +
-                          "\nbuild_time_vars = {k: v.replace('__DOROBOT_RUNTIME_PREFIX__', sys.base_prefix) if isinstance(v, str) else v for k, v in build_time_vars.items()}\n")
-    # Installed console scripts contain build paths. Keep only the interpreter;
-    # Dora gets a relative launcher, and other tools are run as Python modules.
-    for f in (pyhome / "bin").iterdir():
-        if f.name not in {"python", "python3", "python3.13"}:
-            f.unlink()
-    runtime_bin = resources / "runtime/bin"
-    runtime_bin.mkdir(exist_ok=True)
-    dora = runtime_bin / "dora"
-    dora.write_text('#!/bin/sh\nROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)\nexec "$ROOT/python/bin/python3" -I -B -c "from dora_cli import py_main; py_main()" "$@"\n')
-    dora.chmod(0o755)
-    for f in resources.rglob("__pycache__"):
-        shutil.rmtree(f)
-    for f in resources.rglob("*.pyc"):
-        f.unlink()
-    # Build metadata/config helpers carry absolute configure prefixes; not used at runtime.
-    for f in (pyhome / "lib").glob("pkgconfig/*"):
-        f.unlink()
-    python_packages = output(pyhome / "bin/python3", "-I", "-B", "-c", "import importlib.metadata as m,json; print(json.dumps(sorted([{'name':d.metadata['Name'],'version':d.version} for d in m.distributions()],key=lambda d:d['name']),indent=2))")
-    (notices / "python-packages.json").write_text(python_packages + "\n")
-    for f in ["requirements.lock", "release-config.json"]:
-        shutil.copy2(ROOT / "tools/release" / f, resources / f)
+    shutil.copy2(ROOT / "tools/release/release-config.json", resources / "release-config.json")
+    shutil.copy2(ROOT / "runtime/vendor/provenance.json", notices / "native-engine-provenance.json")
+    shutil.copytree(ROOT / "runtime/notices", notices / "native-port", dirs_exist_ok=True)
+    # Vendored crates inherit workspace licenses outside their crate directory.
+    for engine in ["nexus", "khal", "vortx"]:
+        target = notices / "native-engines" / engine
+        target.mkdir(parents=True)
+        for license in (ROOT / "runtime/vendor" / engine).glob("LICENSE*"):
+            shutil.copy2(license, target / license.name)
+    for stale in [resources / "requirements.lock"]:
+        stale.unlink(missing_ok=True)
     if (ROOT / "LICENSE").is_file():
         shutil.copy2(ROOT / "LICENSE", resources / "LICENSE")
     with (contents / "Info.plist").open("wb") as stream:
         plistlib.dump({"CFBundleExecutable": "dorobot-flex", "CFBundleIdentifier": "org.dorobot.studio",
                       "CFBundleName": "DoRobot Studio", "CFBundleDisplayName": "DoRobot Studio",
                       "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "0.1.0",
-                      "CFBundleVersion": "1", "LSMinimumSystemVersion": "14.0", "NSHighResolutionCapable": True,
+                      "CFBundleVersion": "2", "LSMinimumSystemVersion": "14.0", "NSHighResolutionCapable": True,
                       "NSCameraUsageDescription": "Capture robot camera observations when you start a real recording.",
                       "NSBluetoothAlwaysUsageDescription": "Use your paired game controller to operate Nano.",
                       "NSMicrophoneUsageDescription": "Optional capture device access."}, stream)
     release = dict(CONFIG, studio_revision=output("git", "-C", ROOT, "rev-parse", "HEAD"),
                    studio_dirty=bool(output("git", "-C", ROOT, "status", "--porcelain", "--untracked-files=no")),
-                   signing="ad-hoc; not notarized", scope="Nano AISLE/Nexus simulation, three cameras, Dora recording/replay and Feetech base adapter")
+                   signing="ad-hoc; not notarized", scope="Rust Nano/Nexus simulation, three cameras, native Dora, recording/replay, Feetech adapters and Hub transfers", runtime_language="Rust", python_runtime=False)
     (resources / "release.json").write_text(json.dumps(release, indent=2) + "\n")
     # Re-sign every bundled native extension after copying/relocation, inside out.
     for f in sorted(app.rglob("*"), key=lambda f: len(f.parts), reverse=True):

@@ -1,0 +1,129 @@
+[workspace]
+members = [
+    "crates/nexus2d",
+    "crates/nexus3d",
+    "crates/nexus_viewer2d",
+    "crates/nexus_viewer3d",
+    "crates/nexus_rbd2d",
+    "crates/nexus_rbd3d",
+    "crates/nexus_rbd_shaders2d",
+    "crates/nexus_rbd_shaders3d",
+    "crates/nexus_mpm_shaders2d",
+    "crates/nexus_mpm_shaders3d",
+    "crates/nexus_mpm2d",
+    "crates/nexus_mpm3d",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.6.0"
+authors = ["Sébastien Crozet <sebcrozet@dimforge.com>"]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dimforge/nexus"
+readme = "README.md"
+exclude = ["**/.DS_Store"]
+
+[workspace.dependencies]
+glamx = { version = "0.3", default-features = false, features = ["nostd-libm", "bytemuck"] }
+include_dir = "0.7"
+khal-std = "0.4"
+khal = { version = "0.4", features = ["derive"]}
+vortx = { version = "0.5", features = ["unsafe_remove_boundchecks"] }
+bytemuck = { version = "1", features = ["derive"] }
+web-time = "1"
+static_assertions = "1"
+futures = "0.3"
+bitflags = "2"
+bvh = "0.7"
+
+# Physics / geometry. default-features off for the no_std shader crates; host
+# crates opt back in with `features = ["default"]`.
+rapier2d = { version = "0.36.0", default-features = false }
+rapier3d = { version = "0.36.0", default-features = false }
+rapier3d-urdf = "0.36.0"
+rapier3d-mjcf = { version = "0.36.0", features = ["stl", "wavefront", "msh"] }
+parry2d = { version = "0.31", default-features = false }
+parry3d = { version = "0.31", default-features = false }
+
+# Viewer / examples deps
+kiss3d = "0.47.0"
+Inflector = "0.11"
+oorandom = "11"
+anyhow = "1"
+pollster = "1"
+getrandom = { version = "0.2", features = ["js"] }
+
+# Dev deps
+futures-test = "0.3"
+serial_test = "3"
+approx = "0.5"
+rand = "0.9"
+
+# Shaders deps
+khal-builder = "0.4"
+vortx-shaders = { version = "0.5", default-features = false }
+unroll = "0.1"
+crunchy = "0.2.4"
+
+# Shader crates
+nexus_rbd_shaders2d = { version = "0.6.0", path = "crates/nexus_rbd_shaders2d" }
+nexus_rbd_shaders3d = { version = "0.6.0", path = "crates/nexus_rbd_shaders3d" }
+nexus_mpm_shaders2d = { version = "0.6.0", path = "crates/nexus_mpm_shaders2d" }
+nexus_mpm_shaders3d = { version = "0.6.0", path = "crates/nexus_mpm_shaders3d" }
+
+# Internal crates. rbd is pulled both with defaults and with default-features
+# off (mpm wants just the dim feature), so it mirrors the rapier/parry pattern.
+nexus2d = { version = "0.6.0", path = "crates/nexus2d" }
+nexus3d = { version = "0.6.0", path = "crates/nexus3d" }
+nexus_rbd2d = { version = "0.6.0", path = "crates/nexus_rbd2d", default-features = false }
+nexus_rbd3d = { version = "0.6.0", path = "crates/nexus_rbd3d", default-features = false }
+nexus_mpm2d = { version = "0.6.0", path = "crates/nexus_mpm2d" }
+nexus_mpm3d = { version = "0.6.0", path = "crates/nexus_mpm3d" }
+nexus_viewer2d = { version = "0.6.0", path = "crates/nexus_viewer2d" }
+nexus_viewer3d = { version = "0.6.0", path = "crates/nexus_viewer3d" }
+
+[workspace.lints]
+rust.unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(feature, values("dim2", "dim3", "cpu", "cuda", "cuda-oxide", "metal"))',
+    'cfg(target_arch_is_gpu)',
+] }
+
+[patch.crates-io]
+# khal and vortx from GitHub: the `cuda-oxide` feature is not on crates.io.
+khal = { path = "../khal/crates/khal" }
+khal-derive = { path = "../khal/crates/khal-derive" }
+khal-std = { path = "../khal/crates/khal-std" }
+khal-builder = { path = "../khal/crates/khal-builder" }
+vortx = { path = "../vortx" }
+vortx-shaders = { path = "../vortx/vortx-shaders" }
+## Local glam clone with SPIR-V vector-arithmetic intrinsics (Vec3 add/sub/mul/scale).
+#glam = { path = "../glam-rs" }
+# 30% faster for loop in P2G
+#naga = { git = "https://github.com/sebcrozet/wgpu", branch = "for-loop-opt" }
+#khal = { git = "https://github.com/dimforge/khal", branch = "nonblock-readback" }
+#khal-derive = { git = "https://github.com/dimforge/khal", branch = "nonblock-readback" }
+#khal-std = { git = "https://github.com/dimforge/khal", branch = "nonblock-readback" }
+#khal-builder = { git = "https://github.com/dimforge/khal", branch = "nonblock-readback" }
+#kiss3d = { git = "https://github.com/dimforge/kiss3d", branch = "render-2d" }
+#rapier3d = { git = "https://github.com/dimforge/rapier", branch = "multibody-fixes" }
+#rapier3d-mjcf = { git = "https://github.com/dimforge/rapier", branch = "multibody-fixes" }
+#rapier3d-urdf = { git = "https://github.com/dimforge/rapier", branch = "multibody-fixes" }
+#rapier3d-meshloader = { git = "https://github.com/dimforge/rapier", branch = "multibody-fixes" }
+#vortx = { git = "https://github.com/dimforge/vortx", branch = "int-reduce" }
+#vortx-shaders = { git = "https://github.com/dimforge/vortx", branch = "int-reduce" }
+
+#glamx = { path = "../glamx" }
+#parry2d = { path = "../parry/crates/parry2d" }
+#parry3d = { path = "../parry/crates/parry3d" }
+#rapier2d = { path = "../rapier/crates/rapier2d" }
+#rapier3d = { path = "../rapier/crates/rapier3d" }
+#rapier3d-mjcf = { path = "../rapier/crates/rapier3d-mjcf" }
+#rapier3d-urdf = { path = "../rapier/crates/rapier3d-urdf" }
+#rapier3d-meshloader = { path = "../rapier/crates/rapier3d-meshloader" }
+#khal = { path = "../khal/crates/khal" }
+#khal-derive = { path = "../khal/crates/khal-derive" }
+#khal-std = { path = "../khal/crates/khal-std" }
+#khal-builder = { path = "../khal/crates/khal-builder" }
+#vortx = { path = "../vortx" }
+#vortx-shaders = { path = "../vortx/vortx-shaders" }

@@ -76,17 +76,14 @@ pub struct Worker {
 }
 impl Worker {
     pub fn start(profile: &Path, calibration: bool) -> Result<Self, String> {
-        let python = crate::runtime::python();
-        let script = crate::runtime::root().join("tools/capture/worker.py");
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         let staging =
             std::env::temp_dir().join(format!("dorobot-capture-{}-{nonce}", std::process::id()));
-        let mut child = Command::new(python)
-            .arg("-u")
-            .arg(script)
+        let mut child = Command::new(crate::runtime::native())
+            .arg("capture")
             .arg(if calibration { "calibrate" } else { "record" })
             .arg(profile)
             .arg(&staging)
@@ -96,7 +93,7 @@ impl Worker {
             .spawn()
             .map_err(|e| {
                 format!(
-                    "Could not start LeRobot: {e}. Set DOROBOT_PYTHON to its Python environment."
+                    "Could not start the native capture runtime: {e}. Check the Studio installation."
                 )
             })?;
         let input = child.stdin.take();

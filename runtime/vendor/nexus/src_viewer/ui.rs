@@ -1,0 +1,702 @@
+use crate::viewer::{MpmRenderMode, UiState};
+use crate::{DemoKind, RunState, Transition, UiSection};
+use kiss3d::egui;
+use nexus::rbd::pipeline::RunStats;
+use nexus::state::NexusCounts;
+use std::time::Duration;
+
+use crate::backend::BackendType;
+use crate::debug_render::{DebugRenderSettings, LbvhStatus, MpmDebugRenderMode};
+use crate::rapier::pipeline::DebugRenderMode;
+use egui::{Button, CollapsingHeader, Color32, ComboBox, CornerRadius, RichText, Stroke};
+
+/// Sets up a custom warm theme that complements the app's off-white background.
+pub fn setup_custom_theme(ctx: &egui::Context) {
+    let bg_fill = Color32::from_rgb(250, 250, 245);
+    let window_fill = Color32::from_rgb(252, 252, 248);
+    let faint_bg = Color32::from_rgb(240, 240, 232);
+    let extreme_bg = Color32::from_rgb(255, 255, 252);
+
+    let text_color = Color32::from_rgb(60, 58, 52);
+
+    let accent = Color32::from_rgb(82, 130, 150);
+    let accent_active = Color32::from_rgb(70, 115, 135);
+
+    let widget_bg = Color32::from_rgb(235, 235, 225);
+    let widget_bg_hover = Color32::from_rgb(225, 225, 215);
+    let widget_bg_active = Color32::from_rgb(215, 215, 205);
+
+    let stroke_color = Color32::from_rgb(200, 198, 190);
+    let stroke_hover = Color32::from_rgb(180, 178, 170);
+
+    let rounding = CornerRadius::same(6);
+    let small_rounding = CornerRadius::same(4);
+
+    ctx.global_style_mut(|style| {
+        let v = &mut style.visuals;
+        v.dark_mode = false;
+
+        v.widgets.noninteractive.bg_fill = faint_bg;
+        v.widgets.noninteractive.weak_bg_fill = faint_bg;
+        v.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, stroke_color);
+        v.widgets.noninteractive.corner_radius = rounding;
+        v.widgets.noninteractive.fg_stroke = Stroke::new(1.0_f32, text_color);
+
+        v.widgets.inactive.bg_fill = widget_bg;
+        v.widgets.inactive.weak_bg_fill = widget_bg;
+        v.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, stroke_color);
+        v.widgets.inactive.corner_radius = small_rounding;
+        v.widgets.inactive.fg_stroke = Stroke::new(1.0_f32, text_color);
+
+        v.widgets.hovered.bg_fill = widget_bg_hover;
+        v.widgets.hovered.weak_bg_fill = widget_bg_hover;
+        v.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, stroke_hover);
+        v.widgets.hovered.corner_radius = small_rounding;
+        v.widgets.hovered.fg_stroke = Stroke::new(1.5_f32, text_color);
+
+        v.widgets.active.bg_fill = widget_bg_active;
+        v.widgets.active.weak_bg_fill = widget_bg_active;
+        v.widgets.active.bg_stroke = Stroke::new(1.0_f32, accent);
+        v.widgets.active.corner_radius = small_rounding;
+        v.widgets.active.fg_stroke = Stroke::new(2.0_f32, accent_active);
+
+        v.widgets.open.bg_fill = widget_bg;
+        v.widgets.open.weak_bg_fill = widget_bg;
+        v.widgets.open.bg_stroke = Stroke::new(1.0_f32, stroke_color);
+        v.widgets.open.corner_radius = small_rounding;
+        v.widgets.open.fg_stroke = Stroke::new(1.0_f32, text_color);
+
+        v.selection.bg_fill = accent.gamma_multiply(0.25);
+        v.selection.stroke = Stroke::new(1.0_f32, accent);
+
+        v.hyperlink_color = accent;
+        v.faint_bg_color = faint_bg;
+        v.extreme_bg_color = extreme_bg;
+        v.code_bg_color = Color32::from_rgb(230, 230, 220);
+        v.warn_fg_color = Color32::from_rgb(180, 120, 60);
+        v.error_fg_color = Color32::from_rgb(180, 70, 70);
+
+        v.window_corner_radius = CornerRadius::same(8);
+        v.window_fill = window_fill;
+        v.window_stroke = Stroke::new(1.0_f32, stroke_color);
+
+        v.panel_fill = bg_fill;
+
+        v.slider_trailing_fill = true;
+        v.handle_shape = egui::style::HandleShape::Circle;
+
+        style.spacing.item_spacing = egui::vec2(6.0, 3.0);
+        style.spacing.window_margin = egui::Margin::same(10);
+        style.spacing.button_padding = egui::vec2(6.0, 3.0);
+        style.spacing.slider_width = 130.0;
+        style.spacing.indent = 14.0;
+        style.spacing.interact_size = egui::vec2(32.0, 18.0);
+        style.spacing.combo_width = 100.0;
+    });
+}
+
+/// Draws a centered "compiling shaders" banner into an existing egui context.
+///
+/// Shown as an overlay on the first GPU frame of a demo so it stays on screen
+/// while the (blocking) shader compilation freezes the app for a few seconds —
+/// otherwise the window looks frozen with no explanation. Uses a distinct
+/// window id from [`main_panel`] to avoid an egui id collision.
+pub fn compiling_overlay(ctx: &egui::Context) {
+    egui::Window::new("⏳ Compiling shaders")
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .collapsible(false)
+        .resizable(false)
+        .show(ctx, |ui| {
+            ui.colored_label(
+                Color32::from_rgb(82, 130, 150),
+                "Compiling shaders…\nThe app will freeze for a few seconds.\n\nIf nothing happens after a minute or two, check the dev console for an error.",
+            );
+        });
+}
+
+/// Builds the viewer control panel. Mutates `state` in place (run state, demo
+/// selection, backend choice) and queries the scene for scene-specific widgets.
+pub fn main_panel(ctx: &egui::Context, state: &mut UiState, gpu_available: bool) {
+    egui::Window::new("Nexus Viewer")
+        .default_width(300.0)
+        .show(ctx, |ui| {
+            // GPU error banner.
+            if let Some(error_msg) = &state.gpu_init_error {
+                ui.colored_label(
+                    Color32::from_rgb(180, 70, 70),
+                    format!("GPU: {}", error_msg),
+                );
+                ui.separator();
+            }
+
+            // Tabs: one section at a time. Clicking the open tab again closes it.
+            ui.horizontal(|ui| {
+                for (section, label) in [
+                    (UiSection::Performance, "Performance"),
+                    (UiSection::Settings, "Settings"),
+                    (UiSection::Examples, "Examples"),
+                    (UiSection::DebugRender, "Debug render"),
+                ] {
+                    let selected = state.ui_section == Some(section);
+                    if ui.selectable_label(selected, label).clicked() {
+                        state.ui_section = if selected { None } else { Some(section) };
+                    }
+                }
+            });
+
+            egui::ScrollArea::vertical()
+                .max_height(500.0)
+                .show(ui, |ui| match state.ui_section {
+                    Some(UiSection::Settings) => {
+                        ui.separator();
+                        backend_selector(ui, state, gpu_available);
+                        ui.add_space(4.0);
+                        simulation_settings(ui, state);
+                    }
+                    Some(UiSection::Performance) => {
+                        ui.separator();
+                        performance_ui(
+                            ui,
+                            &state.counts,
+                            &state.run_stats,
+                            state.sync_time,
+                            state.steps,
+                        );
+                    }
+                    Some(UiSection::Examples) if !state.demos.is_empty() => {
+                        ui.separator();
+                        examples_section(ui, state);
+                    }
+                    Some(UiSection::DebugRender) => {
+                        ui.separator();
+                        debug_render_settings(ui, &mut state.debug_render, state.debug_lbvh);
+                    }
+                    _ => {}
+                });
+
+            ui.separator();
+
+            // Demo navigation, shown for every tab.
+            if !state.demos.is_empty() {
+                demo_navigation(ui, state);
+            }
+
+            // Bottom controls.
+            ui.horizontal(|ui| {
+                let (play_label, play_hover) = if state.run_state == RunState::Running {
+                    ("Pause", "Pause simulation (T)")
+                } else {
+                    ("Play", "Start simulation (T)")
+                };
+
+                if ui.button(play_label).on_hover_text(play_hover).clicked() {
+                    state.run_state = if state.run_state == RunState::Running {
+                        RunState::Paused
+                    } else {
+                        RunState::Running
+                    };
+                }
+
+                if ui.button("Step").on_hover_text("Single step (S)").clicked() {
+                    state.run_state = RunState::Step;
+                }
+
+                if ui
+                    .button("Restart")
+                    .on_hover_text("Restart example (R)")
+                    .clicked()
+                {
+                    state.transition = Some(Transition::Switch);
+                }
+
+                ui.label(format!("step {}", state.steps)).on_hover_text(
+                    "Steps advanced since the example was (re)started, one per simulated frame",
+                );
+            });
+        });
+}
+
+/// Per-scene simulation settings. The viewer seeds these from the scene on load
+/// and pushes edits back into the running `NexusState` each frame (see
+/// [`crate::NexusViewer::sync`]). Only the groups relevant to the current scene
+/// are shown.
+fn simulation_settings(ui: &mut egui::Ui, state: &mut UiState) {
+    let (has_mpm, has_rbd) = (state.has_mpm, state.has_rbd);
+    if !(has_mpm || has_rbd) {
+        return;
+    }
+
+    ui.label(RichText::new("Simulation").strong());
+    ui.add_space(2.0);
+    let s = &mut state.sim_settings;
+
+    if has_mpm {
+        ui.label("MPM");
+        ui.add(egui::Slider::new(&mut s.mpm_substeps, 1..=200).text("substeps"));
+        ui.checkbox(&mut s.mpm_use_cpic, "Use CPIC")
+            .on_hover_text("Compatible particle-in-cell coupling with rigid colliders");
+        gravity_drag(ui, "gravity", &mut s.mpm_gravity);
+        // View-only coloring mode (not part of `sim_settings`).
+        ComboBox::from_label("coloring")
+            .selected_text(state.mpm_render_mode.text())
+            .show_ui(ui, |ui| {
+                for mode in MpmRenderMode::ALL {
+                    ui.selectable_value(&mut state.mpm_render_mode, *mode, mode.text());
+                }
+            });
+    }
+
+    if has_rbd {
+        if has_mpm {
+            ui.add_space(4.0);
+        }
+        ui.label("Rigid bodies");
+        ui.add(egui::Slider::new(&mut s.rbd_steps_per_frame, 1..=20).text("steps / frame"));
+    }
+
+    ui.add_space(4.0);
+    ui.checkbox(&mut s.deterministic, "Deterministic")
+        .on_hover_text(
+            "Makes two runs of the same scene match bit for bit. \
+         Also enabled by the testbed's --deterministic flag.",
+        );
+}
+
+/// Debug-renderer controls: what to draw, and how.
+fn debug_render_settings(ui: &mut egui::Ui, s: &mut DebugRenderSettings, lbvh: LbvhStatus) {
+    ui.label(RichText::new("Debug render").strong());
+    ui.add_space(2.0);
+    ui.checkbox(&mut s.enabled, "Enabled").on_hover_text(
+        "Wireframe overlay of the physics state. Reads the scene back from the \
+         GPU every frame, so it slows the viewer down.",
+    );
+    if !s.enabled {
+        return;
+    }
+    ui.checkbox(&mut s.hide_regular_rendering, "Hide regular rendering")
+        .on_hover_text("Draw only the debug lines and points, without the shaded scene");
+    ui.add_space(4.0);
+
+    ui.label("Rigid bodies");
+    let mut flag = |ui: &mut egui::Ui, mode: DebugRenderMode, label: &str, hover: &str| {
+        let mut on = s.mode.contains(mode);
+        if ui.checkbox(&mut on, label).on_hover_text(hover).changed() {
+            s.mode.set(mode, on);
+        }
+    };
+
+    flag(
+        ui,
+        DebugRenderMode::COLLIDER_SHAPES,
+        "Collider shapes",
+        "Wireframe outline of every collider, colored by body type",
+    );
+    flag(
+        ui,
+        DebugRenderMode::COLLIDER_AABBS,
+        "Collider AABBs",
+        "World-space bounding box of every collider",
+    );
+    flag(
+        ui,
+        DebugRenderMode::RIGID_BODY_AXES,
+        "Rigid-body axes",
+        "Local coordinate axes at each body's center of mass",
+    );
+    flag(
+        ui,
+        DebugRenderMode::IMPULSE_JOINTS,
+        "Impulse joints",
+        "Anchor and separation segments of each impulse joint",
+    );
+    flag(
+        ui,
+        DebugRenderMode::MULTIBODY_JOINTS,
+        "Multibody joints",
+        "Anchor and separation segments of each multibody joint",
+    );
+    flag(
+        ui,
+        DebugRenderMode::CONTACTS,
+        "Contacts",
+        "Geometric contacts: the segment joining the two contact points, \
+         plus the contact normal",
+    );
+    flag(
+        ui,
+        DebugRenderMode::SOLVER_CONTACTS,
+        "Solver contacts",
+        "The points the contact constraints actually act on (the midpoint \
+         of each contact pair)",
+    );
+    ui.checkbox(&mut s.lbvh, "LBVH")
+        .on_hover_text("Bounding boxes of the broad-phase BVH nodes, one depth at a time");
+    if s.lbvh {
+        ui.indent("lbvh_depth", |ui| lbvh_depth_control(ui, s, lbvh));
+    }
+
+    ui.add_space(4.0);
+    ui.label("MPM");
+    let mut flag = |ui: &mut egui::Ui, mode: MpmDebugRenderMode, label: &str, hover: &str| {
+        let mut on = s.mpm_mode.contains(mode);
+        if ui.checkbox(&mut on, label).on_hover_text(hover).changed() {
+            s.mpm_mode.set(mode, on);
+        }
+    };
+
+    flag(
+        ui,
+        MpmDebugRenderMode::PARTICLES,
+        "Particles",
+        "A point at every particle position; pinned particles are red",
+    );
+    flag(
+        ui,
+        MpmDebugRenderMode::PARTICLE_VELOCITIES,
+        "Particle velocities",
+        "A segment per particle along its velocity",
+    );
+    flag(
+        ui,
+        MpmDebugRenderMode::PARTICLE_CDF,
+        "Particle contact normals",
+        "The CPIC contact normal of each particle close enough to a \
+         collider to see one",
+    );
+    flag(
+        ui,
+        MpmDebugRenderMode::GRID_BLOCKS,
+        "Grid blocks",
+        "Wireframe box of every block the sparse grid allocated; dimmer \
+         when the block only holds particles spilling in from a neighbour",
+    );
+    flag(
+        ui,
+        MpmDebugRenderMode::GRID_NODES,
+        "Grid nodes",
+        "A point at every grid node carrying mass",
+    );
+    flag(
+        ui,
+        MpmDebugRenderMode::GRID_VELOCITIES,
+        "Grid velocities",
+        "A segment per mass-carrying node along its velocity",
+    );
+
+    ui.add_space(4.0);
+    ui.add(egui::Slider::new(&mut s.line_width, 0.5..=10.0).text("line width"))
+        .on_hover_text("Width of the debug segments, in pixels");
+    ui.add(egui::Slider::new(&mut s.point_size, 1.0..=20.0).text("point size"))
+        .on_hover_text("Size of the debug points, in pixels");
+    ui.add(
+        egui::Slider::new(&mut s.contact_normal_length, 0.01..=10.0)
+            .logarithmic(true)
+            .text("normal length"),
+    );
+    ui.add(
+        egui::Slider::new(&mut s.rigid_body_axes_length, 0.01..=10.0)
+            .logarithmic(true)
+            .text("axes length"),
+    );
+    ui.add(
+        egui::Slider::new(&mut s.mpm_velocity_scale, 0.001..=1.0)
+            .logarithmic(true)
+            .text("mpm velocity scale"),
+    )
+    .on_hover_text("Seconds of travel an MPM velocity segment stands for");
+}
+
+/// The `- depth +` selector of the LBVH depth, or why there is no tree.
+fn lbvh_depth_control(ui: &mut egui::Ui, s: &mut DebugRenderSettings, lbvh: LbvhStatus) {
+    match lbvh {
+        LbvhStatus::Tree { max_depth } => {
+            s.lbvh_depth = s.lbvh_depth.min(max_depth);
+            ui.horizontal(|ui| {
+                if ui
+                    .add_enabled(s.lbvh_depth > 0, Button::new("-"))
+                    .on_hover_text("Shallower")
+                    .clicked()
+                {
+                    s.lbvh_depth -= 1;
+                }
+                ui.add(egui::DragValue::new(&mut s.lbvh_depth).range(0..=max_depth));
+                if ui
+                    .add_enabled(s.lbvh_depth < max_depth, Button::new("+"))
+                    .on_hover_text("Deeper")
+                    .clicked()
+                {
+                    s.lbvh_depth += 1;
+                }
+                ui.label(format!("depth (max {max_depth})"));
+            });
+        }
+        LbvhStatus::BruteForce => {
+            ui.label(
+                "No tree: scenes with at most 64 colliders use the brute-force \
+                 broad phase (set NEXUS_DISABLE_BF to force the LBVH).",
+            );
+        }
+        LbvhStatus::Off => {
+            ui.label("No tree to show: the scene has no rigid bodies.");
+        }
+    }
+}
+
+/// A labelled per-component drag editor for a gravity vector (2D or 3D).
+fn gravity_drag(ui: &mut egui::Ui, label: &str, g: &mut nexus::rbd::math::Vector) {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        ui.add(egui::DragValue::new(&mut g.x).speed(0.1).prefix("x "));
+        ui.add(egui::DragValue::new(&mut g.y).speed(0.1).prefix("y "));
+        #[cfg(feature = "dim3")]
+        ui.add(egui::DragValue::new(&mut g.z).speed(0.1).prefix("z "));
+    });
+}
+
+fn performance_ui(
+    ui: &mut egui::Ui,
+    counts: &NexusCounts,
+    run_stats: &RunStats,
+    sync_time: Duration,
+    steps: u64,
+) {
+    // Scene entity counts.
+    ui.label(RichText::new("Scene").strong());
+    ui.add_space(2.0);
+    egui::Grid::new("scene_counts")
+        .num_columns(2)
+        .spacing([20.0, 2.0])
+        .show(ui, |ui| {
+            let mut row = |label: &str, value: usize| {
+                ui.label(label);
+                ui.label(format!("{value}"));
+                ui.end_row();
+            };
+
+            row("Steps:", steps as usize);
+
+            if counts.rigid_bodies > 0 {
+                row("Environments:", counts.num_environments);
+                row("Rigid bodies:", counts.rigid_bodies);
+                row("Colliders:", counts.colliders);
+                row("Collision pairs:", counts.collision_pairs);
+                row("Collision capacity:", counts.collision_pairs_capacity);
+                row("Impulse joints:", counts.impulse_joints);
+                row("Multibodies:", counts.multibodies);
+                row("Multibody DOFs:", counts.multibody_dofs);
+                row("MB contact slots:", counts.mb_contact_constraints);
+                row(
+                    "MB contact capacity:",
+                    counts.mb_contact_constraints_capacity,
+                );
+            }
+
+            if counts.particles > 0 {
+                row("Particles:", counts.particles);
+            }
+        });
+
+    ui.add_space(8.0);
+    ui.separator();
+    ui.add_space(4.0);
+
+    // Timing.
+    let encoding_time = run_stats.encoding_time_ms();
+    let sync_time = sync_time.as_secs_f32() * 1000.0;
+    ui.label(
+        RichText::new(format!(
+            "Encoding: {:.2}ms\nGPU: {:.2}ms\nSync: {:.2}ms",
+            encoding_time, run_stats.gpu_total_time_ms, sync_time
+        ))
+        .strong(),
+    );
+    if !run_stats.gpu_pass_times.is_empty() {
+        CollapsingHeader::new(format!("GPU passes: {:.2}ms", run_stats.gpu_total_time_ms))
+            .id_salt("rbd_gpu_passes")
+            .default_open(false)
+            .show(ui, |ui| {
+                egui::Grid::new("rbd_timestamp_grid")
+                    .num_columns(2)
+                    .spacing([20.0, 2.0])
+                    .show(ui, |ui| {
+                        for (label, ms) in &run_stats.gpu_pass_times {
+                            ui.label(format!("{}:", label));
+                            ui.label(format!("{:.2}ms", ms));
+                            ui.end_row();
+                        }
+                    });
+            });
+    }
+
+    // Slow performance warning.
+    if run_stats.gpu_total_time_ms > 100.0 {
+        ui.add_space(4.0);
+        ui.colored_label(
+            Color32::from_rgb(180, 120, 60),
+            #[cfg(not(target_arch = "wasm32"))]
+            "Running slow? If you have both an integrated and discrete GPU, ensure the discrete GPU is in use.",
+            #[cfg(target_arch = "wasm32")]
+            "Running slow? If you have both an integrated and discrete GPU, ensure your browser runs exclusively on the discrete GPU.",
+        );
+    }
+}
+
+impl UiState {
+    /// Order in which demos appear in the picker: grouped by kind (Rbd, Mpm),
+    /// preserving each group's listing order. Prev/Next walks this sequence so it
+    /// matches the visible list rather than the raw (lexicographically-sorted)
+    /// `demos` index order.
+    fn demo_display_order(&self) -> Vec<usize> {
+        let mut order = Vec::with_capacity(self.demos.len());
+        for kind in [DemoKind::Rbd, DemoKind::Mpm] {
+            for (i, (_, k)) in self.demos.iter().enumerate() {
+                if *k == kind {
+                    order.push(i);
+                }
+            }
+        }
+        order
+    }
+}
+
+/// Previous/Next buttons and the name of the current demo.
+/// The order is the one of the demo list (see `demo_display_order`).
+fn demo_navigation(ui: &mut egui::Ui, state: &mut UiState) {
+    let order = state.demo_display_order();
+    let pos = order
+        .iter()
+        .position(|&i| i == state.selected_demo)
+        .unwrap_or(0);
+
+    ui.horizontal(|ui| {
+        if ui
+            .add_enabled(pos > 0, Button::new("<"))
+            .on_hover_text("Previous example")
+            .clicked()
+        {
+            state.selected_demo = order[pos - 1];
+            state.transition = Some(Transition::Switch);
+        }
+
+        if ui
+            .add_enabled(pos + 1 < order.len(), Button::new(">"))
+            .on_hover_text("Next example")
+            .clicked()
+        {
+            state.selected_demo = order[pos + 1];
+            state.transition = Some(Transition::Switch);
+        }
+
+        ui.label(
+            RichText::new(state.demos[state.selected_demo].0.clone())
+                .strong()
+                .italics(),
+        );
+    });
+}
+
+fn examples_section(ui: &mut egui::Ui, state: &mut UiState) {
+    demo_group(ui, state, DemoKind::Rbd, "Rigid Bodies");
+    demo_group(ui, state, DemoKind::Mpm, "MPM");
+}
+
+fn demo_group(ui: &mut egui::Ui, state: &mut UiState, kind: DemoKind, label: &str) {
+    // Collect owned (index, name) so the closure can freely mutate `state`.
+    let demos: Vec<(usize, String)> = state
+        .demos
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, k))| *k == kind)
+        .map(|(i, (name, _))| (i, name.clone()))
+        .collect();
+
+    if demos.is_empty() {
+        return;
+    }
+
+    CollapsingHeader::new(format!("{} ({})", label, demos.len()))
+        .default_open(true)
+        .show(ui, |ui| {
+            for (idx, name) in &demos {
+                let is_selected = state.selected_demo == *idx;
+                let text = if is_selected {
+                    RichText::new(name).strong()
+                } else {
+                    RichText::new(name)
+                };
+                if ui
+                    .selectable_label(is_selected, text)
+                    .on_hover_text("Click to run this example")
+                    .clicked()
+                    && !is_selected
+                {
+                    state.selected_demo = *idx;
+                    state.transition = Some(Transition::Switch);
+                }
+            }
+        });
+}
+
+/// Unified backend selector. The "CPU (rapier)" option is only shown for RBD
+/// scenes; for MPM scenes a current Rapier selection is shown as CPU (nexus).
+fn backend_selector(ui: &mut egui::Ui, state: &mut UiState, gpu_available: bool) {
+    ui.label(RichText::new("Physics Backend").strong());
+    ui.add_space(2.0);
+
+    let mut new_backend: Option<BackendType> = None;
+
+    if gpu_available
+        && ui
+            .radio(state.backend_type == BackendType::Gpu, "GPU (nexus)")
+            .on_hover_text("GPU-accelerated physics with nexus")
+            .clicked()
+        && state.backend_type != BackendType::Gpu
+    {
+        new_backend = Some(BackendType::Gpu);
+    }
+
+    #[cfg(feature = "cuda")]
+    if ui
+        .radio(state.backend_type == BackendType::Cuda, "CUDA (nexus)")
+        .on_hover_text("GPU-accelerated physics with nexus via CUDA")
+        .clicked()
+        && state.backend_type != BackendType::Cuda
+    {
+        new_backend = Some(BackendType::Cuda);
+    }
+    #[cfg(feature = "cuda")]
+    if state.backend_type == BackendType::Cuda {
+        ui.indent("compute-graphs", |ui| {
+            ui.checkbox(&mut state.compute_graphs, "Compute graphs")
+                .on_hover_text(
+                    "Record each frame's physics dispatches once into a compute graph and replay \
+                     it with a single launch (re-recorded whenever the scene changes).",
+                );
+        });
+    }
+
+    #[cfg(feature = "metal")]
+    if ui
+        .radio(state.backend_type == BackendType::Metal, "Metal (nexus)")
+        .on_hover_text("GPU-accelerated physics with nexus via native Metal")
+        .clicked()
+        && state.backend_type != BackendType::Metal
+    {
+        new_backend = Some(BackendType::Metal);
+    }
+
+    #[cfg(feature = "cpu")]
+    if ui
+        .radio(state.backend_type == BackendType::Cpu, "CPU (nexus)")
+        .on_hover_text("CPU physics using the nexus GPU pipeline executed on CPU")
+        .clicked()
+        && state.backend_type != BackendType::Cpu
+    {
+        new_backend = Some(BackendType::Cpu);
+    }
+
+    if let Some(bt) = new_backend {
+        state.backend_type = bt;
+        state.transition = Some(Transition::Switch);
+    }
+}

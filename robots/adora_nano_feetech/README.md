@@ -36,9 +36,9 @@ reference URDF intentionally stays still; it does not run robot physics.
    Leaving Robot setup/Operate or connecting an external source also stops this
    driver. A stopped/faulted connection requires an explicit reconnect.
 
-Requires `uv`, Python 3.13 (managed by uv), and `dora` CLI **1.0.1** on PATH.
-The Python environment is isolated and pinned by `uv.lock`; no AISLE checkout
-is required. `DOROBOT_UV` may select a uv executable for a GUI launch.
+Studio uses the native Rust adapter and Dora **1.0.1** bundled with the app.
+No Python or AISLE checkout is needed. For a source build, follow
+[`runtime/README.md`](../../runtime/README.md).
 
 ## Dora flow
 
@@ -97,19 +97,21 @@ signs/gains are not reused for hardware.
 From the repository root:
 
 ```sh
-uv run --frozen --project robots/adora_nano_feetech python robots/adora_nano_feetech/run.py \
+runtime/target/release/dorobot-nano-runtime base \
   --mock --output /tmp/nano-base-test
 
 # Physical connection: substitute the actual USB serial device.
-uv run --frozen --project robots/adora_nano_feetech python robots/adora_nano_feetech/run.py \
+runtime/target/release/dorobot-nano-runtime base \
   --port /dev/ttyACM0 --output /tmp/nano-base-physical
 
-uv run --frozen --project robots/adora_nano_feetech python -m unittest discover \
-  -s robots/adora_nano_feetech -v
+cargo test --manifest-path runtime/Cargo.toml --locked --lib
 
 # Scripted motion is accepted only with --mock, never a physical --port.
-uv run --frozen --project robots/adora_nano_feetech python robots/adora_nano_feetech/run.py \
+runtime/target/release/dorobot-nano-runtime base \
   --mock --self-test --output /tmp/nano-base-e2e
+
+cargo test --manifest-path runtime/Cargo.toml --locked --test dora_base \
+  -- --ignored --test-threads=1
 ```
 
 Use a new output directory for each launch. `status.json` is the current
@@ -118,8 +120,9 @@ contains node logs. These are driver diagnostics, not a LeRobot camera dataset.
 Generated runtime data belongs outside the repository and includes local port
 paths. No local serial identifiers or credentials are part of the profile.
 
-Tests cover exact packet bytes, ACK faults, initialization order, wheel mixing,
-proportional limits, deadman/reconnect/pause, slew, stale/reordered input,
-independent watchdog shutdown, and pyserial transport over a pseudo-terminal.
-The Dora self-test verifies forward, lateral and turning commands, release to
-zero, and confirmed torque-off through all four actual nodes.
+Native tests cover packet bytes, ACK faults, wheel mixing, proportional limits,
+deadman/neutral rearm, slew, stale/reordered input and watchdog shutdown. The
+Dora integration tests verify forward, lateral and turning commands, release
+to zero, confirmed torque-off, and a suspended gamepad node through the actual
+graph. The original Python adapter and its tests remain here as protocol
+reference; Studio does not launch them and the app does not package them.

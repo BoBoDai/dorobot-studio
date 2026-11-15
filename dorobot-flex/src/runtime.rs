@@ -57,32 +57,22 @@ pub fn datasets() -> PathBuf {
     }
 }
 
-pub fn bundled_python() -> Option<PathBuf> {
-    resources().map(|p| p.join("runtime/python/bin/python3"))
-}
-
-pub fn python() -> PathBuf {
-    std::env::var_os("DOROBOT_PYTHON")
+pub fn native() -> PathBuf {
+    std::env::var_os("DOROBOT_NATIVE_RUNTIME")
         .map(PathBuf::from)
-        .or_else(bundled_python)
-        .unwrap_or_else(|| "python3".into())
+        .or_else(|| resources().map(|p| p.join("runtime/bin/dorobot-nano-runtime")))
+        .unwrap_or_else(|| root().join("runtime/target/release/dorobot-nano-runtime"))
 }
 
-/// Bundled commands must neither download dependencies nor import user packages.
 pub fn configure(command: &mut Command) {
     if let Some(root) = resources() {
-        let mut paths = vec![root.join("runtime/bin"), root.join("runtime/python/bin")];
+        let mut paths = vec![root.join("runtime/bin")];
         paths.extend(std::env::split_paths(
             &std::env::var_os("PATH").unwrap_or_default(),
         ));
         if let Ok(path) = std::env::join_paths(paths) {
             command.env("PATH", path);
         }
-        command
-            .env("PYTHONNOUSERSITE", "1")
-            .env("PYTHONDONTWRITEBYTECODE", "1")
-            .env_remove("PYTHONHOME")
-            .env_remove("PYTHONPATH");
     }
 }
 

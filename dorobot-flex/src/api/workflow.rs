@@ -84,37 +84,6 @@ impl SimulationRuntime {
             return Err("Simulation is already running. Open Operate.".into());
         }
         let repo = crate::runtime::root();
-        let aisle = std::env::var_os("DOROBOT_AISLE")
-            .map(PathBuf::from)
-            .or_else(|| crate::runtime::resources().map(|p| p.join("aisle")))
-            .or_else(|| {
-                fs::read_dir(repo.join(".."))
-                    .ok()?
-                    .filter_map(Result::ok)
-                    .map(|e| e.path())
-                    .find(|p| {
-                        p.file_name()
-                            .is_some_and(|n| n.to_string_lossy().starts_with("AISLE"))
-                            && p.join("src/aisle").is_dir()
-                    })
-            })
-            .filter(|p| p.join("pyproject.toml").is_file())
-            .ok_or(
-                "AISLE is missing. Install AISLE beside Studio or set DOROBOT_AISLE, then retry.",
-            )?;
-        let home = PathBuf::from(std::env::var_os("HOME").unwrap_or_default());
-        let uv = std::env::var_os("DOROBOT_UV")
-            .map(PathBuf::from)
-            .or_else(|| {
-                [
-                    home.join(".local/bin/uv"),
-                    home.join(".cargo/bin/uv"),
-                    home.join(".cache/dorobot/aisle-validation-tools/bin/uv"),
-                ]
-                .into_iter()
-                .find(|p| p.is_file())
-            })
-            .unwrap_or_else(|| "uv".into());
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -123,34 +92,10 @@ impl SimulationRuntime {
         let socket = PathBuf::from(format!("/tmp/dorobot-sim-{stamp}.sock"));
         let log_path = std::env::temp_dir().join(format!("dorobot-sim-{stamp}.log"));
         let log = fs::File::create(&log_path).map_err(|e| e.to_string())?;
-        let mut cmd = if let Some(python) = crate::runtime::bundled_python() {
-            let mut command = Command::new(python);
-            command.arg("-B");
-            command
-        } else {
-            let mut command = Command::new(uv);
-            command.args(["run", "--project"])
-            .arg(aisle.clone())
-            .args([
-                "--frozen",
-                "--python",
-                "3.13.5",
-                "--with",
-                "dora-rs==1.0.1",
-                "--with",
-                "dimforge-nexus3d==0.2.1",
-                "--with",
-                "opencv-python-headless==5.0.0.93",
-                "--with",
-                "pygame==2.6.1",
-                "python",
-                "-B",
-            ]);
-            command
-        };
-        cmd.arg(repo.join("tools/aisle-validation/run_teleop.py"))
-            .arg("--aisle")
-            .arg(aisle)
+        let mut cmd = Command::new(crate::runtime::native());
+        cmd.arg("sim")
+            .arg("--model")
+            .arg(repo.join("data/adora_nano/adora_nano.urdf"))
             .arg("--output")
             .arg(&output)
             .arg("--socket")
@@ -161,22 +106,10 @@ impl SimulationRuntime {
             .stdin(Stdio::null())
             .stdout(log.try_clone().map_err(|e| e.to_string())?)
             .stderr(log);
-        let mut paths = vec![
-            home.join(".local/bin"),
-            home.join(".cargo/bin"),
-            home.join(".cache/dorobot/aisle-validation-tools/bin"),
-        ];
-        paths.extend(std::env::split_paths(
-            &std::env::var_os("PATH").unwrap_or_default(),
-        ));
-        if let Ok(path) = std::env::join_paths(paths) {
-            cmd.env("PATH", path);
-        }
         crate::runtime::configure(&mut cmd);
-        self.child =
-            Some(cmd.spawn().map_err(|e| {
-                format!("Could not launch simulation: {e}. Check the runtime installation.")
-            })?);
+        self.child = Some(cmd.spawn().map_err(|e| {
+            format!("Could not launch simulation: {e}. Check the runtime installation.")
+        })?);
         self.output = Some(output);
         self.socket = Some(socket);
         self.awaiting = None;
@@ -184,11 +117,7 @@ impl SimulationRuntime {
         self.state.active = true;
         self.state.ready = false;
         self.state.phase = "idle".into();
-        self.state.detail = if crate::runtime::resources().is_some() {
-            "Starting Nano and its 3 cameras… Preparing GPU shaders."
-        } else {
-            "Starting Nano and its 3 cameras… First launch installs dependencies and prepares GPU shaders; allow a few minutes."
-        }.into();
+        self.state.detail = "Starting Nano and its 3 cameras… Preparing GPU shaders.".into();
         Ok(())
     }
     pub fn stop(&mut self) -> Result<(), String> {

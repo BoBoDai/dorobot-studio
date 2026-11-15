@@ -1,0 +1,25 @@
+[package]
+name = "khal-derive"
+authors = ["Sébastien Crozet <sebcrozet@dimforge.com>"]
+description = "Proc-macro for Slang shaders."
+repository = "https://github.com/dimforge/khal"
+version = { workspace = true }
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "khal_derive"
+path = "src/lib.rs"
+proc-macro = true
+
+[features]
+comptime = []
+cpu = []
+cuda = []
+webgpu = []
+
+[dependencies]
+syn = "3.0.3"
+quote = "1.0.37"
+proc-macro2 = "1.0.86"
+darling = "0.24.0"

@@ -1,0 +1,468 @@
+//! Per-joint (re)build of all axis constraints (`update_one_joint`) and the
+//! multibody-side `M⁻¹·Jᵀ` back-solve used by the finalize pass.
+
+use glamx::Vec4;
+use khal_std::index::MaybeIndexUnchecked;
+
+use crate::dynamics::body::WorldMassProperties;
+use crate::dynamics::joint::{ANG_AXES_MASK, LIN_AXES_MASK, SPATIAL_DIM};
+use crate::utils::linalg::{MatSlice, VSlice, lu_solve_in_place};
+use crate::utils::{BodyIx, ISlice};
+use crate::{DIM, Pose};
+
+use super::super::types::{MultibodyInfo, MultibodyLinkStatic};
+use super::super::utils::zero_kinematic_dofs;
+use super::super::ws_soa::{WS_LTW, WS_WORLD_COM, WsAddr, ws_pose, ws_vec};
+use super::helper::*;
+use super::jacobians::*;
+use super::types::*;
+
+/// Back-solve `W·J = M⁻¹·Jᵀ` for one multibody side of a constraint and store
+/// it in the constraint's `W·J` jacobian slot. Extracted from the old fused
+/// `fill_mb_jacobians` step 2 so it can run in the finalize pass (which binds
+/// `mass_matrices` / `lu_pivots`, unlike the build pass).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn solve_mb_wj(
+    jacobians: &mut [f32],
+    j_id: u32,
+    ndofs: u32,
+    mb: &MultibodyInfo,
+    mass_matrices: &[f32],
+    lu_pivots: &[u32],
+    links_static: &[MultibodyLinkStatic],
+    // Interleaved dynamics-buffer view (`stride = num_batches`, `shift =
+    // batch_id`).
+    il: VSlice,
+) {
+    // Copy J into the W·J slot, then LU back-solve in place (matches the old
+    // fused path: `wj = M⁻¹·j`).
+    let wj_base = wj_id(j_id, ndofs);
+    for k in 0..ndofs {
+        let v = jacobians.read(j_id as usize + k as usize);
+        jacobians.write(wj_base + k as usize, v);
+    }
+    // Dense per-multibody-region views (`il` carries `num_batches` /
+    // `batch_id` as stride / shift).
+    let m = MatSlice::dense(
+        mb.mass_matrix_offset as usize * il.stride as usize
+            + il.shift as usize * (ndofs * ndofs) as usize,
+        ndofs,
+        ndofs,
+    );
+    let piv = VSlice::dense(
+        mb.first_dof as usize * il.stride as usize + il.shift as usize * ndofs as usize,
+    );
+    lu_solve_in_place(
+        mass_matrices,
+        m,
+        lu_pivots,
+        piv,
+        jacobians,
+        VSlice::dense(wj_base),
+    );
+
+    // Kinematic dofs are user-driven: the impulse must not move them.
+    let stat_slice = ISlice {
+        buf: links_static,
+        base: mb.first_link as usize,
+        stride: il.stride,
+        shift: il.shift,
+    };
+    zero_kinematic_dofs(jacobians, wj_base, &stat_slice, mb.num_links);
+}
+
+impl MbImpulseJointBuilder {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn update_one_joint(
+        &self,
+        constraints: &mut [MbImpulseJointConstraint],
+        jacobians: &mut [f32],
+        multibody_info: &[MultibodyInfo],
+        links_workspace: &[Vec4],
+        body_jacobians: &[f32],
+        // Interleaved dynamics-buffer view (`stride = num_batches`, `shift =
+        // batch_id`).
+        il: VSlice,
+        poses: &[Pose],
+        bix: BodyIx,
+        mprops: &[WorldMassProperties],
+        dt: f32,
+        lock_erp_inv_dt: f32,
+        lock_cfm_coeff: f32,
+        max_corr_velocity: f32,
+    ) {
+        // Constraint / jacobian slots are batch-local ids into the
+        // batch-interleaved buffers (resolved through `il`).
+        let cons_base = self.constraint_id as usize;
+        // Mark all axis-constraint slots inactive up-front; the active branches
+        // below overwrite the live ones (rapier rebuilds the entire
+        // `out[start..len]` slab each `update` call, so unfilled slots are
+        // guaranteed inactive).
+        for s in 0..MAX_AXIS_CONSTRAINTS {
+            let mut cz = constraints.read(il.atz(cons_base + s as usize));
+            cz.kind = 0;
+            cz.impulse = 0.0;
+            constraints.write(il.atz(cons_base + s as usize), cz);
+        }
+
+        // Resolve per-side multibody descriptors (read by value to avoid
+        // SPIR-V's "pointer to arbitrary element" restriction). Free / fixed
+        // sides ignore the read.
+        let mb_a = if self.side_a_kind == SIDE_KIND_MB {
+            multibody_info.read(il.atz(self.side_a_id as usize))
+        } else {
+            MultibodyInfo::default()
+        };
+        let mb_b = if self.side_b_kind == SIDE_KIND_MB {
+            multibody_info.read(il.atz(self.side_b_id as usize))
+        } else {
+            MultibodyInfo::default()
+        };
+
+        let pose_a = side_world_pose(
+            self.side_a_kind,
+            self.side_a_id,
+            self.side_a_link,
+            &mb_a,
+            links_workspace,
+            il,
+            poses,
+            bix,
+        );
+        let pose_b = side_world_pose(
+            self.side_b_kind,
+            self.side_b_id,
+            self.side_b_link,
+            &mb_b,
+            links_workspace,
+            il,
+            poses,
+            bix,
+        );
+
+        let frame1 = pose_a * self.joint.local_frame_a;
+        let frame2 = pose_b * self.joint.local_frame_b;
+        let world_com1 = side_world_com(
+            self.side_a_kind,
+            self.side_a_link,
+            &mb_a,
+            links_workspace,
+            il,
+            pose_a,
+        );
+        let world_com2 = side_world_com(
+            self.side_b_kind,
+            self.side_b_link,
+            &mb_b,
+            links_workspace,
+            il,
+            pose_b,
+        );
+
+        let helper = new_helper(
+            frame1,
+            frame2,
+            world_com1,
+            world_com2,
+            self.joint.locked_axes,
+        );
+
+        let ndofs_a = if self.side_a_kind == SIDE_KIND_BODY {
+            SPATIAL_DIM as u32
+        } else if self.side_a_kind == SIDE_KIND_MB {
+            mb_a.ndofs
+        } else {
+            0
+        };
+        let ndofs_b = if self.side_b_kind == SIDE_KIND_BODY {
+            SPATIAL_DIM as u32
+        } else if self.side_b_kind == SIDE_KIND_MB {
+            mb_b.ndofs
+        } else {
+            0
+        };
+        let a_ctx = SideCtx {
+            side_kind: self.side_a_kind,
+            side_id: self.side_a_id,
+            side_link: self.side_a_link,
+            ndofs: ndofs_a,
+            mb: mb_a,
+        };
+        let b_ctx = SideCtx {
+            side_kind: self.side_b_kind,
+            side_id: self.side_b_id,
+            side_link: self.side_b_link,
+            ndofs: ndofs_b,
+            mb: mb_b,
+        };
+        let stride = axis_stride(ndofs_a, ndofs_b);
+        // The jacobians buffer is interleaved at per-joint-region granularity:
+        // this joint's region for the current batch starts at
+        // `jacobian_offset * num_batches + batch * jacobian_capacity` and is
+        // dense inside. All `j_id`s below (stored in the constraints) are
+        // absolute dense indices into that region.
+        let j_base = self.jacobian_offset as usize * il.stride as usize
+            + il.shift as usize * self.jacobian_capacity as usize;
+
+        // `lock_erp_inv_dt` / `lock_cfm_coeff` are passed in from the configurable
+        // joint softness (rapier's `joint.softness.{erp_inv_dt,cfm_coeff}(dt)`).
+        let locked_axes = self.joint.locked_axes;
+        let motor_axes = self.joint.motor_axes & !locked_axes;
+        let limit_axes = self.joint.limit_axes & !locked_axes;
+
+        let mut len = 0u32;
+        let mut j_off = j_base as u32;
+
+        // Order matches rapier's `lock_axes`: motors → locks → limits.
+        // Within each kind: angular axes before linear axes.
+
+        // Angular motors.
+        for i in DIM..(SPATIAL_DIM as u32) {
+            if (motor_axes & (1 << i)) != 0 {
+                if len >= MAX_AXIS_CONSTRAINTS {
+                    break;
+                }
+                let mut c = constraints.read(il.atz(cons_base + len as usize));
+                let j_id_a = j_off;
+                let j_id_b = j_off + 2 * ndofs_a;
+                motor_angular_generic(
+                    &mut c,
+                    &helper,
+                    self.joint_id,
+                    &a_ctx,
+                    &b_ctx,
+                    (i - DIM) as usize,
+                    self.joint.motors.at(i as usize),
+                    dt,
+                    jacobians,
+                    j_id_a,
+                    j_id_b,
+                    body_jacobians,
+                    il,
+                    mprops,
+                    bix,
+                );
+                constraints.write(il.atz(cons_base + len as usize), c);
+                len += 1;
+                j_off += stride;
+            }
+        }
+
+        // Linear motors.
+        for i in 0..DIM {
+            if (motor_axes & (1 << i)) != 0 {
+                if len >= MAX_AXIS_CONSTRAINTS {
+                    break;
+                }
+                let mut c = constraints.read(il.atz(cons_base + len as usize));
+                let j_id_a = j_off;
+                let j_id_b = j_off + 2 * ndofs_a;
+                motor_linear_generic(
+                    &mut c,
+                    &helper,
+                    self.joint_id,
+                    &a_ctx,
+                    &b_ctx,
+                    i as usize,
+                    self.joint.motors.at(i as usize),
+                    dt,
+                    jacobians,
+                    j_id_a,
+                    j_id_b,
+                    body_jacobians,
+                    il,
+                    mprops,
+                    bix,
+                );
+                constraints.write(il.atz(cons_base + len as usize), c);
+                len += 1;
+                j_off += stride;
+            }
+        }
+
+        // Angular locks.
+        for i in DIM..(SPATIAL_DIM as u32) {
+            if (locked_axes & (1 << i)) != 0 {
+                if len >= MAX_AXIS_CONSTRAINTS {
+                    break;
+                }
+                let mut c = constraints.read(il.atz(cons_base + len as usize));
+                let j_id_a = j_off;
+                let j_id_b = j_off + 2 * ndofs_a;
+                lock_angular_generic(
+                    &mut c,
+                    &helper,
+                    self.joint_id,
+                    &a_ctx,
+                    &b_ctx,
+                    (i - DIM) as usize,
+                    lock_erp_inv_dt,
+                    lock_cfm_coeff,
+                    jacobians,
+                    j_id_a,
+                    j_id_b,
+                    body_jacobians,
+                    il,
+                    mprops,
+                    bix,
+                );
+                constraints.write(il.atz(cons_base + len as usize), c);
+                len += 1;
+                j_off += stride;
+            }
+        }
+
+        // Linear locks.
+        for i in 0..DIM {
+            if (locked_axes & (1 << i)) != 0 {
+                if len >= MAX_AXIS_CONSTRAINTS {
+                    break;
+                }
+                let mut c = constraints.read(il.atz(cons_base + len as usize));
+                let j_id_a = j_off;
+                let j_id_b = j_off + 2 * ndofs_a;
+                lock_linear_generic(
+                    &mut c,
+                    &helper,
+                    self.joint_id,
+                    &a_ctx,
+                    &b_ctx,
+                    i as usize,
+                    lock_erp_inv_dt,
+                    lock_cfm_coeff,
+                    jacobians,
+                    j_id_a,
+                    j_id_b,
+                    body_jacobians,
+                    il,
+                    mprops,
+                    bix,
+                );
+                constraints.write(il.atz(cons_base + len as usize), c);
+                len += 1;
+                j_off += stride;
+            }
+        }
+
+        // Angular limits.
+        for i in DIM..(SPATIAL_DIM as u32) {
+            if (limit_axes & (1 << i)) != 0 {
+                if len >= MAX_AXIS_CONSTRAINTS {
+                    break;
+                }
+                let mut c = constraints.read(il.atz(cons_base + len as usize));
+                let j_id_a = j_off;
+                let j_id_b = j_off + 2 * ndofs_a;
+                let lim = self.joint.limits.at(i as usize);
+                limit_angular_generic(
+                    &mut c,
+                    &helper,
+                    self.joint_id,
+                    &a_ctx,
+                    &b_ctx,
+                    (i - DIM) as usize,
+                    [lim.min, lim.max],
+                    lock_erp_inv_dt,
+                    lock_cfm_coeff,
+                    max_corr_velocity,
+                    jacobians,
+                    j_id_a,
+                    j_id_b,
+                    body_jacobians,
+                    il,
+                    mprops,
+                    bix,
+                );
+                constraints.write(il.atz(cons_base + len as usize), c);
+                len += 1;
+                j_off += stride;
+            }
+        }
+
+        // Linear limits.
+        for i in 0..DIM {
+            if (limit_axes & (1 << i)) != 0 {
+                if len >= MAX_AXIS_CONSTRAINTS {
+                    break;
+                }
+                let mut c = constraints.read(il.atz(cons_base + len as usize));
+                let j_id_a = j_off;
+                let j_id_b = j_off + 2 * ndofs_a;
+                let lim = self.joint.limits.at(i as usize);
+                limit_linear_generic(
+                    &mut c,
+                    &helper,
+                    self.joint_id,
+                    &a_ctx,
+                    &b_ctx,
+                    i as usize,
+                    [lim.min, lim.max],
+                    lock_erp_inv_dt,
+                    lock_cfm_coeff,
+                    max_corr_velocity,
+                    jacobians,
+                    j_id_a,
+                    j_id_b,
+                    body_jacobians,
+                    il,
+                    mprops,
+                    bix,
+                );
+                constraints.write(il.atz(cons_base + len as usize), c);
+                len += 1;
+                j_off += stride;
+            }
+        }
+
+        // Silence unused-variable warning on 2D where ANG_AXES_MASK isn't read.
+        let _ = ANG_AXES_MASK;
+        let _ = LIN_AXES_MASK;
+    }
+}
+
+/// Center of mass the side's lever arm is measured against. A free-body side
+/// is positioned by its COM-centered solver pose, so that pose's origin is it;
+/// a multibody link is positioned by its body-origin frame, so its center of
+/// mass comes from the workspace.
+#[inline]
+pub(super) fn side_world_com(
+    side_kind: u32,
+    side_link: u32,
+    mb: &MultibodyInfo,
+    links_workspace: &[Vec4],
+    il: VSlice,
+    side_pose: Pose,
+) -> crate::Vector {
+    if side_kind == SIDE_KIND_MB {
+        let wa = WsAddr::new(mb.first_link as usize, il.stride, il.shift);
+        ws_vec(links_workspace, wa, side_link, WS_WORLD_COM)
+    } else {
+        side_pose.translation
+    }
+}
+
+/// Look up the world-space pose of a side. Free-body sides read from the
+/// shared `poses` buffer (COM-centered solver pose); multibody sides take
+/// their link's body-origin `local_to_world` from the multibody workspace.
+/// The `mb` argument is read by value to keep SPIR-V happy and is only
+/// meaningful when `side_kind == SIDE_KIND_MB`.
+#[inline]
+pub(super) fn side_world_pose(
+    side_kind: u32,
+    side_id: u32,
+    side_link: u32,
+    mb: &MultibodyInfo,
+    links_workspace: &[Vec4],
+    il: VSlice,
+    poses: &[Pose],
+    bix: BodyIx,
+) -> Pose {
+    if side_kind == SIDE_KIND_FIXED {
+        return Pose::IDENTITY;
+    }
+    if side_kind == SIDE_KIND_BODY {
+        return poses.read(bix.at(side_id));
+    }
+    let wa = WsAddr::new(mb.first_link as usize, il.stride, il.shift);
+    ws_pose(links_workspace, wa, side_link, WS_LTW)
+}

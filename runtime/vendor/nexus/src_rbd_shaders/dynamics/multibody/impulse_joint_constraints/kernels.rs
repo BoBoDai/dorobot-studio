@@ -1,0 +1,359 @@
+//! The four compute entry points of the multibody impulse-joint pipeline
+//! (update / finalize / solve / remove-bias).
+
+use glamx::Vec4;
+use khal_std::glamx::UVec3;
+use khal_std::index::MaybeIndexUnchecked;
+use khal_std::iter::StepRng;
+use khal_std::macros::{spirv, spirv_bindgen};
+use khal_std::sync::workgroup_memory_barrier_with_group_sync;
+
+use crate::Pose;
+use crate::dynamics::ConstraintSoftness;
+use crate::dynamics::body::{Velocity, WorldMassProperties};
+use crate::utils::BatchIndices;
+use crate::utils::linalg::VSlice;
+
+use super::super::lu::LANES;
+use super::super::types::{MultibodyInfo, MultibodyLinkStatic};
+
+use super::jacobians::*;
+use super::types::*;
+use super::update::*;
+
+/// (Re)build all axis constraints of every multibody-touching impulse joint.
+///
+/// Run once per substep. Mirrors rapier's
+/// `JointGenericExternalConstraintBuilder::update`: rebuilds all `J / W·J`
+/// rows + biases from current poses / mass matrix.
+#[spirv_bindgen]
+#[spirv(compute(threads(64)))]
+pub fn gpu_mb_update_impulse_joint_constraints(
+    #[spirv(global_invocation_id)] invocation_id: UVec3,
+    #[spirv(num_workgroups)] num_workgroups: UVec3,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] builders: &[MbImpulseJointBuilder],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)]
+    constraints: &mut [MbImpulseJointConstraint],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] jacobians: &mut [f32],
+    #[spirv(uniform, descriptor_set = 0, binding = 3)] softness: &ConstraintSoftness,
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 0)] multibody_info: &[MultibodyInfo],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 1)] links_workspace: &[Vec4],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 2)] body_jacobians: &[f32],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 3)] poses: &[Pose],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 4)] mprops: &[WorldMassProperties],
+    #[spirv(uniform, descriptor_set = 0, binding = 4)] batch_ids: &BatchIndices,
+) {
+    let num_threads = num_workgroups.x * 64;
+    let dt = softness.dt;
+    // Joint lock/limit softness — configurable via `joint_natural_frequency` /
+    // `joint_damping_ratio` (rapier's `joint.softness`), replacing the old
+    // hardcoded `0.8/dt` + `cfm = 0`.
+    let lock_erp_inv_dt = softness.joint_erp_inv_dt;
+    let lock_cfm_coeff = softness.joint_cfm_coeff;
+    let max_corr_velocity = softness.max_corr_velocity;
+
+    // Flat sweep over the interleaved builder slots (slot `t` = joint `t / nb`
+    // of batch `t % nb`). Iterating to `cap * nb` instead of the per-batch
+    // lengths lets us drop the `num_joints` storage binding — the host pads
+    // unused slots with `side_a_kind == SIDE_KIND_FIXED && side_b_kind ==
+    // SIDE_KIND_FIXED` which we use as the inactive-slot sentinel below.
+    let nb = batch_ids.num_batches;
+    let total = batch_ids.mb_imp_joints_batch_capacity * nb;
+    for t in StepRng::new(invocation_id.x..total, num_threads) {
+        let builder = builders.read(t as usize);
+        let is_dummy =
+            builder.side_a_kind == SIDE_KIND_FIXED && builder.side_b_kind == SIDE_KIND_FIXED;
+        if !is_dummy {
+            let batch_id = t % nb;
+            // Interleaved view shared by the dynamics buffers (multibody_info /
+            // links_workspace / body_jacobians / dof_state) and the constraint
+            // slots. The jacobians buffer is interleaved at per-joint-region
+            // granularity instead (dense inside; see `update_one_joint`).
+            let il = VSlice::interleaved(0, nb, batch_id);
+            let bix = batch_ids.body_ix(batch_id);
+            builder.update_one_joint(
+                constraints,
+                jacobians,
+                multibody_info,
+                links_workspace,
+                body_jacobians,
+                il,
+                poses,
+                bix,
+                mprops,
+                dt,
+                lock_erp_inv_dt,
+                lock_cfm_coeff,
+                max_corr_velocity,
+            );
+        }
+    }
+}
+
+/// Companion finalize pass to `gpu_mb_update_impulse_joint_constraints`: for
+/// each active constraint, back-solve the multibody side(s)' `M⁻¹·Jᵀ` columns
+/// and compute `inv_lhs`. Must run after `update` and before
+/// `gpu_mb_solve_impulse_joint_constraints` each substep.
+#[spirv_bindgen]
+#[spirv(compute(threads(64)))]
+pub fn gpu_mb_finalize_impulse_joint_constraints(
+    #[spirv(global_invocation_id)] invocation_id: UVec3,
+    #[spirv(num_workgroups)] num_workgroups: UVec3,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] builders: &[MbImpulseJointBuilder],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)]
+    constraints: &mut [MbImpulseJointConstraint],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] jacobians: &mut [f32],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 0)] multibody_info: &[MultibodyInfo],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 1)] mass_matrices: &[f32],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 2)] lu_pivots: &[u32],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 3)]
+    links_static: &[MultibodyLinkStatic],
+    #[spirv(uniform, descriptor_set = 0, binding = 3)] batch_ids: &BatchIndices,
+) {
+    let num_threads = num_workgroups.x * 64;
+    let nb = batch_ids.num_batches;
+    let total = batch_ids.mb_imp_joints_batch_capacity * nb;
+
+    for t in StepRng::new(invocation_id.x..total, num_threads) {
+        let builder = builders.read(t as usize);
+        let is_dummy =
+            builder.side_a_kind == SIDE_KIND_FIXED && builder.side_b_kind == SIDE_KIND_FIXED;
+        if !is_dummy {
+            let batch_id = t % nb;
+            let il = VSlice::interleaved(0, nb, batch_id);
+            for s in 0..MAX_AXIS_CONSTRAINTS {
+                let cons_idx = il.atz(builder.constraint_id as usize + s as usize);
+                let mut c = constraints.read(cons_idx);
+                if c.kind != 0 {
+                    // Multibody side(s): LU back-solve `M⁻¹·Jᵀ`. Free-body sides
+                    // already have their `W·J` (= M⁻¹·Jᵀ) filled by the build
+                    // pass (it holds `mprops`). The loop-closure relative block
+                    // is stored on side B as a normal MB jacobian, so it's
+                    // handled here too.
+                    if c.side_a_kind == SIDE_KIND_MB && c.ndofs_a > 0 {
+                        let mb = multibody_info.read(il.atz(c.side_a_id as usize));
+                        solve_mb_wj(
+                            jacobians,
+                            c.j_id_a,
+                            c.ndofs_a,
+                            &mb,
+                            mass_matrices,
+                            lu_pivots,
+                            links_static,
+                            il,
+                        );
+                    }
+                    if c.side_b_kind == SIDE_KIND_MB && c.ndofs_b > 0 {
+                        let mb = multibody_info.read(il.atz(c.side_b_id as usize));
+                        solve_mb_wj(
+                            jacobians,
+                            c.j_id_b,
+                            c.ndofs_b,
+                            &mb,
+                            mass_matrices,
+                            lu_pivots,
+                            links_static,
+                            il,
+                        );
+                    }
+                    c.finalize_generic_constraint(jacobians);
+                    constraints.write(cons_idx, c);
+                }
+            }
+        }
+    }
+}
+
+/// One PGS iteration over the multibody-touching impulse-joint axis constraints
+/// of a single color — **one workgroup per joint**, the lanes cooperating on
+/// that joint's per-axis `J·v` reductions and `W·J` applies.
+///
+/// Joints are graph-colored at init time (see `set_impulse_joints`): within
+/// one color no two joints share a multibody or a free body, so the color's
+/// joints run race-free in parallel. The host dispatches one color per
+/// iteration, giving an exact sequential Gauss–Seidel sweep in color-sorted
+/// order.
+#[spirv_bindgen]
+#[spirv(compute(threads(64, 1, 1)))]
+pub fn gpu_mb_solve_impulse_joint_constraints(
+    #[spirv(workgroup_id)] wg_id: UVec3,
+    #[spirv(local_invocation_id)] lid: UVec3,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] builders: &[MbImpulseJointBuilder],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)]
+    constraints: &mut [MbImpulseJointConstraint],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 2)] jacobians: &[f32],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 3)] all_color_groups: &[u32],
+    #[spirv(uniform, descriptor_set = 0, binding = 4)] batch_ids: &BatchIndices,
+    #[spirv(uniform, descriptor_set = 0, binding = 5)] curr_color: &u32,
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 0)] multibody_info: &[MultibodyInfo],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 1)] dof_state: &mut [f32],
+    #[spirv(storage_buffer, descriptor_set = 1, binding = 2)] solver_vels: &mut [Velocity],
+    // Per-lane scratch for the J·v tree reductions.
+    #[spirv(workgroup)] partial: &mut [f32; LANES as usize],
+) {
+    let nb = batch_ids.num_batches;
+    let batch_id = wg_id.x % nb;
+    let k = wg_id.x / nb;
+    let lane = lid.x;
+
+    let il = VSlice::interleaved(0, nb, batch_id);
+    let bix = batch_ids.body_ix(batch_id);
+
+    // `color_groups` is a per-batch prefix-sum over the color-sorted
+    // builders, stored color-major interleaved (`color * nb + batch`):
+    // color `c` owns the sorted-builder range
+    // `[color_groups[c-1], color_groups[c])` (start `0` for color `0`).
+    let color = *curr_color as usize;
+    let start = if color > 0 {
+        all_color_groups.read(il.atz(color - 1))
+    } else {
+        0
+    };
+    let end = all_color_groups.read(il.atz(color));
+
+    let mut j = start + k;
+    let workgroup_is_active = j < end;
+    if !workgroup_is_active {
+        // Technically, if we enter here, we should return. However, on the web, a return would
+        // break uniform control flow. This could be avoided with a `workgroupUniformLoad` but
+        // that’s not supported by rust-gpu.
+        j = start; // Any valid index will do.
+    }
+
+    let builder = builders.at(il.atz(j as usize));
+
+    // Per-multibody dof base: same for every axis constraint of this joint.
+    let dof_base_a = if builder.side_a_kind == SIDE_KIND_MB {
+        let mb = multibody_info.at(il.atz(builder.side_a_id as usize));
+        VSlice::interleaved(mb.first_dof as usize, il.stride, il.shift)
+    } else {
+        VSlice::dense(0)
+    };
+    let dof_base_b = if builder.side_b_kind == SIDE_KIND_MB {
+        let mb = multibody_info.at(il.atz(builder.side_b_id as usize));
+        VSlice::interleaved(mb.first_dof as usize, il.stride, il.shift)
+    } else {
+        VSlice::dense(0)
+    };
+
+    // TODO(PERF): load jacobians into shared memory and keep the velocity deltat on shared
+    //             memory and only writeback after all the axis constraints are solved.
+    for s in 0..MAX_AXIS_CONSTRAINTS {
+        let c = constraints.at_mut(il.atz(builder.constraint_id as usize + s as usize));
+        let active = workgroup_is_active && c.kind != 0;
+
+        // dvel = J_b · v_b - J_a · v_a   (rapier's `vel2 - vel1`).
+        let v1 = side_dot_vel_par(
+            active,
+            c.side_a_kind,
+            c.j_id_a,
+            c.ndofs_a,
+            c.side_a_id,
+            jacobians,
+            dof_state,
+            dof_base_a,
+            solver_vels,
+            bix,
+            lane,
+            partial,
+        );
+        let v2 = side_dot_vel_par(
+            active,
+            c.side_b_kind,
+            c.j_id_b,
+            c.ndofs_b,
+            c.side_b_id,
+            jacobians,
+            dof_state,
+            dof_base_b,
+            solver_vels,
+            bix,
+            lane,
+            partial,
+        );
+
+        let delta = if active {
+            let dvel = c.rhs + (v2 - v1);
+            let total = (c.impulse + c.inv_lhs * (dvel - c.cfm_gain * c.impulse))
+                // NOTE: should be `clamp`, but `clamp` breaks uniform control flow for some reasons.
+                .max(c.impulse_lo)
+                .min(c.impulse_hi);
+            let d = total - c.impulse;
+            if lane == 0 {
+                c.impulse = total;
+            }
+            d
+        } else {
+            0.0f32
+        };
+
+        // Apply ±delta · W·J: sign +1 for side A, -1 for side B (matches
+        // rapier `solver_vel1.axpy(delta_impulse, &wj1, 1.0)`,
+        // `solver_vel2.axpy(-delta_impulse, &wj2, 1.0)`).
+        side_apply_impulse_par(
+            active,
+            c.side_a_kind,
+            c.j_id_a,
+            c.ndofs_a,
+            c.side_a_id,
+            1.0,
+            delta,
+            jacobians,
+            dof_state,
+            dof_base_a,
+            solver_vels,
+            bix,
+            lane,
+        );
+        side_apply_impulse_par(
+            active,
+            c.side_b_kind,
+            c.j_id_b,
+            c.ndofs_b,
+            c.side_b_id,
+            -1.0,
+            delta,
+            jacobians,
+            dof_state,
+            dof_base_b,
+            solver_vels,
+            bix,
+            lane,
+        );
+
+        workgroup_memory_barrier_with_group_sync();
+    }
+}
+
+/// Strip the positional bias from each active constraint's `rhs` for the
+/// stabilization sweep — mirrors `gpu_mb_remove_joint_constraint_bias`.
+#[spirv_bindgen]
+#[spirv(compute(threads(64)))]
+pub fn gpu_mb_remove_impulse_joint_constraint_bias(
+    #[spirv(global_invocation_id)] invocation_id: UVec3,
+    #[spirv(num_workgroups)] num_workgroups: UVec3,
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 0)] builders: &[MbImpulseJointBuilder],
+    #[spirv(storage_buffer, descriptor_set = 0, binding = 1)]
+    constraints: &mut [MbImpulseJointConstraint],
+    #[spirv(uniform, descriptor_set = 0, binding = 2)] batch_ids: &BatchIndices,
+) {
+    let num_threads = num_workgroups.x * 64;
+    let nb = batch_ids.num_batches;
+    let total = batch_ids.mb_imp_joints_batch_capacity * nb;
+    for t in StepRng::new(invocation_id.x..total, num_threads) {
+        let builder = builders.at(t as usize);
+        let is_dummy =
+            builder.side_a_kind == SIDE_KIND_FIXED && builder.side_b_kind == SIDE_KIND_FIXED;
+        if is_dummy {
+            continue;
+        }
+        let batch_id = t % nb;
+        let il = VSlice::interleaved(0, nb, batch_id);
+        for s in 0..MAX_AXIS_CONSTRAINTS {
+            let c = constraints.at_mut(il.atz(builder.constraint_id as usize + s as usize));
+            if c.kind != 0 {
+                c.rhs = c.rhs_wo_bias;
+            }
+        }
+    }
+}

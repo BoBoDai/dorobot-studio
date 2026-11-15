@@ -1,12 +1,13 @@
 {
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "platform": "macos-arm64",
-  "python": "3.13.5",
   "aisle": {
     "repository": "https://github.com/moxin-org/AISLE.git",
-    "revision": "845e31f5d1871905e69c9d838f90a32c62bd6476"
+    "revision": "845e31f5d1871905e69c9d838f90a32c62bd6476",
+    "integration": "Native Rust port of the Nano room, control and capture flow"
   },
   "makepad": "44d8220f12acfa46157019267e119e0866dd6b05",
   "dora": "1.0.1",
-  "nexus": "0.2.1"
+  "nexus": "ca2cc91d6a3cabbed1ccff9b7f08b22d76c7865d",
+  "runtime": "rust"
 }

@@ -2,6 +2,12 @@
 
 SO-100/SO-101 LeRobot data collection and dataset review with the **Makepad** UI framework.
 
+The standalone RC uses Rust for Studio, native Dora nodes, Nexus simulation,
+controller/serial control, three-camera recording and dataset transfer. It
+packages no Python runtime or bindings. See the [native runtime](runtime/README.md)
+and [macOS release guide](tools/release/README.md). FFmpeg remains a native codec
+dependency; Python is used only by development/build and acceptance scripts.
+
 For the current capture workflow, build requirements, verification results and remaining hardware checks, see [the functional review and setup guide](docs/FUNCTIONAL_REVIEW.md). Production mode is the default; use `--demo` for generated fixtures.
 
 This is a standalone Git repository and Cargo workspace. Open this directory
@@ -60,8 +66,9 @@ the viewer leaves the source recording running.
 
 Operate and Replay retain separate panel layouts and the replay playhead. When a
 source finishes, **Open recording** opens its finalized dataset in Replay.
+The [native runtime guide](runtime/README.md) describes the built-in Dora producer.
 The [Nano room integration guide](tools/aisle-validation/README.md#mobile-nano-in-a-living-room)
-includes the Dora producer and full capture workflow. This workflow currently
+retains the original AISLE validation experiments. The recording workflow currently
 captures at 5 Hz; the Live mode does not imply 30 fps throughput.
 
 ## Overview

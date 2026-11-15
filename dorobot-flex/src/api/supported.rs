@@ -52,22 +52,6 @@ impl NanoRuntime {
         if !mock && (!port.starts_with("/dev/") || !std::path::Path::new(port).exists()) {
             return Err("Enter an existing USB serial device under /dev/.".into());
         }
-        let home = std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_default();
-        let uv = std::env::var_os("DOROBOT_UV")
-            .map(PathBuf::from)
-            .or_else(|| {
-                [
-                    home.join(".local/bin/uv"),
-                    home.join(".cargo/bin/uv"),
-                    home.join(".cache/dorobot/aisle-validation-tools/bin/uv"),
-                ]
-                .into_iter()
-                .find(|p| p.is_file())
-            })
-            .unwrap_or_else(|| PathBuf::from("uv"));
-        let folder = crate::runtime::root().join("robots/adora_nano_feetech");
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -77,14 +61,9 @@ impl NanoRuntime {
         fs::create_dir_all(&output).map_err(|e| e.to_string())?;
         fs::write(output.join("lease"), b"live").map_err(|e| e.to_string())?;
         let log = fs::File::create(output.join("launcher.log")).map_err(|e| e.to_string())?;
-        let mut command = if let Some(python) = crate::runtime::bundled_python() {
-            Command::new(python)
-        } else {
-            let mut command = Command::new(uv);
-            command.args(["run", "--frozen", "--project"]).arg(&folder).arg("python");
-            command
-        };
-        command.arg(folder.join("run.py"))
+        let mut command = Command::new(crate::runtime::native());
+        command
+            .arg("base")
             .arg("--output")
             .arg(&output)
             .arg("--owner-pid")
@@ -97,18 +76,10 @@ impl NanoRuntime {
         } else {
             command.arg("--port").arg(port);
         }
-        // GUI launch environments do not always include the user CLI directory.
-        let mut paths = vec![home.join(".local/bin"), home.join(".cargo/bin")];
-        paths.extend(std::env::split_paths(
-            &std::env::var_os("PATH").unwrap_or_default(),
-        ));
-        if let Ok(path) = std::env::join_paths(paths) {
-            command.env("PATH", path);
-        }
         crate::runtime::configure(&mut command);
-        let child = command
-            .spawn()
-            .map_err(|e| format!("Cannot start the Nano runtime: {e}. Check the runtime installation."))?;
+        let child = command.spawn().map_err(|e| {
+            format!("Cannot start the Nano runtime: {e}. Check the runtime installation.")
+        })?;
         self.child = Some(child);
         self.output = Some(output);
         self.stopping = false;

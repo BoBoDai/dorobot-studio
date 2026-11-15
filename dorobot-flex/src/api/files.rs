@@ -916,9 +916,7 @@ impl Backend for FileBackend {
                 self.status = format!("{} {repo}…", if upload { "Uploading" } else { "Downloading" });
                 self.library.busy = Some(self.status.clone());
                 std::thread::spawn(move || {
-                    let python = crate::runtime::python();
-                    let script = crate::runtime::root().join("tools/capture/hub.py");
-                    let result = std::process::Command::new(python).arg(script).arg(if upload { "push" } else { "pull" }).arg(repo).arg(&path).output()
+                    let result = std::process::Command::new(crate::runtime::native()).arg("hub").arg(if upload { "push" } else { "pull" }).arg(repo).arg(&path).output()
                         .map_err(|e| e.to_string()).and_then(|o| if o.status.success() { Ok(path) } else { Err(String::from_utf8_lossy(&o.stderr).chars().rev().take(1500).collect::<String>().chars().rev().collect()) });
                     let _ = tx.send(result);
                 });
@@ -1193,10 +1191,7 @@ impl Backend for FileBackend {
                     self.hardware.instruction = self.status.clone();
                     self.record.recording = false;
                     self.record.busy = false;
-                    if self.status.contains("No module named 'lerobot'") {
-                        self.status = "LeRobot capture dependencies are missing. Install tools/capture/requirements.txt in a Python environment and set DOROBOT_PYTHON to its interpreter, then retry Start calibration.".into();
-                        self.hardware.instruction = self.status.clone();
-                    }
+
                 }
                 _ => {}
             }
