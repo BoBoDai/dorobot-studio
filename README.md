@@ -1,6 +1,11 @@
 # DoRobot Studio
 
-SO-100/SO-101 LeRobot data collection and dataset review with the **Makepad** UI framework.
+Adora Nano simulation, SO-100/SO-101 LeRobot data collection and dataset review
+with the **Makepad** UI framework.
+
+**Start here: [Detailed user guide](docs/USER_GUIDE.md)** — installation, first
+simulation, controller mappings, camera layouts, recording/replay, real hardware
+calibration, Hub transfers and troubleshooting.
 
 The standalone RC uses Rust for Studio, native Dora nodes, Nexus simulation,
 controller/serial control, three-camera recording and dataset transfer. It
@@ -124,7 +129,8 @@ control cycles through 0.25×, 0.5×, 1× and 2× in both windows and survives r
 the extra window preserves the main task. Layouts and navigation width are
 saved locally. Hardware uses the same panel behavior and has **Restore panels**.
 
-The four Replay views are 3D, main camera, wrist camera and tracking error.
+Replay provides 3D, the available camera views and tracking error, including
+all three cameras in a captured Nano dataset.
 Camera panels explain missing media. Record and Hardware keep their controls
 visible with setup guidance; recording stays disabled until a profile exists.
 See the [functional UX judge loop](docs/ux/functional-review.md) for the workflow
@@ -182,9 +188,9 @@ cargo run --release -p dorobot-flex
 
 ### Loading a Dataset
 
-1. Click **Open Dataset** in the sidebar
-2. Navigate to a LeRobot dataset directory (containing `meta/info.json`)
-3. Select an episode from the episode list
+1. Open **Library → Open folder…**
+2. Choose a LeRobot dataset directory (containing `meta/info.json`), or a parent library folder
+3. Open a dataset and use **Episodes** to select an episode
 4. Use playback controls or drag the timeline to scrub
 
 ### Keyboard Shortcuts

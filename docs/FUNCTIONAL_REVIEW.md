@@ -1,5 +1,9 @@
 # DoRobot Studio setup and workflows
 
+For step-by-step operating instructions, screenshots and troubleshooting, use
+the [user guide](USER_GUIDE.md). This document records implementation and
+validation details.
+
 ## Setup → Operate → Record → Replay
 
 The sidebar follows the recording journey. **Robot setup** stays a setup page;

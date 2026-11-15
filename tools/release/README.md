@@ -8,6 +8,10 @@ bindings are packaged or launched.
 
 ## Use
 
+See the [detailed user guide](../../docs/USER_GUIDE.md) for installation,
+controller mappings, camera layouts, capture/replay, hardware calibration,
+dataset transfers and troubleshooting.
+
 Move **DoRobot Studio.app** to Applications. Open **Robot setup → Simulation →
 Start simulation → Operate**. Start and stop a take with **Record**, then **Save**
 and **Replay**. The first simulation launch prepares GPU shaders. A paired
