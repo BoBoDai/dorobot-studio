@@ -40,7 +40,7 @@ fn urdf_for(robot_type: &str) -> Option<(PathBuf, PathBuf)> {
         .unwrap_or(robot);
     let relative = PathBuf::from("data").join(&dir);
     let assets = if relative.is_dir() { relative } else {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data").join(&dir)
+        crate::runtime::root().join("data").join(&dir)
     };
     let urdf = assets.join(format!("{dir}.urdf"));
     urdf.exists().then_some((urdf, assets))
@@ -916,8 +916,8 @@ impl Backend for FileBackend {
                 self.status = format!("{} {repo}…", if upload { "Uploading" } else { "Downloading" });
                 self.library.busy = Some(self.status.clone());
                 std::thread::spawn(move || {
-                    let python = std::env::var_os("DOROBOT_PYTHON").unwrap_or_else(|| "python3".into());
-                    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tools/capture/hub.py");
+                    let python = crate::runtime::python();
+                    let script = crate::runtime::root().join("tools/capture/hub.py");
                     let result = std::process::Command::new(python).arg(script).arg(if upload { "push" } else { "pull" }).arg(repo).arg(&path).output()
                         .map_err(|e| e.to_string()).and_then(|o| if o.status.success() { Ok(path) } else { Err(String::from_utf8_lossy(&o.stderr).chars().rev().take(1500).collect::<String>().chars().rev().collect()) });
                     let _ = tx.send(result);
@@ -1041,7 +1041,7 @@ impl Backend for FileBackend {
                 // it is not another captured frame.
                 if !finished || self.live_preview.stats.frames == 0 {
                     if finished { packet.header.sequence = packet.header.sequence.saturating_sub(1); }
-                    let assets = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/adora_nano");
+                    let assets = crate::runtime::root().join("data/adora_nano");
                     let model = (assets.join("adora_nano.urdf"), assets);
                     super::live::apply_packet(&mut self.live_preview, packet, model);
                 }

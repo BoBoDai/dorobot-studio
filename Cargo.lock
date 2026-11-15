@@ -1910,7 +1910,7 @@ dependencies = [
 
 [[package]]
 name = "dorobot-dora-bridge"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "anyhow",
  "dorobot-types",
@@ -1921,7 +1921,7 @@ dependencies = [
 
 [[package]]
 name = "dorobot-flex"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -1944,14 +1944,14 @@ dependencies = [
 
 [[package]]
 name = "dorobot-types"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "dorobot-ux"
-version = "0.1.0"
+version = "0.1.0-rc.1"
 dependencies = [
  "makepad-widgets",
 ]

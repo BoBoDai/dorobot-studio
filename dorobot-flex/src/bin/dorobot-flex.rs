@@ -19,7 +19,7 @@ use makepad_widgets::*;
 /// against that clock rather than counting frames of its own.
 const PLAYBACK_TIMER_FPS: f64 = 60.0;
 
-app_main!(App);
+app_main!(App, font_assets: [INTER_FONT_ASSET]);
 
 // Focused buttons own Space/Return; playback shortcuts must not perform a
 // second, unrelated action when a person activates one with the keyboard.
@@ -54,7 +54,7 @@ fn make_backend() -> Box<dyn Backend> {
         .and_then(|i| args.get(i + 1))
         .cloned()
         .or_else(|| std::env::var("DOROBOT_DATASETS").ok())
-        .unwrap_or_else(|| format!("{}/../datasets", env!("CARGO_MANIFEST_DIR")));
+        .unwrap_or_else(|| dorobot_flex::runtime::datasets().display().to_string());
     let prefer = args
         .iter()
         .position(|a| a == "--open")
@@ -321,7 +321,7 @@ impl App {
         let mut hardware = self.backend.hardware().clone();
         if self.backend.workflow().simulation {
             hardware.nano = None;
-            let assets = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/adora_nano");
+            let assets = dorobot_flex::runtime::root().join("data/adora_nano");
             hardware.robot_urdf = Some((assets.join("adora_nano.urdf"),assets));
             hardware.can_advance = false; hardware.joints.clear(); hardware.steps.clear();
             hardware.instruction.clear();

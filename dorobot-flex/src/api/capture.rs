@@ -76,8 +76,8 @@ pub struct Worker {
 }
 impl Worker {
     pub fn start(profile: &Path, calibration: bool) -> Result<Self, String> {
-        let python = std::env::var_os("DOROBOT_PYTHON").unwrap_or_else(|| "python3".into());
-        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tools/capture/worker.py");
+        let python = crate::runtime::python();
+        let script = crate::runtime::root().join("tools/capture/worker.py");
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

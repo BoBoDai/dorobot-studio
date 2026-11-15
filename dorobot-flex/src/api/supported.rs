@@ -67,7 +67,7 @@ impl NanoRuntime {
                 .find(|p| p.is_file())
             })
             .unwrap_or_else(|| PathBuf::from("uv"));
-        let folder = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../robots/adora_nano_feetech");
+        let folder = crate::runtime::root().join("robots/adora_nano_feetech");
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -77,12 +77,14 @@ impl NanoRuntime {
         fs::create_dir_all(&output).map_err(|e| e.to_string())?;
         fs::write(output.join("lease"), b"live").map_err(|e| e.to_string())?;
         let log = fs::File::create(output.join("launcher.log")).map_err(|e| e.to_string())?;
-        let mut command = Command::new(uv);
-        command
-            .args(["run", "--frozen", "--project"])
-            .arg(&folder)
-            .arg("python")
-            .arg(folder.join("run.py"))
+        let mut command = if let Some(python) = crate::runtime::bundled_python() {
+            Command::new(python)
+        } else {
+            let mut command = Command::new(uv);
+            command.args(["run", "--frozen", "--project"]).arg(&folder).arg("python");
+            command
+        };
+        command.arg(folder.join("run.py"))
             .arg("--output")
             .arg(&output)
             .arg("--owner-pid")
@@ -103,9 +105,10 @@ impl NanoRuntime {
         if let Ok(path) = std::env::join_paths(paths) {
             command.env("PATH", path);
         }
+        crate::runtime::configure(&mut command);
         let child = command
             .spawn()
-            .map_err(|e| format!("Cannot start uv: {e}. Install uv or set DOROBOT_UV."))?;
+            .map_err(|e| format!("Cannot start the Nano runtime: {e}. Check the runtime installation."))?;
         self.child = Some(child);
         self.output = Some(output);
         self.stopping = false;

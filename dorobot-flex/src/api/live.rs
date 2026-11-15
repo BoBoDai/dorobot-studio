@@ -19,7 +19,7 @@ use std::{
 /// Reconnect the current local controller simulation without baking a run's
 /// temporary socket name into the UI. Ignore recordings and stale runs.
 pub fn nano_gamepad_source() -> PathBuf {
-    let runs = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../tools/aisle-validation/runs");
+    let runs = crate::runtime::runs();
     find_gamepad_source(&runs).unwrap_or_else(|| PathBuf::from("/tmp/nano-gamepad.sock"))
 }
 

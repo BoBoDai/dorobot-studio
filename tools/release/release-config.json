@@ -1,0 +1,12 @@
+{
+  "version": "0.1.0-rc.1",
+  "platform": "macos-arm64",
+  "python": "3.13.5",
+  "aisle": {
+    "repository": "https://github.com/moxin-org/AISLE.git",
+    "revision": "845e31f5d1871905e69c9d838f90a32c62bd6476"
+  },
+  "makepad": "44d8220f12acfa46157019267e119e0866dd6b05",
+  "dora": "1.0.1",
+  "nexus": "0.2.1"
+}
