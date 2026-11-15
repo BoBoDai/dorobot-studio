@@ -674,7 +674,7 @@ impl RecordScreenRef {
         for (id, enabled) in [
             (
                 ids!(transport.btn_record) as &[LiveId],
-                st.recording || (!st.profile_label.is_empty() && !st.busy && !has_take),
+                st.recording || (st.ready_to_record && !st.profile_label.is_empty() && !st.busy && !has_take),
             ),
             (
                 ids!(transport.btn_save),

@@ -58,7 +58,7 @@ def appearance(want):
         time.sleep(.6)
     raise AssertionError('Appearance did not change')
 
-screens = ([('Library','nav_library'), ('Record','nav_record'), ('Play','nav_play'), ('Hardware','nav_hardware'), ('Eval','nav_eval')]
+screens = ([('Library','nav_library'), ('Record','nav_record'), ('Replay','nav_play'), ('Robot setup','nav_hardware'), ('Operate','nav_live'), ('Eval','nav_eval')]
            if a.app == 'studio' else [(n, f'tab{i}') for i,n in enumerate(['Home','Scenes','Robots','Train','Inspect','Validate','Runs','Deploy'])])
 if a.screens:
     wanted = set(a.screens.split(','))

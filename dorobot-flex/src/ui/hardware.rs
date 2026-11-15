@@ -17,7 +17,7 @@ script_mod! {
 
     // Stepper node: ring + number, or a filled check once the step is done.
     let StepDot = View{
-        width: Fit height: Fit
+        width: Fit height: 26
         flow: Right
         align: Align{y: 0.5}
         spacing: 9.0
@@ -51,8 +51,10 @@ script_mod! {
                 }
             }
             num := Label{
+                padding: 0.0 margin: 0.0
                 text: "1"
                 draw_text +: {
+                    temp_y_shift: #(if cfg!(target_os = "macos") { -0.10f64 } else { 0.0f64 })
                     state: instance(0.0)
                     light: instance(0.0)
                     text_style: mod.widgets.ux.TEXT_CHIP{}
@@ -65,8 +67,10 @@ script_mod! {
             }
         }
         caption := Label{
+            padding: 0.0 margin: 0.0
             text: "Step"
             draw_text +: {
+                temp_y_shift: #(if cfg!(target_os = "macos") { -0.10f64 } else { 0.0f64 })
                 state: instance(0.0)
                 light: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_BODY{}
@@ -194,16 +198,22 @@ script_mod! {
         width: Fill
         height: Fill
         flow: Down
-        spacing: 14.0
-        padding: Inset{left: 16. right: 16. top: 14. bottom: 16.}
+        spacing: 6.0
+        padding: 6.0
         show_bg: true
         draw_bg +: {
             light: instance(0.0)
             pixel: fn() { return mix(#x111114, #xF2F2F7, self.light) }
         }
 
+        supported_robots := View{width: Fill height: 32 flow: Right spacing: 6.0 align: Align{y: 0.5}
+            simulation_select := mod.widgets.ux.ToolButton{text: "Nano simulation"}
+            nano_select := mod.widgets.ux.ToolButton{text: "Adora Nano · Feetech base"}
+            rig_select := mod.widgets.ux.ToolButton{text: "LeRobot rig"}
+        }
+
         stepper := View{
-            width: Fill height: 44
+            width: Fill height: 32
             flow: Right
             align: Align{y: 0.5}
             padding: Inset{left: 10. right: 10.}
@@ -222,9 +232,10 @@ script_mod! {
         // owns the layout, so they drag, resize, maximise and persist.
         // Each Card keeps its body verbatim inside the slot — its own
         // walk and its children's are what lay the contents out.
-        layout_tools := View{width: Fill height: 44 flow: Right spacing: 8.0
-            hardware_reset := Button{height: 44 text: "Restore panels"}
-            Label{width: Fill text: "Drag panel titles to arrange · drag dividers to resize"
+        layout_tools := View{width: Fill height: 32 flow: Right spacing: 10.0 align: Align{y: 0.5}
+            hardware_reset := mod.widgets.ux.QuietButton{text: "Restore panels"}
+            hardware_fit := mod.widgets.ux.QuietButton{text: "Fit view"}
+            hardware_layout_hint := Label{visible: false width: Fill height: Fit padding: 0.0 text: "Drag panel titles to arrange · drag edges to resize"
                 draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
         }
         content := FlexPanels{panel_count: 2 persistence_key: "hardware-layout.json"
@@ -237,6 +248,7 @@ script_mod! {
                         // "RobotView mounts here" written across it.
                         viewport := RobotView{
                         keyboard_controls: false width: Fill height: Fill
+                        material_roughness: 0.68 material_metallic: 0.02
                         sky_horizon: mod.theme.color_bg_app sky_zenith: mod.theme.color_bg_app
                         ground_color: mod.theme.color_bg_container ground2_color: mod.theme.color_bg_container
                         grid_color: mod.theme.color_text_disabled }
@@ -247,12 +259,31 @@ script_mod! {
                         width: Fill height: Fill
                         flow: Down
 
-                        banner := RoundedView{
-                            width: Fill height: Fit
-                            margin: Inset{left: 12. right: 12. top: 12.}
-                            padding: Inset{left: 12. right: 12. top: 12. bottom: 12.}
+                        nano_controls := View{visible: false width: Fill height: Fit flow: Down spacing: 10.0 padding: 12.0
+                            driver_state := Label{width: Fill height: Fit padding: 0.0
+                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}}}
+                            serial_row := View{width: Fill height: 32 flow: Right spacing: 6.0
+                                port := TextInput{width: Fill height: 32 min_height: 32 margin: 0.0
+                                    empty_text: "USB serial port"}
+                                scan := mod.widgets.ux.ToolButton{text: "Find port"}
+                            }
+                            connection_row := View{width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 6.0
+                                connect := mod.widgets.ux.PrimaryButton{text: "Connect"}
+                                test := mod.widgets.ux.QuietButton{text: "Bus test"}
+                                stop := mod.widgets.ux.StopButton{text: "Disconnect"}
+                            }
+                            wheel_commands := Label{width: Fill height: Fit padding: 0.0
+                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                            help := Label{width: Fill height: Fit padding: 0.0
+                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                        }
+
+                        banner := ScrollYView{
+                            width: Fill height: Fill
+                            margin: Inset{left: 6. right: 6. top: 6. bottom: 0.}
+                            padding: 10.0
                             flow: Right
-                            align: Align{y: 0.5}
+                            align: Align{y: 0.0}
                             spacing: 16.0
                             show_bg: true
                             draw_bg +: {
@@ -287,8 +318,10 @@ script_mod! {
                                     }
                                 }
                                 ring_text := Label{
+                                    padding: 0.0 margin: 0.0
                                     text: "0/0"
                                     draw_text +: {
+                                        temp_y_shift: #(if cfg!(target_os = "macos") { -0.10f64 } else { 0.0f64 })
                                         light: instance(0.0)
                                         text_style: mod.widgets.ux.TEXT_TITLE{}
                                         get_color: fn() { return mix(#xE5E5EA, #x38383A, self.light) }
@@ -298,15 +331,16 @@ script_mod! {
                             btext := View{
                                 width: Fill height: Fit flow: Down spacing: 5.0
                                 instruction := Label{
-                                    width: Fill
+                                    width: Fill padding: 0.0
                                     text: "Move every joint through its full range"
                                     draw_text +: {
                                         light: instance(0.0)
-                                        text_style: mod.widgets.ux.TEXT_TITLE{}
+                                        text_style: mod.widgets.ux.TEXT_BODY{}
                                         get_color: fn() { return mix(#xE5E5EA, #x38383A, self.light) }
                                     }
                                 }
                                 subline := Label{
+                                    width: Fill padding: 0.0
                                     text: "0/0 joints complete"
                                     draw_text +: { color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{} }
                                 }
@@ -325,23 +359,20 @@ script_mod! {
                             joint_5 := JointRow{}
                         }
 
-                        Filler{}
-
                         actions := View{
                             width: Fill height: Fit
-                            flow: Right
+                            flow: Flow.Right{wrap: true}
                             align: Align{y: 0.5}
-                            spacing: 12.0
+                            spacing: 8.0
                             padding: Inset{left: 12. right: 12. bottom: 14.}
-                            Filler{}
                             btn_restart := Button{
-                                text: "Restart step"
-                                padding: Inset{left: 20. right: 20. top: 12. bottom: 12.}
+                                text: "Restart step" width: 120 height: 32 min_height: 32 margin: 0.0
+                                padding: Inset{left: 12. right: 12. top: 0. bottom: 0.}
                                 draw_bg +: {
                                     light: instance(0.0)
                                     pixel: fn() {
                                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
-                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
+                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 4.0)
                                         let idle = mix(#x2C2C2E, #xFFFFFF, self.light)
                                         let hov = mix(#x38383A, #xF2F2F7, self.light)
                                         sdf.fill_keep(mix(idle, hov, self.hover))
@@ -356,8 +387,8 @@ script_mod! {
                                 }
                             }
                             btn_continue := Button{
-                                text: "Continue"
-                                padding: Inset{left: 30. right: 30. top: 12. bottom: 12.}
+                                text: "Continue" width: 156 height: 32 min_height: 32 margin: 0.0
+                                padding: Inset{left: 16. right: 16. top: 0. bottom: 0.}
                                 draw_bg +: {
                                     enabled_f: instance(0.0)
                                     light: instance(0.0)
@@ -365,7 +396,7 @@ script_mod! {
                                         let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                                         let off = mix(#x38383A, #xE5E5EA, self.light)
                                         let live = mix(off, #x0060CC, self.enabled_f)
-                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, mod.widgets.nx.BUTTON_RADIUS)
+                                        sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 4.0)
                                         sdf.fill(mix(live, #x0060CC, self.hover * self.enabled_f))
                                         return sdf.result
                                     }
@@ -394,6 +425,14 @@ pub struct HardwareScreen {
     /// Model currently mounted in the mirror, so it is opened once.
     #[rust]
     loaded_urdf: Option<(std::path::PathBuf, std::path::PathBuf)>,
+    #[rust]
+    inspector_available: Option<bool>,
+    #[rust]
+    fit_pending: bool,
+    #[rust]
+    viewport_aspect: f64,
+    #[rust]
+    last_view_distance: f32,
 }
 
 impl Widget for HardwareScreen {
@@ -402,11 +441,55 @@ impl Widget for HardwareScreen {
         if self.view.button(cx, ids!(hardware_reset)).clicked(&actions) {
             self.view.flex_panels(cx, ids!(content)).reset(cx);
         }
+        if self.view.button(cx, ids!(hardware_fit)).clicked(&actions) {
+            fit_robot(cx, &self.view);
+        }
         cx.extend_actions(actions);
     }
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
-        self.view.draw_walk(cx, scope, walk)
+        let step = self.view.draw_walk(cx, scope, walk);
+        if step.is_ok() {
+            let widget = self.view.widget(cx, ids!(content.robot_panel.content.mirror.viewport));
+            let rect = widget.area().rect(cx);
+            if rect.size.x > 1.0 && rect.size.y > 1.0 {
+                let aspect = (rect.size.x / rect.size.y).clamp(0.4, 1.0);
+                if self.fit_pending {
+                    fit_robot(cx, &self.view);
+                    self.fit_pending = false;
+                } else if self.viewport_aspect > 0.0 && (self.viewport_aspect - aspect).abs() > 0.001 {
+                    if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                        let distance = viewer.view_distance() * (self.viewport_aspect / aspect) as f32;
+                        viewer.set_view_distance(cx, distance);
+                    }
+                }
+                self.viewport_aspect = aspect;
+                if let Some(viewer) = widget.borrow::<makepad_urdf_player::robot_view::RobotView>() {
+                    self.last_view_distance = viewer.view_distance();
+                }
+            }
+        }
+        step
     }
+}
+
+fn fit_robot(cx: &mut Cx, root: &View) {
+    let widget = root.widget(cx, ids!(content.robot_panel.content.mirror.viewport));
+    let rect = widget.area().rect(cx);
+    if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+        if let Some(robot) = viewer.robot() {
+            let (min, max) = robot.bounds_world();
+            let center = (min + max) * 0.5;
+            let radius = (max - min).length() * 0.5;
+            let aspect = if rect.size.y > 0.0 {
+                (rect.size.x / rect.size.y).clamp(0.4, 1.0) as f32
+            } else {
+                1.0
+            };
+            viewer.set_camera_target(cx, [center.x, center.y, center.z]);
+            viewer.set_view_angles(cx, 0.72, -0.22);
+            viewer.set_view_distance(cx, radius * 3.1 / aspect);
+        }
+    };
 }
 
 const STEP_IDS: [&[LiveId]; 5] = [
@@ -432,6 +515,26 @@ const JOINT_IDS: [&[LiveId]; 6] = [
 ];
 
 impl HardwareScreenRef {
+    pub fn restore_view_distance(&self, cx: &mut Cx) {
+        if let Some(inner) = self.borrow() {
+            let widget = inner.view.widget(cx, ids!(content.robot_panel.content.mirror.viewport));
+            if inner.last_view_distance > 0.0 {
+                if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                    viewer.set_view_distance(cx, inner.last_view_distance);
+                }
+            }
+        }
+    }
+    /// Hide the simulation's unused inspector without changing the user's layout.
+    pub fn set_inspector_available(&self, cx: &mut Cx, available: bool) {
+        if let Some(mut inner) = self.borrow_mut() {
+            if inner.inspector_available != Some(available) {
+                inner.inspector_available = Some(available);
+                inner.fit_pending = true;
+                inner.view.flex_panels(cx, ids!(content)).set_panel_available(cx, 1, available);
+            }
+        }
+    }
     pub fn sync(&self, cx: &mut Cx, state: &HardwareState) {
         let light = crate::ui::frame::light_mode();
         let Some(mut inner) = self.borrow_mut() else {
@@ -441,16 +544,51 @@ impl HardwareScreenRef {
         let need_load = inner.loaded_urdf != want;
         if need_load {
             inner.loaded_urdf = want.clone();
+            inner.fit_pending = true;
         }
         let root = &mut inner.view;
+
+        let nano = state.nano.as_ref();
+        root.widget(cx, ids!(stepper)).set_visible(cx, nano.is_none());
+        root.widget(cx, ids!(content.camera_a_panel.content.calib.nano_controls)).set_visible(cx, nano.is_some());
+        root.widget(cx, ids!(content.camera_a_panel.content.calib.actions)).set_visible(cx, nano.is_none());
+        root.widget(cx, ids!(content.camera_a_panel.content.calib.banner)).set_visible(cx, nano.is_none());
+        root.button(cx, ids!(supported_robots.nano_select)).set_text(cx, if nano.is_some() { "Adora Nano · Feetech base ✓" } else { "Adora Nano · Feetech base" });
+        if let Some(nano) = nano {
+            root.widget(cx, ids!(content.camera_a_panel.content.calib.nano_controls.serial_row)).set_visible(cx, !nano.active);
+            let title = if nano.active { if nano.mock { "Bus test connected" } else { "Base connected" } } else if nano.phase == "error" { "Connection failed" } else { "Connect mobile base" };
+            root.label(cx, ids!(content.camera_a_panel.content.calib.nano_controls.driver_state)).set_text(cx,title);
+            root.label(cx, ids!(content.camera_a_panel.content.calib.nano_controls.wheel_commands))
+                .set_text(cx, &format!("Ticks 13: {:+} · 14: {:+} · 15: {:+}\n{} writes · no position feedback", nano.command_ticks[0], nano.command_ticks[1], nano.command_ticks[2], nano.acks));
+            let help = if nano.phase == "error" { nano.detail.clone() }
+                else if nano.active && nano.mock { "Command test only · no simulated motion.\nL1 hold to send · release to stop".into() }
+                else if nano.active { "L1 hold to drive · release to stop\nLeft stick: drive / strafe · Right stick: turn".into() }
+                else { "USB serial · Feetech mobile base".into() };
+            root.label(cx, ids!(content.camera_a_panel.content.calib.nano_controls.help)).set_text(cx, &help);
+            root.widget(cx, ids!(content.camera_a_panel.content.calib.nano_controls.connection_row.connect)).set_visible(cx, !nano.active);
+            root.widget(cx, ids!(content.camera_a_panel.content.calib.nano_controls.connection_row.test)).set_visible(cx, !nano.active);
+            root.widget(cx, ids!(content.camera_a_panel.content.calib.nano_controls.connection_row.stop)).set_visible(cx, nano.active);
+            root.button(cx, ids!(content.camera_a_panel.content.calib.nano_controls.connection_row.connect)).set_enabled(cx, !nano.active);
+            root.button(cx, ids!(content.camera_a_panel.content.calib.nano_controls.connection_row.test)).set_enabled(cx, !nano.active);
+            root.button(cx, ids!(content.camera_a_panel.content.calib.nano_controls.connection_row.stop)).set_enabled(cx, nano.active);
+        }
 
         root.label(cx, ids!(content.robot_panel.head.title))
             .set_text(
                 cx,
                 if state.live_angles.is_empty() {
-                    "Reference pose · no live data"
+                    "Reference model"
                 } else {
                     "Live mirror"
+                },
+            );
+        root.label(cx, ids!(content.camera_a_panel.head.title))
+            .set_text(
+                cx,
+                if state.joints.is_empty() && !state.can_advance {
+                    "Connection status"
+                } else {
+                    "Joint calibration"
                 },
             );
         // The mirror renders the robot itself, so the model is opened once and
@@ -473,12 +611,30 @@ impl HardwareScreenRef {
                 rv.set_joint_angles(cx, &state.live_angles);
             }
         }
-
         script_apply_eval!(cx, root, { draw_bg +: { light: #(light) } });
+        let sky = if light > 0.5 {
+            dorobot_ux::tokens::pal::VOID_L
+        } else {
+            dorobot_ux::tokens::pal::DEEP_D
+        };
+        let ground = if light > 0.5 {
+            dorobot_ux::tokens::pal::VOID_L
+        } else {
+            dorobot_ux::tokens::pal::LIFT_D
+        };
+        let grid = if light > 0.5 {
+            vec4(0.77, 0.78, 0.81, 1.0)
+        } else {
+            vec4(0.27, 0.28, 0.31, 1.0)
+        };
+        let mut viewport = root.widget(cx, ids!(content.robot_panel.content.mirror.viewport));
+        script_apply_eval!(cx, viewport, { sky_horizon: #(sky) sky_zenith: #(sky) ground_color: #(ground) ground2_color: #(ground) grid_color: #(grid) });
         apply_light_in(
             cx,
             root,
             &[
+                (ids!(hardware_reset), Themed::Both),
+                (ids!(hardware_fit), Themed::Both),
                 (
                     ids!(content.camera_a_panel.content.calib.banner),
                     Themed::Bg,
@@ -586,6 +742,27 @@ impl HardwareScreenRef {
         // ---- progress banner ----------------------------------------------
         let done_n = state.joints_done();
         let total = state.joints.len();
+        // Port discovery has no calibration progress yet. A 0/0 ring looks
+        // like an incomplete task even though no joint readings are available.
+        root.widget(cx, ids!(content.camera_a_panel.content.calib.banner.ring))
+            .set_visible(cx, total > 0);
+        root.widget(
+            cx,
+            ids!(content.camera_a_panel.content.calib.banner.btext.subline),
+        )
+        .set_visible(cx, total > 0);
+        root.button(
+            cx,
+            ids!(content.camera_a_panel.content.calib.actions.btn_restart),
+        )
+        .set_text(
+            cx,
+            if total == 0 && !state.can_advance {
+                "Check connections"
+            } else {
+                "Restart step"
+            },
+        );
         let frac = if total == 0 {
             0.0
         } else {
@@ -691,6 +868,35 @@ impl HardwareScreenRef {
     pub fn wizard_intent(&self, cx: &mut Cx, actions: &Actions) -> Option<Intent> {
         let mut inner = self.borrow_mut()?;
         let v = &mut inner.view;
+        if v.button(cx, ids!(supported_robots.simulation_select)).clicked(actions) {
+            return Some(Intent::SelectSimulation(true));
+        }
+        if v.button(cx, ids!(supported_robots.nano_select)).clicked(actions) {
+            return Some(Intent::SelectNanoBase(true));
+        }
+        if v.button(cx, ids!(supported_robots.rig_select)).clicked(actions) {
+            return Some(Intent::SelectNanoBase(false));
+        }
+        if v.button(cx, ids!(content.camera_a_panel.content.calib.nano_controls.serial_row.scan)).clicked(actions) {
+            let (ports, _) = crate::api::files::serial_ports();
+            let input = v.text_input(cx, ids!(content.camera_a_panel.content.calib.nano_controls.serial_row.port));
+            // Repeated clicks cycle candidates; discovery alone never connects.
+            let current = input.text();
+            if !ports.is_empty() {
+                let next = ports.iter().position(|p| p == &current).map_or(0, |i| (i+1)%ports.len());
+                input.set_text(cx, &ports[next]);
+            } else { input.set_text(cx, ""); }
+            return Some(Intent::SelectNanoBase(true));
+        }
+        if v.button(cx, ids!(content.camera_a_panel.content.calib.nano_controls.connection_row.connect)).clicked(actions) {
+            return Some(Intent::ConnectNanoBase { mock: false, port: v.text_input(cx, ids!(content.camera_a_panel.content.calib.nano_controls.serial_row.port)).text() });
+        }
+        if v.button(cx, ids!(content.camera_a_panel.content.calib.nano_controls.connection_row.test)).clicked(actions) {
+            return Some(Intent::ConnectNanoBase { mock: true, port: String::new() });
+        }
+        if v.button(cx, ids!(content.camera_a_panel.content.calib.nano_controls.connection_row.stop)).clicked(actions) {
+            return Some(Intent::DisconnectNanoBase);
+        }
         if v.button(
             cx,
             ids!(content.camera_a_panel.content.calib.actions.btn_restart),

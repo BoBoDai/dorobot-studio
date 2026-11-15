@@ -19,6 +19,11 @@ pub struct Session {
     pub speed: f64,
     #[serde(default = "default_sidebar_width")]
     pub sidebar_width: f64,
+    pub live_source: Option<String>,
+    pub rig_profile: Option<PathBuf>,
+    pub capture_task: Option<String>,
+    pub capture_destination: Option<String>,
+    pub simulation_source: Option<bool>,
 }
 
 fn default_speed() -> f64 {
@@ -41,14 +46,24 @@ impl Session {
                 .iter()
                 .find(|d| Some(d.id.as_str()) == backend.dataset_id())
                 .and_then(|d| d.path.canonicalize().ok()),
-            episode: backend.playback().selected,
-            time: backend.playback().current_time,
-            speed: backend.playback().speed,
+            episode: backend.replay().selected,
+            time: backend.replay().current_time,
+            speed: backend.replay().speed,
             sidebar_width: default_sidebar_width(),
+            live_source: backend.live_connection().map(|c| c.source.clone()),
+            rig_profile: backend.rig_profile(),
+            capture_task: Some(backend.workflow().task),
+            capture_destination: Some(backend.workflow().destination),
+            simulation_source: Some(backend.workflow().simulation),
         }
     }
 
     pub fn restore(&self, backend: &mut dyn Backend, restore_dataset: bool) {
+        if let Some(path) = &self.rig_profile { if path.is_file() { backend.dispatch(Intent::ConfigureRig(path.clone())); } }
+        if let Some(selected) = self.simulation_source { backend.dispatch(Intent::SelectSimulation(selected)); }
+        let flow = backend.workflow();
+        backend.dispatch(Intent::SetCapturePreferences {task:self.capture_task.clone().unwrap_or(flow.task),destination:self.capture_destination.clone().unwrap_or(flow.destination)});
+        if let Some(source) = &self.live_source { backend.dispatch(Intent::SetLiveSource(source.clone())); }
         if restore_dataset {
             if let Some(path) = &self.dataset_path {
                 if path.is_dir() {
@@ -86,7 +101,7 @@ impl Session {
                 }
             }
         }
-        if let Some(screen) = Screen::ALL.into_iter().find(|s| s.label() == self.screen) {
+        if let Some(screen) = Screen::ALL.into_iter().find(|s| s.label() == self.screen || matches!((s,self.screen.as_str()), (Screen::Hardware,"Hardware") | (Screen::Live,"Live") | (Screen::Play,"Play"))) {
             backend.dispatch(Intent::Navigate(screen));
         }
     }
@@ -141,6 +156,8 @@ mod tests {
             time: 1.5,
             speed: 2.0,
             sidebar_width: 224.0,
+            live_source: None,
+            ..Default::default()
         };
         save(&path, &session).unwrap();
         assert_eq!(load(&path), Some(session));

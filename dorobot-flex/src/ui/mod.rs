@@ -7,8 +7,8 @@
 use makepad_widgets::*;
 
 pub mod eval;
-pub mod frame;
 pub mod flex_layout;
+pub mod frame;
 pub mod hardware;
 pub mod library;
 pub mod play;
@@ -24,3 +24,5 @@ pub fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
     play::script_mod(vm);
     eval::script_mod(vm)
 }
+
+mod replay_scene;

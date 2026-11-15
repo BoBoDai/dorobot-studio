@@ -51,6 +51,7 @@ impl MockBackend {
 }
 
 impl Backend for MockBackend {
+    fn workflow(&self) -> super::workflow::WorkflowState { super::workflow::WorkflowState { simulation: false, calibrated: true, ..Default::default() } }
     fn screen(&self) -> Screen {
         self.screen
     }
@@ -72,7 +73,15 @@ impl Backend for MockBackend {
 
     fn dispatch(&mut self, intent: Intent) {
         match intent {
+            Intent::SetCapturePreferences {..} | Intent::SelectSimulation(_) | Intent::StartSimulation | Intent::StopSimulation | Intent::SimulationCapture {..} | Intent::OpenSavedRecording | Intent::CreateRig {..} => {},
             Intent::ConfigureRig(_)
+            | Intent::SelectNanoBase(_)
+            | Intent::ConnectNanoBase { .. }
+            | Intent::DisconnectNanoBase
+            | Intent::SetLiveSource(_)
+            | Intent::ConnectLive(_)
+            | Intent::DisconnectLive
+            | Intent::OpenLiveRecording
             | Intent::OpenFolder(_)
             | Intent::UndoExclude
             | Intent::HubTransfer { .. } => {}
@@ -309,6 +318,7 @@ fn hardware_fixture() -> HardwareState {
         };
 
     HardwareState {
+        nano: None,
         can_advance: false,
         robot_label: "SO-101".into(),
         steps: vec![
@@ -351,7 +361,7 @@ fn record_fixture() -> RecordState {
     let values = [0.123f32, -0.456, 1.234, -1.111, 0.789, 2.345];
 
     RecordState {
-        robot_urdf: None,
+        ready_to_record: true,        robot_urdf: None,
         pose: Vec::new(),
         previews: BTreeMap::new(),
         busy: false,
@@ -467,6 +477,8 @@ fn playback_fixture() -> PlaybackState {
         video_frame_offsets: BTreeMap::new(),
         robot_urdf: None,
         joint_frames: Vec::new(),
+        scene: None,
+            live: None,
     }
 }
 

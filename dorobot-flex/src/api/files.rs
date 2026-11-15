@@ -38,7 +38,10 @@ fn urdf_for(robot_type: &str) -> Option<(PathBuf, PathBuf)> {
         .find(|(pat, _)| robot.contains(pat))
         .map(|(_, d)| (*d).to_string())
         .unwrap_or(robot);
-    let assets = PathBuf::from("data").join(&dir);
+    let relative = PathBuf::from("data").join(&dir);
+    let assets = if relative.is_dir() { relative } else {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data").join(&dir)
+    };
     let urdf = assets.join(format!("{dir}.urdf"));
     urdf.exists().then_some((urdf, assets))
 }
@@ -128,7 +131,7 @@ fn urdf_limits(path: &Path) -> Vec<(f32, f32)> {
 /// arm, so they are listed separately rather than offered as candidates: the
 /// SO-100 shows up through a USB serial bridge (`usbserial`/`usbmodem` here,
 /// `ttyUSB`/`ttyACM` on Linux).
-fn serial_ports() -> (Vec<String>, usize) {
+pub(crate) fn serial_ports() -> (Vec<String>, usize) {
     let Ok(entries) = fs::read_dir("/dev") else {
         return (Vec::new(), 0);
     };
@@ -195,6 +198,12 @@ fn dir_size(path: &Path) -> u64 {
 }
 
 pub struct FileBackend {
+    simulation: super::workflow::SimulationRuntime,
+    nano_driver: super::supported::NanoRuntime,
+    live_client: Option<super::live::LiveClient>,
+    live_preview: PlaybackState,
+    connection: super::live::ConnectionState,
+    live_status: String,
     root: PathBuf,
     status: String,
     hub_rx: Option<std::sync::mpsc::Receiver<Result<PathBuf, String>>>,
@@ -215,6 +224,31 @@ pub struct FileBackend {
 }
 
 impl FileBackend {
+    pub fn connect_live(&mut self, socket: PathBuf) {
+        self.nano_driver.stop();
+        // Returning from the base-driver test must also release its page
+        // selection, otherwise Hardware keeps hiding the simulation feed.
+        if self.hardware.nano.take().is_some() { self.rescan_hardware(); }
+        use super::live::{ConnectionPhase, ConnectionState};
+        self.live_client = None;
+        if let Some(live) = &mut self.live_preview.live { live.connected = false; }
+        self.connection = ConnectionState { source: socket.to_string_lossy().trim().into(), ..Default::default() };
+        self.screen = Screen::Live;
+        self.playback.is_playing = false;
+        let path = PathBuf::from(&self.connection.source);
+        if !cfg!(unix) || !path.is_absolute() || self.connection.source.len() > 100 {
+            self.connection.phase = ConnectionPhase::Error;
+            self.connection.detail = "Enter an absolute local socket path (up to 100 bytes).".into();
+        } else {
+            self.live_preview = super::live::empty_preview();
+            self.live_client = Some(super::live::LiveClient::connect(path));
+            self.connection.phase = ConnectionPhase::Connecting;
+            self.connection.detail = "Waiting for the Dora source; reconnects automatically.".into();
+        }
+        self.live_status = self.connection.summary();
+        self.status = self.live_status.clone();
+    }
+
     pub fn new(root: impl AsRef<Path>) -> Self {
         Self::with_open(root, None)
     }
@@ -223,8 +257,14 @@ impl FileBackend {
     /// one found.
     pub fn with_open(root: impl AsRef<Path>, prefer: Option<&str>) -> Self {
         let mut b = Self {
+            simulation: super::workflow::SimulationRuntime::default(),
+            nano_driver: super::supported::NanoRuntime::default(),
+            live_client: None,
+            live_preview: super::live::empty_preview(),
+            connection: super::live::ConnectionState::default(),
+            live_status: super::live::ConnectionState::default().summary(),
             root: root.as_ref().to_path_buf(),
-            status: "Open a dataset folder to review, or load a rig profile to record.".into(),
+            status: "Choose Simulation or Real robot to begin. Existing recordings are in Library.".into(),
             hub_rx: None,
             rig: None,
             worker: None,
@@ -232,7 +272,7 @@ impl FileBackend {
             save_rx: None,
             excluded: BTreeSet::new(),
             undo_exclude: None,
-            screen: Screen::Library,
+            screen: Screen::Hardware,
             library: LibraryState::default(),
             playback: PlaybackState::default(),
             hardware: HardwareState::default(),
@@ -353,6 +393,8 @@ impl FileBackend {
             video_frame_offsets: BTreeMap::new(),
             robot_urdf: urdf_for(&ds.info.robot_type),
             joint_frames: Vec::new(),
+            scene: None,
+            live: None,
         };
         // Restore any curation recorded for this dataset before.
         let saved = Self::load_tags(&summary.path.join("meta").join("dorobot_tags.json"));
@@ -401,17 +443,15 @@ impl FileBackend {
             .unwrap_or("")
             .to_string();
 
-        // Transpose the frames into channel-major series for the plot. Capped
-        // because a legible plot is the point: six traces already crowd the
-        // pane, and SO-100 has exactly six joints.
+        // Keep every channel; the signal view pages through a small number of
+        // lanes. A six-channel cap hides most joints on bimanual robots.
         let series = |pick: fn(&crate::data::lerobot_dataset::EpisodeFrame) -> &Vec<f32>,
                       names: &[String]| {
             let width = data
                 .frames
                 .first()
                 .map(|f| pick(f).len())
-                .unwrap_or(0)
-                .min(6);
+                .unwrap_or(0);
             (0..width)
                 .map(|c| PlotChannel {
                     name: names.get(c).cloned().unwrap_or_else(|| format!("ch {c}")),
@@ -445,6 +485,17 @@ impl FileBackend {
             .iter()
             .map(|f| to_urdf_pose(&robot, &f.state, &limits))
             .collect();
+        self.playback.scene = match scene::SceneReplay::load(
+            &ds.root_path,
+            index,
+            &data.frames.iter().map(|f| f.timestamp).collect::<Vec<_>>(),
+        ) {
+            Ok(scene) => scene,
+            Err(e) => {
+                ::log::error!("Replay scene: {e}");
+                None
+            }
+        };
         // A new episode starts at its head, stopped.
         self.playback.current_time = 0.0;
         self.playback.is_playing = false;
@@ -473,6 +524,19 @@ impl FileBackend {
     /// joints are not. The later steps stay pending and say so rather than
     /// showing a wizard that looks ready to run.
     pub fn rescan_hardware(&mut self) {
+        if self.hardware.nano.is_some() {
+            self.hardware.robot_label = super::supported::NANO_LABEL.into();
+            self.hardware.robot_urdf = urdf_for("adora_nano");
+            self.hardware.steps.clear();
+            self.hardware.joints.clear();
+            self.hardware.live_angles.clear();
+            self.hardware.active_joint = None;
+            self.hardware.can_advance = false;
+            self.hardware.instruction = "Mobile base: forward, strafe and turn.\nArms, head and cameras are not included in this driver.\n\nL1: hold to drive · release to stop\nLeft stick: forward / strafe · right stick: turn\nOptions: pause / resume\n\nMotor IDs: 13 left front · 14 rear · 15 right front\nCommand units: vendor ticks. No measured odometry.".into();
+            let ports = serial_ports().0;
+            self.hardware.instruction.push_str(&if ports.is_empty() { "\n\nNo USB serial device found. Bus test is available without a robot.".into() } else { format!("\n\nUSB candidates: {}", ports.join(", ")) });
+            return;
+        }
         let (ports, others) = serial_ports();
         let found = !ports.is_empty();
         let step = |title: &str, state: StepState| WizardStep {
@@ -501,12 +565,8 @@ impl FileBackend {
         // The mirror shows the model for whatever robot the open dataset names,
         // falling back to the SO-100 so the stage is not empty before one is
         // chosen.
-        let robot = self
-            .open
-            .as_ref()
-            .map(|(_, ds)| ds.info.robot_type.to_lowercase())
-            .unwrap_or_else(|| "so100".into());
-        self.hardware.robot_urdf = urdf_for(&robot).or_else(|| urdf_for("so100"));
+        let robot = self.rig.as_ref().map(|(_,rig)|rig.robot_type.as_str()).unwrap_or("so101");
+        self.hardware.robot_urdf = urdf_for(robot);
         self.hardware.instruction = if found {
             format!(
                 "Found {}: {}",
@@ -611,6 +671,8 @@ impl FileBackend {
         }
         match super::capture::Rig::load(&path) {
             Ok(rig) => {
+                self.simulation.state.simulation = false;
+                self.simulation.state.calibrated = false;
                 self.record = RecordState {
                     robot_urdf: urdf_for(&rig.robot_type),
                     profile_label: rig.robot_type.clone(),
@@ -622,13 +684,13 @@ impl FileBackend {
                 };
                 self.hardware.robot_label = rig.robot_type.clone();
                 self.hardware.can_advance = true;
-                self.hardware.instruction = "Rig loaded. Continue opens the LeRobot calibration console. Follow its instructions and press Continue when prompted.".into();
+                self.hardware.instruction = "1. Check leader, follower and cameras. 2. Press Continue to calibrate; follow each LeRobot prompt. 3. Open Record after calibration completes.".into();
                 let pending = fs::read(path.with_extension("pending-take.json"))
                     .ok()
                     .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
                 self.rig = Some((path, rig));
                 self.status =
-                    "Rig loaded. Calibrate in Hardware, then start a recording session.".into();
+                    "Profile ready. Calibrate in Robot setup, then open Record.".into();
                 if let Some(take) =
                     pending.filter(|t| t["frames"].as_str().is_some_and(|p| Path::new(p).is_file()))
                 {
@@ -652,13 +714,24 @@ impl FileBackend {
             return;
         }
         let Some((path, _)) = &self.rig else {
-            self.status = "Load a rig profile using New Recording Session.".into();
+            self.status = "Open Robot setup to create or load a rig profile.".into();
             return;
         };
+        let profile = fs::read(path).ok().and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+        for role in ["follower", "leader"] {
+            let key = format!("{role}_port");
+            let port = profile.as_ref().and_then(|v|v[&key].as_str()).unwrap_or("");
+            if port.is_empty() || !Path::new(port).exists() {
+                self.status = format!("{role} device not found: {port}. Connect it over USB, then create or load a profile with the correct serial port.");
+                self.hardware.instruction = self.status.clone();
+                return;
+            }
+        }
         match super::capture::Worker::start(path, calibration) {
             Ok(w) => {
                 self.worker = Some(w);
                 self.record.busy = true;
+                if calibration { self.hardware.can_advance = false; self.simulation.state.calibrated = false; self.record.ready_to_record = false; }
                 self.status = if calibration {
                     "Calibration starting…"
                 } else {
@@ -705,11 +778,14 @@ impl FileBackend {
 }
 
 impl Backend for FileBackend {
+    fn rig_profile(&self) -> Option<PathBuf> { self.rig.as_ref().map(|(p,_)|p.clone()) }
+    fn workflow(&self) -> super::workflow::WorkflowState { self.simulation.state.clone() }
     fn dataset_id(&self) -> Option<&str> {
         self.open.as_ref().map(|(id, _)| id.as_str())
     }
     fn status(&self) -> Option<&str> {
-        Some(&self.status)
+        if self.screen == Screen::Hardware { if let Some(nano) = &self.hardware.nano { return Some(&nano.detail); } }
+        Some(if (self.screen == Screen::Live && self.hardware.nano.is_none()) || (self.screen == Screen::Record && self.simulation.state.simulation && self.simulation.state.active) { &self.live_status } else { &self.status })
     }
     fn screen(&self) -> Screen {
         self.screen
@@ -724,15 +800,113 @@ impl Backend for FileBackend {
         &self.record
     }
     fn playback(&self) -> &PlaybackState {
-        &self.playback
+        if (self.screen == Screen::Live && self.hardware.nano.is_none()) || (self.screen == Screen::Record && self.simulation.state.simulation && self.simulation.state.active) { &self.live_preview } else { &self.playback }
     }
+    fn replay(&self) -> &PlaybackState { &self.playback }
+    fn live_connection(&self) -> Option<&super::live::ConnectionState> { Some(&self.connection) }
     fn eval(&self) -> &EvalState {
         &self.eval
     }
 
     fn dispatch(&mut self, intent: Intent) {
+        if self.playback().live.is_some() {
+            match &intent {
+                Intent::Seek(_) | Intent::TogglePlay | Intent::StepFrames(_) | Intent::SelectEpisode(_)
+                | Intent::SetSpeed(_) | Intent::TagEpisode {..} | Intent::DeleteEpisode(_)
+                | Intent::UndoExclude => return,
+                _ => {},
+            }
+        }
+
         match intent {
-            Intent::ConfigureRig(path) => self.configure(path),
+            Intent::SetCapturePreferences { task, destination } => {
+                if !self.simulation.state.pending() || self.simulation.state.phase == "review" {
+                    self.simulation.state.task = task; self.simulation.state.destination = destination;
+                }
+            }
+            Intent::SelectSimulation(selected) => {
+                if self.simulation.state.simulation == selected { self.screen = Screen::Hardware; return; }
+                if self.simulation.state.active || self.worker.is_some() || self.take.is_some() || self.save_rx.is_some() {
+                    self.status = "Finish the current session before changing source. Stop simulation or save/discard the current take.".into();
+                } else {
+                    self.nano_driver.stop(); self.simulation.state.simulation = selected;
+                    self.hardware.nano = None; self.screen = Screen::Hardware; self.rescan_hardware();
+                    self.status = if selected { "Simulation setup · Start a scene when ready." } else { "Real robot setup · Choose a driver and configure its devices." }.into();
+                }
+            }
+            Intent::StartSimulation => {
+                self.nano_driver.stop();
+                if self.worker.is_some() || self.take.is_some() { self.status = "Finish the real robot session first.".into(); return; }
+                self.simulation.state.simulation = true;
+                if let Err(e) = self.simulation.start() { self.status = e.clone(); self.simulation.state.detail = e; }
+            }
+            Intent::StopSimulation => {
+                if let Err(e) = self.simulation.stop() { self.status = e; }
+                else { self.dispatch(Intent::DisconnectLive); }
+            }
+            Intent::SimulationCapture { action, task, destination } => {
+                if let Err(e) = self.simulation.command(&action, task, destination) { self.status = e; }
+            }
+            Intent::OpenSavedRecording => {
+                let path = if self.simulation.state.simulation { self.simulation.state.dataset.clone() } else { self.rig.as_ref().map(|(_,r)|r.dataset.clone()) };
+                if let Some(path) = path { self.dispatch(Intent::OpenFolder(path)); }
+            }
+            Intent::CreateRig { robot_type, follower, leader, cameras, task, destination } => {
+                if self.worker.is_some() || self.take.is_some() || self.save_rx.is_some() || self.simulation.state.active { self.status = "Finish the current session before replacing the rig.".into(); return; }
+                match super::capture::create_profile(&robot_type, &follower, &leader, &cameras, &task, &destination) {
+                    Ok(path) => self.dispatch(Intent::ConfigureRig(path)), Err(e) => self.status = e,
+                }
+            }
+            Intent::SetLiveSource(source) => {
+                if self.live_client.is_none() { self.connection.source = source; }
+            }
+            Intent::ConnectLive(path) => self.connect_live(path),
+            Intent::DisconnectLive => {
+                self.live_client = None;
+                self.connection.phase = super::live::ConnectionPhase::Disconnected;
+                self.connection.preview_fps = 0.;
+                self.connection.frame_age_ms = None;
+                self.connection.detail = "Preview disconnected. Source simulation and recording continue.".into();
+                if let Some(live) = &mut self.live_preview.live { live.connected = false; }
+                self.live_status = self.connection.summary();
+                if self.screen == Screen::Hardware {
+                    self.status = "Robot setup · choose Nano simulation to return.".into();
+                }
+            }
+            Intent::OpenLiveRecording => {
+                if let Some(path) = self.connection.dataset.clone().filter(|p| p.join("meta/info.json").is_file()) {
+                    self.dispatch(Intent::OpenFolder(path));
+                } else {
+                    self.connection.detail = "The source has not finished saving a recording yet.".into();
+                    self.live_status = self.connection.summary();
+                }
+            }
+            Intent::ConfigureRig(path) => { if self.simulation.state.active { self.status = "Stop simulation before switching to a real robot.".into(); return; } self.nano_driver.stop(); self.configure(path); self.screen = Screen::Hardware; },
+            Intent::SelectNanoBase(selected) => {
+                if self.simulation.state.active { self.status = "Stop simulation before switching to a real robot.".into(); return; }
+                self.simulation.state.simulation = false;
+                if selected { self.simulation.state.calibrated = false; self.record.ready_to_record = false; }
+                if !selected { self.nano_driver.stop(); }
+                self.hardware.nano = selected.then(|| self.nano_driver.state.clone());
+                self.rescan_hardware();
+            }
+            Intent::ConnectNanoBase { mock, port } => {
+                if self.worker.is_some() || self.simulation.state.active {
+                    self.status = "Stop the capture worker and simulation before connecting the Nano base.".into();
+                } else {
+                    // A physical driver must not share gamepad control with an
+                    // apparently live simulation in the Hardware page.
+                    self.live_client = None;
+                    if let Some(live) = &mut self.live_preview.live { live.connected = false; }
+                    self.connection.phase = super::live::ConnectionPhase::Disconnected;
+                    if let Err(error) = self.nano_driver.start(mock, &port) {
+                        self.nano_driver.state.detail = error;
+                    }
+                    self.hardware.nano = Some(self.nano_driver.state.clone());
+                    self.rescan_hardware();
+                }
+            }
+            Intent::DisconnectNanoBase => self.nano_driver.stop(),
             Intent::HubTransfer { repo, destination } => {
                 if self.hub_rx.is_some() || self.record.recording || self.save_rx.is_some() { self.status = "Finish the active operation before transferring a dataset.".into(); return; }
                 let upload = destination.is_none();
@@ -750,12 +924,13 @@ impl Backend for FileBackend {
                 });
             },
             Intent::OpenFolder(path) => { self.root = path; self.rescan(); if let Some(id) = self.library.datasets.first().map(|d| d.id.clone()) { self.open_dataset(&id); self.screen = Screen::Play; } },
-            Intent::NewRecordingSession => { self.screen = Screen::Record; },
+            Intent::NewRecordingSession => { self.screen = Screen::Hardware; },
             Intent::WizardAdvance => {
+                if self.hardware.nano.is_some() { return; }
                 if let Some(w) = &mut self.worker { if w.calibration { if let Err(e) = w.send("") { self.status = e; } } }
                 else { self.start_worker(true); }
             }
-            Intent::RecordStart => self.start_worker(false),
+            Intent::RecordStart => { if !self.simulation.state.calibrated { self.status = "Calibrate the leader and follower in Robot setup before recording.".into(); self.screen = Screen::Hardware; return; } self.nano_driver.stop(); self.start_worker(false); },
             Intent::RecordStop => { if let Some(w) = &mut self.worker { if let Err(e) = w.send("stop") { self.status = e; } self.status = "Stopping capture and closing cameras…".into(); self.record.busy = true; } },
             Intent::SaveEpisode => {
                 if self.hub_rx.is_none() && self.save_rx.is_none() && self.worker.is_none() {
@@ -779,10 +954,17 @@ impl Backend for FileBackend {
             Intent::DeleteEpisode(index) => self.exclude(index, false),
             Intent::UndoExclude => { if let Some(i) = self.undo_exclude { self.exclude(i, true); } },
             Intent::Navigate(s) => {
+                if !matches!(s, Screen::Hardware | Screen::Live) { self.nano_driver.stop(); }
+                if s == Screen::Live { self.playback.is_playing = false; }
                 if s == Screen::Hardware {
                     self.rescan_hardware();
                 }
                 self.screen = s;
+                if s == Screen::Hardware {
+                    self.status = if self.simulation.state.simulation { "Simulation setup · Start a scene, then open controls.".into() } else { self.hardware.instruction.clone() };
+                } else if s == Screen::Record && !self.simulation.state.simulation {
+                    self.status = if self.simulation.state.calibrated { format!("{} · {}",self.record.profile_label,self.record.task) } else { "Complete calibration in Robot setup before recording.".into() };
+                }
             }
             Intent::RescanDatasets => {
                 self.rescan();
@@ -795,7 +977,7 @@ impl Backend for FileBackend {
             Intent::SelectEpisode(i) => self.select_episode(i),
             // Re-enumerate ports: the only wizard step that can be answered
             // without the arm attached.
-            Intent::WizardRestartStep => { if self.worker.as_ref().is_some_and(|w| !w.calibration) { self.status = "Stop and review the recording before restarting hardware setup.".into(); return; } self.worker = None; self.record.busy = false; self.rescan_hardware(); self.hardware.can_advance = self.rig.is_some(); },
+            Intent::WizardRestartStep => { if self.hardware.nano.is_some() { self.rescan_hardware(); return; } if self.worker.as_ref().is_some_and(|w| !w.calibration) { self.status = "Stop and review the recording before restarting hardware setup.".into(); return; } self.worker = None; self.record.busy = false; self.rescan_hardware(); self.hardware.can_advance = self.rig.is_some(); },
             Intent::TogglePlay => {
                 // Restart from the head when play is pressed at the end,
                 // rather than sitting there doing nothing.
@@ -835,6 +1017,49 @@ impl Backend for FileBackend {
     }
 
     fn poll(&mut self) {
+        let was_ready = self.simulation.state.ready;
+        self.simulation.poll();
+        if !was_ready && self.simulation.state.ready {
+            if let Some(socket) = self.simulation.socket.clone() {
+                let previous = self.screen;
+                self.connect_live(socket);
+                if previous != Screen::Hardware && previous != Screen::Live { self.screen = previous; }
+            }
+        }
+        self.nano_driver.poll();
+        if self.hardware.nano.is_some() { self.hardware.nano = Some(self.nano_driver.state.clone()); }
+        use super::live::ConnectionPhase;
+        if let Some(client) = &mut self.live_client {
+            if let Some(mut packet) = client.take() {
+                let finished = packet.header.finished;
+                self.connection.dataset = packet.header.dataset.clone().filter(|p| p.join("meta/info.json").is_file());
+                self.connection.phase = if finished { ConnectionPhase::Completed } else { ConnectionPhase::Streaming };
+                self.connection.detail = if finished {
+                    if self.connection.dataset.is_some() { "Recording ready. Open it in Replay." } else { "Last frame retained; waiting for the next session." }.into()
+                } else { packet.header.phase.clone() };
+                // Completion repeats the last image with a notification sequence;
+                // it is not another captured frame.
+                if !finished || self.live_preview.stats.frames == 0 {
+                    if finished { packet.header.sequence = packet.header.sequence.saturating_sub(1); }
+                    let assets = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/adora_nano");
+                    let model = (assets.join("adora_nano.urdf"), assets);
+                    super::live::apply_packet(&mut self.live_preview, packet, model);
+                }
+                if finished {
+                    if let Some(live) = &mut self.live_preview.live { live.finished = true; live.connected = false; }
+                }
+            }
+            if client.stale() && self.connection.phase != ConnectionPhase::Completed {
+                self.connection.phase = ConnectionPhase::Waiting;
+                self.connection.detail = format!("Reconnecting automatically. {}", client.error().unwrap_or_else(|| "No new frames.".into()));
+                if let Some(live) = &mut self.live_preview.live { live.connected = false; }
+            }
+            self.connection.preview_fps = if self.connection.phase == ConnectionPhase::Streaming { client.preview_fps() } else { 0. };
+            self.connection.frame_age_ms = client.sequence.map(|_| client.last_frame.elapsed().as_millis() as u64);
+            self.connection.received_frames = client.received_frames;
+            self.live_status = self.connection.summary();
+        }
+
         if let Some(result) = self.hub_rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
             self.hub_rx = None;
             self.library.busy = None;
@@ -947,8 +1172,11 @@ impl Backend for FileBackend {
                     self.hardware.can_advance = true;
                 }
                 "calibrated" => {
+                    self.hardware.can_advance = true;
+                    self.simulation.state.calibrated = true;
+                    self.record.ready_to_record = true;
                     self.hardware.instruction =
-                        "Both arms calibrated. Open Record to capture.".into();
+                        "Leader and follower calibrated. Open Record to capture.".into();
                     self.status = self.hardware.instruction.clone();
                     self.record.busy = false;
                 }
@@ -965,6 +1193,10 @@ impl Backend for FileBackend {
                     self.hardware.instruction = self.status.clone();
                     self.record.recording = false;
                     self.record.busy = false;
+                    if self.status.contains("No module named 'lerobot'") {
+                        self.status = "LeRobot capture dependencies are missing. Install tools/capture/requirements.txt in a Python environment and set DOROBOT_PYTHON to its interpreter, then retry Start calibration.".into();
+                        self.hardware.instruction = self.status.clone();
+                    }
                 }
                 _ => {}
             }
@@ -1005,10 +1237,168 @@ mod tests {
     use super::*;
 
     #[test]
+    fn simulation_source_and_pending_recording_survive_navigation() {
+        let mut b = FileBackend::new("does/not/exist");
+        b.simulation.state.active = true;
+        b.simulation.state.ready = true;
+        b.simulation.state.phase = "recording".into();
+        b.simulation.state.frames = 42;
+        b.live_preview = super::super::live::empty_preview();
+        for screen in [Screen::Library, Screen::Hardware, Screen::Play, Screen::Live, Screen::Record] {
+            b.dispatch(Intent::Navigate(screen));
+            assert_eq!(b.simulation.state.phase, "recording");
+            assert_eq!(b.simulation.state.frames,42);
+        }
+        assert!(b.playback().live.is_some());
+        b.dispatch(Intent::SelectNanoBase(true));
+        assert!(b.hardware.nano.is_none());
+        assert!(b.status.contains("Stop simulation"));
+        b.dispatch(Intent::SelectSimulation(false));
+        assert!(b.simulation.state.simulation);
+    }
+
+    #[test]
+    fn real_recording_routes_to_calibration_without_starting_worker() {
+        let mut b = FileBackend::new("does/not/exist");
+        b.dispatch(Intent::SelectSimulation(false));
+        b.dispatch(Intent::RecordStart);
+        assert_eq!(b.screen(), Screen::Hardware);
+        assert!(b.worker.is_none());
+        assert!(b.status.contains("Calibrate"));
+    }
+
+    #[test]
+    fn returning_to_simulation_clears_the_base_driver_page() {
+        let mut backend = FileBackend::new("does/not/exist");
+        backend.dispatch(Intent::Navigate(Screen::Hardware));
+        backend.dispatch(Intent::SelectNanoBase(true));
+        backend.dispatch(Intent::ConnectLive("/tmp/nano-gamepad-regression.sock".into()));
+        assert!(backend.hardware.nano.is_none());
+        backend.live_preview.dataset_name = "Nano gamepad · regression".into();
+        backend.connection.phase = super::super::live::ConnectionPhase::Streaming;
+        backend.dispatch(Intent::Navigate(Screen::Hardware));
+        assert!(backend.playback().live.is_none());
+        backend.dispatch(Intent::Navigate(Screen::Live));
+        assert!(backend.playback().live.is_some());
+        assert_eq!(backend.playback().dataset_name, "Nano gamepad · regression");
+    }
+
+    #[test]
+    fn nano_base_selection_is_distinct_from_simulation_and_calibration() {
+        let mut backend = FileBackend::new("does/not/exist");
+        backend.live_preview = super::super::live::empty_preview();
+        backend.live_preview.dataset_name = "Nano gamepad · test".into();
+        backend.connection.phase = super::super::live::ConnectionPhase::Streaming;
+        backend.dispatch(Intent::Navigate(Screen::Hardware));
+        assert!(backend.playback().live.is_none());
+        backend.dispatch(Intent::Navigate(Screen::Live));
+        assert!(backend.playback().live.is_some());
+        backend.dispatch(Intent::Navigate(Screen::Hardware));
+        backend.dispatch(Intent::SelectNanoBase(true));
+        assert!(backend.hardware.nano.is_some());
+        assert!(!backend.hardware.can_continue());
+        assert!(backend.hardware.joints.is_empty());
+        assert!(backend.hardware.live_angles.is_empty());
+        assert!(backend.playback().live.is_none());
+        assert!(backend.hardware.robot_urdf.is_some());
+        backend.dispatch(Intent::ConnectNanoBase { mock: false, port: String::new() });
+        assert!(!backend.hardware.nano.as_ref().unwrap().active);
+        assert!(backend.status().unwrap().contains("serial device"));
+        backend.dispatch(Intent::SelectNanoBase(false));
+        assert!(backend.hardware.nano.is_none());
+    }
+
+    #[test]
+    fn hardware_gamepad_view_keeps_replay_and_setup_separate() {
+        let mut backend = FileBackend::new(std::env::temp_dir().join("dorobot-gamepad-no-dataset"));
+        backend.playback.current_time = 12.5;
+        backend.live_preview = super::super::live::empty_preview();
+        backend.live_preview.dataset_name = "Nano gamepad · test".into();
+        backend.live_preview.current_time = 3.;
+        backend.connection.phase = super::super::live::ConnectionPhase::Streaming;
+        backend.dispatch(Intent::Navigate(Screen::Hardware));
+        assert!(backend.playback().live.is_none());
+        backend.dispatch(Intent::Navigate(Screen::Live));
+        assert!(backend.playback().live.is_some());
+        assert_eq!(backend.playback().current_time, 3.);
+        backend.dispatch(Intent::Seek(5.));
+        assert_eq!(backend.replay().current_time, 12.5);
+        backend.dispatch(Intent::Navigate(Screen::Play));
+        assert_eq!(backend.playback().current_time, 12.5);
+        backend.dispatch(Intent::Navigate(Screen::Hardware));
+        backend.dispatch(Intent::DisconnectLive);
+        assert!(backend.playback().live.is_none());
+        assert_eq!(backend.replay().current_time, 12.5);
+    }
+
+    #[test]
+    fn live_mode_preserves_replay_position_and_never_applies_live_transport() {
+        let mut backend = FileBackend::new("does/not/exist");
+        backend.playback.dataset_name = "saved dataset".into();
+        backend.playback.selected = Some(7);
+        backend.playback.current_time = 2.5;
+        backend.playback.stats.duration_s = 10.;
+        backend.playback.stats.fps = 5.;
+        backend.playback.is_playing = true;
+        backend.dispatch(Intent::ConnectLive(format!("/tmp/dorobot-missing-{}.sock", std::process::id()).into()));
+        assert_eq!(backend.screen(), Screen::Live);
+        backend.dispatch(Intent::Seek(9.));
+        backend.dispatch(Intent::TogglePlay);
+        let saved = crate::preferences::Session::snapshot(&backend, true);
+        assert_eq!(saved.time, 2.5);
+        assert_eq!(saved.episode, Some(7));
+        assert!(!backend.replay().is_playing);
+        backend.dispatch(Intent::DisconnectLive);
+        backend.dispatch(Intent::Navigate(Screen::Play));
+        assert_eq!(backend.playback().dataset_name, "saved dataset");
+        assert_eq!(backend.playback().current_time, 2.5);
+        backend.dispatch(Intent::ConnectLive("https://not-a-local-stream".into()));
+        assert_eq!(backend.connection.phase, super::super::live::ConnectionPhase::Error);
+        assert!(backend.live_client.is_none());
+    }
+
+    #[test]
     fn missing_root_yields_an_empty_library() {
         let b = FileBackend::new("does/not/exist");
         assert!(b.library().datasets.is_empty());
         assert!(b.playback().episodes.is_empty());
+    }
+    #[test]
+    fn bimanual_signals_keep_all_channels_and_follow_episode_selection() {
+        use crate::data::lerobot_writer::{DatasetSpec, DatasetWriter, FrameRecord};
+        let root = std::env::temp_dir().join(format!("dorobot-signals-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let names: Vec<_> = (0..17).map(|i| format!("joint_{i}")).collect();
+        let mut writer = DatasetWriter::create(&root, DatasetSpec {
+            robot_type: "adora_nano".into(), fps: 10.0,
+            camera_keys: vec![], joint_names: names.clone(),
+        }).unwrap();
+        for episode in 0..2 {
+            let mut ep = writer.begin_episode("both arms").unwrap();
+            for frame in 0..3 {
+                let mut state = vec![0.0; 17];
+                let mut action = vec![0.0; 17];
+                state[16] = (episode * 3 + frame) as f32 * 0.1;
+                action[16] = state[16] + 0.01;
+                ep.push(FrameRecord { state, action }).unwrap();
+            }
+            writer.commit(ep).unwrap();
+        }
+        drop(writer);
+        let mut backend = FileBackend::new(&root);
+        for episode in 0..2 {
+            backend.dispatch(Intent::SelectEpisode(episode));
+            let state = backend.playback();
+            assert_eq!(state.state_series.len(), 17);
+            assert_eq!(state.action_series.len(), 17);
+            assert_eq!(state.state_series.iter().map(|c| c.name.clone()).collect::<Vec<_>>(), names);
+            for frame in 0..3 {
+                let expected = (episode * 3 + frame) as f32 * 0.1;
+                assert_eq!(state.state_series[16].points[frame as usize].1, expected as f64);
+                assert_eq!(state.action_series[16].points[frame as usize].1, (expected + 0.01) as f64);
+            }
+        }
+        fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn dataset_root_tags_exclusion_undo_and_restart() {

@@ -541,6 +541,25 @@ impl RobotView {
         self.robot.as_ref()
     }
 
+    /// Refresh display materials from disk during host live reload, retaining
+    /// geometry, joint state and the camera. Mesh-authored colours remain the
+    /// fallback for visuals that do not define a URDF colour.
+    pub fn reload_materials(&mut self, cx: &mut Cx, path: &std::path::Path) -> Result<(), String> {
+        let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        let urdf = urdf_rs::read_from_string(&source).map_err(|e| e.to_string())?;
+        if let Some(robot) = &mut self.robot {
+            for link in &mut robot.links {
+                if let Some(color) = urdf.links.iter().find(|v| v.name == link.name)
+                    .and_then(|v| v.visual.iter().find_map(|visual| crate::robot::visual_color(visual, &urdf)))
+                {
+                    link.color = Some(color);
+                }
+            }
+            self.area.redraw(cx);
+        }
+        Ok(())
+    }
+
     /// Indices into the URDF joint list that this widget treats as movable.
     pub fn movable_joints(&self) -> &[usize] {
         &self.movable
@@ -577,14 +596,33 @@ impl RobotView {
 
     /// Aim the orbit camera (radians). Framing and distance are untouched.
     pub fn set_view_angles(&mut self, cx: &mut Cx, yaw: f32, pitch: f32) {
+        // A host may frame a recording before the first draw. Initialize the
+        // default orbit first so the lazy renderer cannot overwrite that view.
+        self.ensure_initialized(cx);
         self.camera.orbit_yaw = yaw;
         self.camera.orbit_pitch = pitch.clamp(-1.55, 1.55);
         self.pan_offset = vec2(0.0, 0.0);
         self.area.redraw(cx);
     }
 
+    /// Set host-selected framing without changing the recorded robot pose.
+    pub fn set_view_distance(&mut self, cx: &mut Cx, distance: f32) {
+        if distance.is_finite() {
+            self.camera.distance = distance.clamp(0.15, 40.0);
+            self.area.redraw(cx);
+        }
+    }
+
     pub fn is_animating(&self) -> bool {
         self.animating
+    }
+
+    pub fn view_distance(&self) -> f32 { self.camera.distance }
+
+    /// Orbit pivot in the same Z-up coordinates accepted by set_camera_target.
+    pub fn camera_target(&self) -> [f32; 3] {
+        let p = self.camera.desktop_target;
+        [p.x, -p.z, p.y]
     }
 
     pub fn set_animating(&mut self, cx: &mut Cx, on: bool) {
@@ -717,6 +755,60 @@ impl RobotView {
         self.area.redraw(cx);
     }
 
+    /// Read-only control annotations. Marker keys identify joints without
+    /// changing authored materials, geometry or the robot's editable selection.
+    pub fn set_joint_highlights(&mut self, cx: &mut Cx, selected: &[String], active: &[String]) {
+        let Some(robot) = &self.robot else { return; };
+        let markers: Vec<_> = robot.joints.iter().enumerate().filter_map(|(index, joint)| {
+            if !selected.contains(&joint.name) { return None; }
+            let link = robot.get_link_index(&joint.child_link)?;
+            let transform = robot.get_link_transform(link)?;
+            Some((index, transform.w_axis.truncate(), active.contains(&joint.name)))
+        }).collect();
+        let mut items = Vec::new();
+        for (index, position, moving) in markers {
+            let key = 0xD0B00000 + index as u64;
+            if !self.external_meshes.contains_key(&key) {
+                let (mut positions, mut normals, mut indices) = (Vec::new(), Vec::new(), Vec::new());
+                for y in 0..=8 {
+                    let phi = std::f32::consts::PI * y as f32 / 8.;
+                    for x in 0..=12 {
+                        let theta = std::f32::consts::TAU * x as f32 / 12.;
+                        let normal = [phi.sin() * theta.cos(), phi.sin() * theta.sin(), phi.cos()];
+                        positions.extend(normal);
+                        normals.extend(normal);
+                    }
+                }
+                for y in 0..8u32 { for x in 0..12u32 {
+                    let i = y * 13 + x;
+                    indices.extend([i, i + 13, i + 1, i + 1, i + 13, i + 14]);
+                }}
+                self.upsert_external_mesh(cx, key, &positions, &normals, &indices);
+            }
+            let radius = if moving { 0.012 } else { 0.008 };
+            items.push(ExternalItem {
+                mesh_key: key,
+                transform: glam::Mat4::from_translation(position).to_cols_array(),
+                scale: [radius; 3],
+                color: if moving { [1., 0.85, 0.05, 1.] } else { [0.05, 0.55, 1., 1.] },
+                roughness: 0.5, metallic: 0.,
+            });
+        }
+        self.set_external_items(cx, items);
+    }
+
+    pub fn control_highlights(&self) -> Vec<(String, bool)> {
+        let Some(robot) = &self.robot else { return Vec::new(); };
+        self.external_items.iter().filter_map(|item| {
+            let index = item.mesh_key.checked_sub(0xD0B00000)? as usize;
+            robot.joints.get(index).map(|joint| (joint.name.clone(), item.color[0] > 0.9))
+        }).collect()
+    }
+
+    pub fn view_angles(&self) -> [f32; 2] {
+        [self.camera.orbit_yaw, self.camera.orbit_pitch]
+    }
+
     /// Drop the external scene entirely (registry included).
     pub fn clear_external(&mut self, cx: &mut Cx) {
         self.external_items.clear();
@@ -766,6 +858,11 @@ impl RobotView {
 
     pub fn external_counts(&self) -> (usize, usize) {
         (self.external_meshes.len(), self.external_items.len())
+    }
+
+    /// The actual posed instances submitted by a host, for inspection.
+    pub fn external_items(&self) -> &[ExternalItem] {
+        &self.external_items
     }
 
     /// Move the orbit pivot to a point in the model's own (Z-up) frame.
@@ -1431,7 +1528,9 @@ impl RobotView {
             self.draw_mesh.metallic = self.material_metallic;
         }
 
-        let selected_link = self.selected_link_index();
+        // Passive replay/setup mirrors have no editable selected joint. Do not
+        // turn their first joint amber and hide the authored material colour.
+        let selected_link = if self.keyboard_controls { self.selected_link_index() } else { None };
         if let Some(robot) = &self.robot {
             for (i, link) in robot.links.iter().enumerate() {
                 let Some(Some(slot)) = self.geometries.get(i) else {
@@ -1444,7 +1543,14 @@ impl RobotView {
                     continue;
                 };
                 let base = link.color.unwrap_or(DEFAULT_LINK_COLOR);
-                let color = if Some(i) == selected_link {
+                let controlled = self.external_items.iter().any(|item| {
+                    item.color[0] > 0.9 && item.mesh_key.checked_sub(0xD0B00000)
+                        .and_then(|index| robot.joints.get(index as usize))
+                        .is_some_and(|joint| joint.child_link == link.name)
+                });
+                let color = if controlled {
+                    [base[0] * 0.2 + 0.8, base[1] * 0.2 + 0.68, base[2] * 0.2 + 0.04, base[3]]
+                } else if Some(i) == selected_link {
                     [
                         base[0] * 0.45 + SELECTED_TINT[0] * 0.55,
                         base[1] * 0.45 + SELECTED_TINT[1] * 0.55,

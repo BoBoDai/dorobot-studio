@@ -165,9 +165,11 @@ script_mod! {
 
     mod.widgets.nx = {}
 
-    // Balance PingFang button ink against its cap-height band, scaling the
-    // correction with type size. Leave other platforms' fallback faces alone.
-    mod.widgets.Button.draw_text.temp_y_shift = #(if cfg!(target_os = "macos") { -0.15f64 } else { 0.0f64 })
+    // Makepad uses cap-height metrics, not the rendered glyph bounds. PingFang
+    // still sits low in compact faces; this optical correction is measured
+    // against the rasterized labels, including symbols and descenders.
+    mod.widgets.Button.draw_text.temp_y_shift = #(if cfg!(target_os = "macos") { -0.12f64 } else { 0.0f64 })
+    mod.widgets.Button.draw_text.ink_centered = true
 
     // ----------------------------------------------------------------- type --
     // Inherit the app's PingFang iOS sheet and the framework's fallbacks.

@@ -70,6 +70,9 @@ fn make_backend() -> Box<dyn Backend> {
     if let Some(p) = profile {
         backend.dispatch(Intent::ConfigureRig(p.into()));
     }
+    if let Some(socket)=args.iter().position(|a|a=="--live-socket").and_then(|i|args.get(i+1)) {
+        backend.connect_live(socket.into());
+    }
     Box::new(backend)
 }
 
@@ -78,6 +81,21 @@ script_mod! {
     use mod.widgets.*
     use mod.widgets.ux.*
 
+    let WorkflowInput = TextInput{
+        height: 32 min_height: 32 margin: 0.
+        padding: Inset{left: 8. right: 8. top: 7. bottom: 7.}
+        draw_text +: {text_style: mod.widgets.ux.TEXT_BODY{}}
+        draw_bg +: {
+            light: instance(0.0)
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, 4.0)
+                sdf.fill_keep(mix(#x161618, #xFFFFFF, self.light))
+                sdf.stroke(mix(mix(#x636366, #xAEAEB2, self.light), #x0A84FF, self.focus), 1.0)
+                return sdf.result
+            }
+        }
+    }
     startup() do #(App::script_component(vm)){
         ui: Root{
 
@@ -92,38 +110,124 @@ script_mod! {
                     sidebar := View{
                         width: 196 height: Fill flow: Down padding: 12.0 spacing: 12.0
                         show_bg: true draw_bg.color: mod.theme.color_bg_container
-                        Label{ width: Fill height: Fit margin: Inset{left: 8. top: 12. bottom: 22.} text: "DoRobot Studio"
+                        Label{ width: Fill height: Fit margin: Inset{left: 8. top: 8. bottom: 12.} text: "DoRobot Studio"
                             draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
                         nav := mod.widgets.ux.NavRail{ width: Fill height: Fill }
-                        appearance := Button{width: Fill height: 44 text: "Appearance: Light"}
+                        appearance := mod.widgets.ux.QuietButton{width: Fill height: 32 text: "Light appearance"}
                     }
                     sidebar_resize := View{width: 8 height: Fill cursor: MouseCursor.ColResize}
                     workspace := View{
                         width: Fill height: Fill flow: Down
                         page_header := View{
-                            width: Fill height: Fit flow: Down padding: Inset{left: 20. right: 20. top: 18. bottom: 14.} spacing: 2.0
-                            page_title := Label{width: Fill text: "Library"
-                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_H1{}} }
-                            status := Label{width: Fill height: Fit max_lines: 2 text_overflow: Ellipsis text: ""
-                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}} }
+                            width: Fill height: 36 flow: Right align: Align{y: 0.5}
+                            padding: Inset{left: 16. right: 12. top: 0. bottom: 0.} spacing: 16.0
+                            page_title := Label{width: Fit height: Fit padding: 0.0 text: "Library"
+                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.FONT_MEDIUM{font_size: 14.0}} }
+                            status := Label{width: Fill height: Fit padding: 0.0 max_lines: 1 text_overflow: Ellipsis text: ""
+                                draw_text +: {color: mod.theme.color_text_disabled text_style: mod.widgets.ux.TEXT_META{}} }
+                            help_toggle := mod.widgets.ux.QuietButton{text: "Help"}
                         }
                         hub_form := View{ visible: false width: Fill height: Fit flow: Right spacing: 8. padding: 12.
                             hub_repo := TextInput{width: Fill height: 44 empty_text: "Dataset repository: owner/name"}
                             hub_go := Button{ text: "Transfer" height: 44 }
                             hub_cancel := Button{ text: "Cancel" height: 44 }
                         }
+                        capture_notice := mod.widgets.ux.Card{visible: false width: Fill height: 38 flow: Right padding: Inset{left: 10. right: 6. top: 3. bottom: 3.} spacing: 8. align: Align{y: 0.5}
+                            capture_notice_text := Label{width: Fill padding: 0. max_lines: 1 text_overflow: Ellipsis text: "" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}}}
+                            capture_return := mod.widgets.ux.ToolButton{text: "Go to Record"}
+                        }
+                        workflow := mod.widgets.ux.Card{visible: false width: Fill height: Fit flow: Down padding: Inset{left: 16. right: 12. top: 10. bottom: 10.} spacing: 10.
+                            source_row := View{width: Fill height: Fit flow: Right spacing: 8. align: Align{y: 0.5}
+                                wf_sim := mod.widgets.ux.SegmentButton{text: "Simulation"}
+                                wf_real := mod.widgets.ux.SegmentButton{text: "Real robot"}
+                                wf_source := Label{width: Fill padding: Inset{left: 8.} max_lines: 1 text_overflow: Ellipsis text: "" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}}}
+                                wf_start := mod.widgets.ux.PrimaryButton{text: "Start simulation"}
+                                wf_operate := mod.widgets.ux.PrimaryButton{text: "Open controls"}
+                                wf_stop := mod.widgets.ux.QuietButton{text: "Stop"}
+                                wf_more := mod.widgets.ux.QuietButton{text: "More"}
+                            }
+                            wf_real_types := View{width: Fill height: Fit flow: Right spacing: 8.
+                                wf_arm := mod.widgets.ux.SegmentButton{text: "SO-100 / SO-101"}
+                                wf_nano := mod.widgets.ux.SegmentButton{text: "Adora Nano"}
+                                Filler{}
+                                wf_rig := mod.widgets.ux.QuietButton{text: "Load profile…"}
+                                wf_edit := mod.widgets.ux.QuietButton{text: "Edit rig"}
+                            }
+                            wf_guide := Label{visible: false width: Fill height: Fit padding: Inset{top: 4. bottom: 4.} text: "" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}}}
+                            wf_detail := Label{width: Fill height: Fit padding: 0. text: "" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                            wf_setup_actions := View{width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 8.
+                                wf_next := mod.widgets.ux.PrimaryButton{text: "Record →"}
+                                wf_external := mod.widgets.ux.ToolButton{text: "External stream…"}
+                                wf_back := mod.widgets.ux.PrimaryButton{text: "Robot setup →"}
+                            }
+                            wf_rig_form := View{width: Fill height: Fit flow: Down spacing: 6.
+                                View{width: Fill height: Fit flow: Right spacing: 6.
+                                    Label{width: 36 padding: 0. text: "Type" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                                    wf_type := WorkflowInput{width: 110 height: 32 min_height: 32 text: "so101" empty_text: "Robot type"}
+                                    Label{width: 58 padding: 0. text: "Follower" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                                    wf_follower := WorkflowInput{width: Fill height: 32 min_height: 32 empty_text: "Follower serial port · /dev/…"}
+                                    Label{width: 50 padding: 0. text: "Leader" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                                    wf_leader := WorkflowInput{width: Fill height: 32 min_height: 32 empty_text: "Leader serial port · /dev/…"}
+                                }
+                                View{width: Fill height: Fit flow: Right spacing: 6.
+                                    Label{width: 90 padding: 0. text: "Cameras" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}}}
+                                    wf_cameras := WorkflowInput{width: Fill height: 32 min_height: 32 empty_text: "Camera indices · e.g. 0,1"}
+                                    wf_create := mod.widgets.ux.PrimaryButton{text: "Use this rig"}
+                                }
+                            }
+                            wf_capture_fields := View{width: Fill height: Fit flow: Down spacing: 6.
+                                View{width: Fill height: Fit flow: Right spacing: 8. align: Align{y: 0.5}
+                                    Label{width: 90 padding: 0. text: "Task" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}}}
+                                    wf_task := WorkflowInput{width: Fill height: 32 min_height: 32 empty_text: "Describe the task to capture"}
+                                }
+                                View{width: Fill height: Fit flow: Right spacing: 8. align: Align{y: 0.5}
+                                    Label{width: 90 padding: 0. text: "Save folder" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_BODY{}}}
+                                    wf_destination := WorkflowInput{width: Fill height: 32 min_height: 32 empty_text: "Absolute recording folder"}
+                                    wf_browse := mod.widgets.ux.ToolButton{text: "Choose…"}
+                                }
+                            }
+                            wf_capture := View{width: Fill height: Fit flow: Flow.Right{wrap: false} spacing: 8. align: Align{y: 0.5}
+                                wf_record := mod.widgets.ux.PrimaryButton{text: "● Record"}
+                                wf_finish := mod.widgets.ux.StopButton{text: "■ Stop recording"}
+                                wf_save := mod.widgets.ux.PrimaryButton{text: "Save episode"}
+                                wf_discard := mod.widgets.ux.ToolButton{text: "Discard take"}
+                                wf_replay := mod.widgets.ux.ToolButton{text: "Replay →"}
+                                wf_count := Label{width: Fill padding: 0. text: "" draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                            }
+                        }
+                        live_bar := View{
+                            visible: false width: Fill height: 40 flow: Right spacing: 8.0
+                            align: Align{y: 0.5} padding: Inset{left: 6. right: 6. top: 4. bottom: 4.}
+                            Label{text: "Dora source" padding: 0.0 draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                            live_source := TextInput{width: Fill height: 32 min_height: 32 margin: 0.0 text: "/tmp/nano-living.sock"
+                                empty_text: "Local stream socket path"
+                                padding: Inset{left: 8. right: 8. top: 7. bottom: 7.}
+                                draw_text +: {text_style: mod.widgets.ux.TEXT_BODY{}}
+                                draw_bg +: {border_radius: 4.0}
+                            }
+                            live_connect := mod.widgets.ux.ToolButton{text: "Connect"}
+                            live_disconnect := mod.widgets.ux.ToolButton{text: "Disconnect"}
+                            live_recording := mod.widgets.ux.ToolButton{text: "Open recording" visible: false}
+                        }
+                        gamepad_help := View{
+                            visible: false width: Fill height: Fit flow: Right spacing: 8.0
+                            align: Align{y: 0.5} padding: Inset{left: 10. right: 6. top: 4. bottom: 4.}
+                            gamepad_mapping := Label{width: Fill height: Fit padding: 0.0 max_lines: 3 text_overflow: Ellipsis text: ""
+                                draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}}}
+                            gamepad_setup := mod.widgets.ux.PrimaryButton{text: "Robot setup"}
+                        }
                         setup_page := View{
-                                visible: false width: Fill height: Fit flow: Down padding: 8.0
+                                visible: false width: Fill height: Fit flow: Down padding: 6.0
                                 setup_card := mod.widgets.ux.Card{
-                                    width: Fill height: Fit flow: Down padding: 12.0 spacing: 8.0
-                                    setup_title := Label{width: Fill text: "Set up your robot"
+                                    width: Fill height: Fit flow: Down padding: 8.0 spacing: 6.0
+                                    setup_title := Label{width: Fill padding: 0.0 text: "Set up your robot"
                                         draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
-                                    setup_description := Label{width: Fill height: Fit text: ""
+                                    setup_description := Label{width: Fill height: Fit padding: 0.0 text: ""
                                         draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_META{}} }
-                                    setup_actions := View{width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 12.0
-                                        setup_rig := mod.widgets.nx.Primary{height: 44 text: "Choose rig profile…"}
-                                        setup_rescan := mod.widgets.nx.NxBtn{height: 44 text: "Check connections"}
-                                        setup_replay := mod.widgets.nx.NxBtn{height: 44 text: "Open replay"}
+                                    setup_actions := View{width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 8.0
+                                        setup_rig := mod.widgets.nx.Primary{height: 32 min_height: 32 padding: Inset{left: 12. right: 12. top: 0. bottom: 0.} text: "Robot setup →"}
+                                        setup_rescan := mod.widgets.ux.ToolButton{text: "Check connections"}
+                                        setup_replay := mod.widgets.ux.ToolButton{text: "Open replay"}
                                     }
                                 }
                             }
@@ -131,6 +235,13 @@ script_mod! {
                             width: Fill height: Fill flow: Overlay
                             page_library := LibraryScreen{}
                             page_hardware := HardwareScreen{visible: false}
+                            hardware_teleop := PlayScreen{visible: false
+                                toolbar +: {align: Align{y: 0.5}
+                                    camera_hint := Label{width: Fit text: "Click camera/map · Drag 3D"
+                                        draw_text +: {color: mod.theme.color_text_disabled text_style: mod.widgets.ux.TEXT_META{}}}
+                                }
+                                upper +: {grid +: {persistence_key: "hardware-camera-layout.json"}}
+                            }
                             page_record := RecordScreen{visible: false}
                             page_play := PlayScreen{visible: false}
                             page_eval := EvalScreen{visible: false}
@@ -145,7 +256,7 @@ script_mod! {
                 create_on_start: false
                 body +: {flow: Down width: Fill height: Fill
                     monitor_bar := View{width: Fill height: 56 flow: Right padding: 6.0
-                        Label{width: Fill text: "Replay · shared episode and playback" draw_text.color: mod.theme.color_text}
+                        monitor_title := Label{width: Fill text: "Replay · shared episode and playback" draw_text.color: mod.theme.color_text}
                         close_monitor := Button{height: 44 text: "Close window"}
                     }
                     monitor_play := PlayScreen{
@@ -160,6 +271,7 @@ script_mod! {
 
 enum FolderRequest {
     Dataset,
+    Recording,
     Download(String),
 }
 
@@ -172,6 +284,14 @@ pub struct App {
     backend: Box<dyn Backend>,
     #[rust(false)]
     started: bool,
+    #[rust]
+    rig_editing: bool,
+    #[rust]
+    external_stream: bool,
+    #[rust]
+    workflow_help: bool,
+    #[rust]
+    workflow_more: bool,
     #[rust]
     playback_timer: Timer,
     #[rust]
@@ -191,6 +311,168 @@ pub struct App {
 }
 
 impl App {
+    fn display_status(&self) -> &str {
+        let status = self.backend.status().unwrap_or("Demo · no hardware connected");
+        if status.starts_with("Simulation setup") { "Ready" }
+        else if status.starts_with("Real robot setup") || status.starts_with("Choose a USB serial port") { "Not connected" }
+        else { status }
+    }
+    fn sync_hardware(&self, cx: &mut Cx) {
+        let mut hardware = self.backend.hardware().clone();
+        if self.backend.workflow().simulation {
+            hardware.nano = None;
+            let assets = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/adora_nano");
+            hardware.robot_urdf = Some((assets.join("adora_nano.urdf"),assets));
+            hardware.can_advance = false; hardware.joints.clear(); hardware.steps.clear();
+            hardware.instruction.clear();
+        }
+        if !self.backend.workflow().simulation && hardware.nano.is_none() {
+            if self.rig_editing { hardware.can_advance = false; hardware.instruction = "Save this rig or cancel changes before calibrating.".into(); }
+            use dorobot_flex::api::{StepState, WizardStep};
+            let profile = !self.backend.record().profile_label.is_empty();
+            let calibrated = self.backend.workflow().calibrated;
+            let cameras = !self.backend.record().previews.is_empty();
+            hardware.steps = [("Profile",profile),("Devices",calibrated),("Calibrate",calibrated),("Cameras",cameras),("Record",self.backend.record().recording || self.backend.record().last_take.is_some())].into_iter().enumerate().map(|(i,(title,done))| WizardStep { title:title.into(), state:if done { StepState::Done } else if (i == 0 && !profile) || (i == 2 && profile && !calibrated) || (i == 3 && calibrated && !cameras) { StepState::Active } else { StepState::Pending } }).collect();
+        }
+        self.ui.hardware_screen(cx, ids!(page_hardware)).sync(cx, &hardware);
+        let sim_setup = self.backend.workflow().simulation;
+        self.ui.widget(cx, ids!(page_hardware.supported_robots)).set_visible(cx, false);
+        if !sim_setup && hardware.nano.is_none() {
+            self.ui.button(cx, ids!(page_hardware.content.camera_a_panel.content.calib.actions.btn_continue)).set_text(cx, if self.backend.record().busy { "Continue" } else if self.backend.workflow().calibrated { "Calibrate again" } else { "Start calibration" });
+        }
+        self.ui.hardware_screen(cx, ids!(page_hardware)).set_inspector_available(cx, !sim_setup && (hardware.nano.is_some() || !self.backend.record().profile_label.is_empty()));
+        self.ui.widget(cx, ids!(page_hardware.layout_tools.hardware_layout_hint)).set_visible(cx, self.workflow_help);
+        self.ui.widget(cx, ids!(page_hardware.layout_tools.hardware_reset)).set_visible(cx, self.workflow_more);
+        self.ui.widget(cx, ids!(page_hardware.content.camera_a_panel.content.calib.nano_controls.wheel_commands)).set_visible(cx, self.workflow_more);
+        if sim_setup {
+            self.ui.widget(cx, ids!(page_hardware.stepper)).set_visible(cx, false);
+            self.ui.widget(cx, ids!(page_hardware.content.camera_a_panel.content.calib.actions)).set_visible(cx, false);
+            self.ui.label(cx, ids!(page_hardware.content.camera_a_panel.head.title)).set_text(cx, "Simulation readiness");
+        }
+    }
+    fn sync_workflow(&self, cx: &mut Cx) {
+        let state = self.backend.workflow();
+        let screen = self.backend.screen();
+        let setup = screen == Screen::Hardware;
+        let record = screen == Screen::Record;
+        let simulation = state.simulation;
+        let pending = if simulation { state.pending() } else { self.backend.record().recording || self.backend.record().last_take.is_some() };
+        let nano = self.backend.hardware().nano.is_some();
+        let has_profile = !self.backend.record().profile_label.is_empty();
+        let real_form = setup && !simulation && !nano && (!has_profile || self.rig_editing);
+        let capture_ready = simulation && (state.ready || state.pending() || state.phase == "error" || state.dataset.is_some());
+        let fields = real_form || (record && capture_ready && state.phase != "recording");
+        self.ui.widget(cx, ids!(capture_notice)).set_visible(cx, pending && !record);
+        self.ui.label(cx, ids!(capture_notice_text)).set_text(cx, &if simulation { format!("{} · {} frames", if state.phase == "recording" { "● Recording" } else { "Unsaved take" }, state.frames) } else if self.backend.record().recording { "● Recording".into() } else { "Unsaved take".into() });
+        self.ui.widget(cx, ids!(workflow)).set_visible(cx, setup || (record && (capture_ready || (!simulation && !nano && has_profile))));
+        self.ui.widget(cx, ids!(source_row)).set_visible(cx, setup);
+        self.ui.widget(cx, ids!(wf_real_types)).set_visible(cx, setup && !simulation);
+        for (path, selected) in [(ids!(wf_sim),simulation),(ids!(wf_real),!simulation),(ids!(wf_arm),!nano),(ids!(wf_nano),nano)] {
+            let mut button = self.ui.widget(cx,path);
+            let selected = if selected { 1.0 } else { 0.0 };
+            script_apply_eval!(cx, button, {draw_bg +: {on: #(selected)} draw_text +: {on: #(selected)}});
+        }
+        self.ui.label(cx, ids!(wf_source)).set_text(cx, if simulation { "Nano · Living room" } else if nano { "Adora Nano" } else { "Arm rig" });
+        self.ui.widget(cx, ids!(help_toggle)).set_visible(cx, setup || (screen == Screen::Live && self.backend.playback().live.is_some()) || (record && (capture_ready || (!simulation && !nano && has_profile))));
+        self.ui.button(cx, ids!(help_toggle)).set_text(cx, if self.workflow_help { "Hide help" } else { "Help" });
+        self.ui.button(cx, ids!(wf_more)).set_text(cx, if self.workflow_more { "Less" } else { "More" });
+        self.ui.widget(cx, ids!(wf_guide)).set_visible(cx, self.workflow_help);
+        self.ui.label(cx, ids!(wf_guide)).set_text(cx, if simulation {
+            if setup { "Model zeros and limits are preset. Restart to reset.\nPS4/PS5: hold L1 to move; release to stop. R1 changes control mode." }
+            else { "Captures all 3 cameras, depth, joints and scene data. 5 fps in simulation time.\nStop → Save → Replay. Discard removes only the unsaved take." }
+        } else if nano { "Connect the USB serial port to drive the base. Bus test checks commands without motors.\nArm/head calibration and camera capture are unavailable with this driver." }
+        else { "Connect follower, leader and cameras, then save the rig.\nCalibrate each device before recording. Press Continue only when the calibration prompt asks." });
+        let detail = if simulation {
+            if state.phase == "saved" || (state.phase == "idle" && ((state.active && state.ready) || (!state.active && (state.detail.starts_with("Nano · Living room") || state.detail.starts_with("Simulation stopped.") || state.detail.starts_with("Unsaved take discarded."))))) { String::new() }
+            else if state.phase == "recording" { "3 cameras · 17 joints · 5 sim fps".into() }
+            else { state.detail.clone() }
+        } else if nano { "Base only · arms, head and cameras unavailable".into() }
+        else if state.calibrated { "Calibration complete".into() }
+        else { String::new() };
+        self.ui.label(cx, ids!(wf_detail)).set_text(cx,&detail);
+        self.ui.widget(cx, ids!(wf_detail)).set_visible(cx,!detail.is_empty() && !(record && state.phase == "recording"));
+        self.ui.widget(cx, ids!(wf_back)).set_visible(cx, false);
+        self.ui.widget(cx, ids!(wf_rig_form)).set_visible(cx, real_form);
+        self.ui.widget(cx, ids!(wf_capture_fields)).set_visible(cx, fields);
+        for path in [ids!(wf_task), ids!(wf_destination), ids!(wf_browse)] {
+            self.ui.widget(cx, path).set_disabled(cx, simulation && state.pending() && state.phase != "review");
+        }
+        self.ui.widget(cx, ids!(wf_start)).set_visible(cx, simulation && setup && !state.active);
+        self.ui.widget(cx, ids!(wf_stop)).set_visible(cx, simulation && setup && state.active);
+        self.ui.button(cx, ids!(wf_stop)).set_enabled(cx, !state.pending());
+        self.ui.widget(cx, ids!(wf_operate)).set_visible(cx, setup && ((simulation && state.ready) || self.backend.hardware().nano.as_ref().is_some_and(|n|n.active)));
+        self.ui.widget(cx, ids!(wf_edit)).set_visible(cx, setup && !simulation && has_profile && !nano);
+        self.ui.button(cx, ids!(wf_edit)).set_text(cx, if self.rig_editing { "Cancel changes" } else { "Edit rig" });
+        self.ui.widget(cx, ids!(wf_rig)).set_visible(cx, !simulation && setup && !nano);
+        self.ui.widget(cx, ids!(wf_next)).set_visible(cx, setup && !simulation && state.calibrated);
+        self.ui.widget(cx, ids!(wf_external)).set_visible(cx, setup && self.workflow_more);
+        self.ui.widget(cx, ids!(wf_setup_actions)).set_visible(cx, setup && (self.workflow_more || (!simulation && state.calibrated)));
+        self.ui.widget(cx, ids!(wf_capture)).set_visible(cx, record && (capture_ready || self.backend.record().saved > 0));
+        self.ui.widget(cx, ids!(wf_record)).set_visible(cx, simulation && !state.pending());
+        self.ui.widget(cx, ids!(wf_finish)).set_visible(cx, simulation && state.phase == "recording");
+        self.ui.widget(cx, ids!(wf_save)).set_visible(cx, simulation && state.phase == "review");
+        self.ui.widget(cx, ids!(wf_discard)).set_visible(cx, simulation && matches!(state.phase.as_str(), "review" | "error"));
+        self.ui.button(cx, ids!(wf_record)).set_enabled(cx, state.can_record());
+        self.ui.button(cx, ids!(wf_finish)).set_enabled(cx, state.phase == "recording");
+        self.ui.button(cx, ids!(wf_save)).set_enabled(cx, state.phase == "review");
+        self.ui.button(cx, ids!(wf_discard)).set_enabled(cx, matches!(state.phase.as_str(), "review" | "error"));
+        self.ui.widget(cx, ids!(wf_replay)).set_visible(cx, if simulation { state.dataset.is_some() && !state.pending() } else { self.backend.record().saved > 0 });
+        self.ui.label(cx, ids!(wf_count)).set_text(cx, &if simulation { format!("{} frames · {:.1}s · {} saved",state.frames,state.frames as f64 / 5.,state.saved) } else { format!("{} saved episodes",self.backend.record().saved) });
+        frame::apply_light(cx, &self.ui, &[
+            (ids!(help_toggle),frame::Themed::Both),(ids!(wf_more),frame::Themed::Both),(ids!(workflow),frame::Themed::Bg),(ids!(capture_notice),frame::Themed::Bg),(ids!(capture_return),frame::Themed::Both),
+            (ids!(wf_edit),frame::Themed::Both),(ids!(wf_arm),frame::Themed::Both),(ids!(wf_nano),frame::Themed::Both),(ids!(wf_back),frame::Themed::Both),
+            (ids!(wf_type),frame::Themed::Bg),(ids!(wf_follower),frame::Themed::Bg),(ids!(wf_leader),frame::Themed::Bg),(ids!(wf_cameras),frame::Themed::Bg),(ids!(wf_task),frame::Themed::Bg),(ids!(wf_destination),frame::Themed::Bg),
+            (ids!(wf_sim),frame::Themed::Both),(ids!(wf_real),frame::Themed::Both),
+            (ids!(wf_start),frame::Themed::Both),(ids!(wf_stop),frame::Themed::Both),
+            (ids!(wf_operate),frame::Themed::Both),(ids!(wf_rig),frame::Themed::Both),
+            (ids!(wf_next),frame::Themed::Both),(ids!(wf_external),frame::Themed::Both),
+            (ids!(wf_create),frame::Themed::Both),(ids!(wf_browse),frame::Themed::Both),
+            (ids!(wf_record),frame::Themed::Both),(ids!(wf_finish),frame::Themed::Both),
+            (ids!(wf_save),frame::Themed::Both),(ids!(wf_discard),frame::Themed::Both),(ids!(wf_replay),frame::Themed::Both),
+        ],frame::light_mode());
+    }
+    fn sync_live_controls(&self, cx: &mut Cx) {
+        self.sync_workflow(cx);
+        let live = self.backend.screen() == Screen::Live;
+        let teleop = matches!(self.backend.screen(), Screen::Live | Screen::Record) && self.backend.playback().live.is_some();
+        self.ui.widget(cx, ids!(live_bar)).set_visible(cx, live && self.external_stream && self.backend.hardware().nano.is_none());
+        self.ui.widget(cx, ids!(gamepad_help)).set_visible(cx, teleop);
+        self.ui.widget(cx,ids!(gamepad_setup)).set_visible(cx, live);
+        self.ui.widget(cx,ids!(hardware_teleop.toolbar.camera_hint)).set_visible(cx, self.workflow_help);
+        if teleop {
+            self.ui.button(cx, ids!(gamepad_setup)).set_text(cx, if self.backend.screen() == Screen::Record { "Robot setup" } else { "Record →" });
+            let phase = &self.backend.playback().stats.task;
+            let mapping = if !self.workflow_help { "Hold L1 to move · Release to stop · R1 mode" } else if phase.contains("Left arm") || phase.contains("Right arm") {
+                dorobot_flex::ui::play::ARM_CONTROL_MAP
+            } else if phase.contains("Head") {
+                "L1: hold to move · R1: change mode · Left stick: head pan / tilt · Options: pause"
+            } else {
+                "Hold L1 + left stick ↑/↓ to drive · Right stick ←/→ to turn · D-pad also drives / turns · R1: change mode · Options: pause"
+            };
+            // Keep every control visible, including J5, when other joints
+            // reach their limits. Limit/recovery feedback lives in the 3D panel.
+            self.ui.label(cx, ids!(gamepad_mapping)).set_text(cx, mapping);
+        }
+        let connection = self.backend.live_connection();
+        let active = connection.is_some_and(|c| c.phase.active());
+        let streaming = if connection.is_some_and(|c| c.phase == dorobot_flex::api::live::ConnectionPhase::Streaming) { 1.0 } else { 0.0 };
+        // Blink on the existing UI timer, independent of frame rate or replay.
+        // Keep the caption legible in both phases; stale/ended feeds never pulse.
+        let pulse = if (Cx::time_now() / 0.6) as u64 % 2 == 0 { 1.0 } else { 0.0 };
+        let mut live_nav = self.ui.widget(cx, ids!(nav_live));
+        script_apply_eval!(cx, live_nav, { draw_bg +: { streaming: #(streaming) pulse: #(pulse) } });
+        let mut glyph = live_nav.widget(cx, ids!(glyph));
+        script_apply_eval!(cx, glyph, { draw_bg +: { streaming: #(streaming) } });
+        let mut caption = live_nav.widget(cx, ids!(caption));
+        script_apply_eval!(cx, caption, { draw_text +: { streaming: #(streaming) } });
+        live_nav.redraw(cx);
+        self.ui.button(cx, ids!(live_connect)).set_text(cx, if active { "Reconnect" } else { "Connect" });
+        self.ui.button(cx, ids!(live_connect)).set_enabled(cx, connection.is_some());
+        self.ui.button(cx, ids!(live_disconnect)).set_enabled(cx, active);
+        self.ui.widget(cx, ids!(live_recording)).set_visible(cx, connection.is_some_and(|c| c.dataset.is_some()));
+        self.ui.label(cx, ids!(monitor_title)).set_text(cx, if live || teleop { "Live · synchronized cameras and robot" } else { "Replay · shared episode and playback" });
+    }
+
     fn hide_monitor(&mut self, cx: &mut Cx) {
         self.monitor_open = false;
         self.ui
@@ -199,7 +481,7 @@ impl App {
     }
 
     fn save_session(&self) {
-        if std::env::args().any(|a| a == "--demo") {
+        if std::env::args().any(|a| a == "--demo" || a == "--live-socket") {
             return;
         }
         if let Some(path) = preferences::path() {
@@ -213,12 +495,12 @@ impl App {
     }
     /// Repaint every screen from the current backend snapshot.
     fn sync(&mut self, cx: &mut Cx) {
-        self.ui.label(cx, ids!(main_window.body.workspace.page_header.status)).set_text(
-            cx,
-            self.backend
-                .status()
-                .unwrap_or("DEMO · generated fixtures; no hardware connected"),
-        );
+        self.ui
+            .label(cx, ids!(main_window.body.workspace.page_header.status))
+            .set_text(
+                cx,
+                self.display_status(),
+            );
         self.ui
             .widget(cx, ids!(hub_form))
             .set_visible(cx, self.hub_upload.is_some());
@@ -230,9 +512,9 @@ impl App {
         self.ui.button(cx, ids!(appearance)).set_text(
             cx,
             if light > 0.5 {
-                "Appearance: Light"
+                "Light appearance"
             } else {
-                "Appearance: Dark"
+                "Dark appearance"
             },
         );
         self.ui.label(cx, ids!(page_title)).set_text(
@@ -241,7 +523,8 @@ impl App {
                 Screen::Library => "Library",
                 Screen::Record => "Record",
                 Screen::Play => "Replay",
-                Screen::Hardware => "Hardware",
+                Screen::Live => "Operate",
+                Screen::Hardware => "Robot setup",
                 Screen::Eval => "Evaluate",
             },
         );
@@ -250,9 +533,14 @@ impl App {
             cx,
             &self.ui,
             &[
+                (ids!(appearance), frame::Themed::Both),
                 (ids!(setup_card), frame::Themed::Bg),
                 (ids!(setup_rescan), frame::Themed::Both),
                 (ids!(setup_replay), frame::Themed::Both),
+                (ids!(live_connect), frame::Themed::Both),
+                (ids!(live_disconnect), frame::Themed::Both),
+                (ids!(live_recording), frame::Themed::Both),
+                (ids!(gamepad_setup), frame::Themed::Both),
             ],
             light,
         );
@@ -262,19 +550,21 @@ impl App {
         }
         let nav = self.ui.widget(cx, ids!(nav));
         frame::sync_nav(cx, &nav, self.backend.screen());
+        self.sync_live_controls(cx);
 
         self.ui
             .library_screen(cx, ids!(page_library))
             .sync(cx, self.backend.library());
-        self.ui
-            .hardware_screen(cx, ids!(page_hardware))
-            .sync(cx, self.backend.hardware());
+        self.sync_hardware(cx);
         self.ui
             .record_screen(cx, ids!(page_record))
             .sync(cx, self.backend.record());
         self.ui
             .play_screen(cx, ids!(page_play))
             .sync(cx, self.backend.playback());
+        if matches!(self.backend.screen(), Screen::Live | Screen::Record) && self.backend.playback().live.is_some() {
+            self.ui.play_screen(cx, ids!(hardware_teleop)).sync(cx, self.backend.playback());
+        }
         self.ui
             .eval_screen(cx, ids!(page_eval))
             .sync(cx, self.backend.eval());
@@ -287,14 +577,18 @@ impl App {
         // Overlay flow: exactly one page is visible at a time.
         let screen = self.backend.screen();
         let setup = match screen {
-            Screen::Record => self.backend.record().profile_label.is_empty(),
-            Screen::Hardware => self.backend.record().profile_label.is_empty(),
+            Screen::Record => if self.backend.workflow().simulation { !self.backend.workflow().active } else { self.backend.record().profile_label.is_empty() || self.backend.hardware().nano.is_some() },
+            Screen::Hardware => false,
+            Screen::Live => !self.external_stream && self.backend.hardware().nano.is_none() && !self.backend.live_connection().is_some_and(|c|c.phase.active()),
             Screen::Eval => self.backend.eval().checkpoint.is_empty(),
             Screen::Play => self.backend.playback().episodes.is_empty(),
             _ => false,
         };
         self.ui.widget(cx, ids!(setup_page)).set_visible(cx, setup);
         if setup {
+            let live_empty = screen == Screen::Live;
+            let simulation_empty = screen == Screen::Record && self.backend.workflow().simulation;
+            let nano_record = screen == Screen::Record && self.backend.hardware().nano.is_some();
             let evaluating = screen == Screen::Eval;
             let no_recordings = screen == Screen::Play;
             self.ui.button(cx, ids!(setup_replay)).set_text(
@@ -307,7 +601,7 @@ impl App {
             );
             self.ui.label(cx, ids!(setup_title)).set_text(
                 cx,
-                if no_recordings {
+                if live_empty { "No live session running" } else if simulation_empty { "Start a simulation to record" } else if nano_record { "Recording unavailable for the Nano base driver" } else if no_recordings {
                     "Choose a recording to replay"
                 } else if evaluating {
                     "No rollout running"
@@ -315,10 +609,10 @@ impl App {
                     "Connect a robot to get started"
                 },
             );
-            self.ui.label(cx, ids!(setup_description)).set_text(cx, if no_recordings {
-                "Open a LeRobot dataset from Library to review robot motion and camera recordings."
+            self.ui.label(cx, ids!(setup_description)).set_text(cx, if live_empty { "Start a simulation or connect your robot in Robot setup." } else if simulation_empty { "Start Nano in Robot setup, then record its cameras and motion." } else if nano_record { "This driver supports the base only. Use Simulation to capture Nano’s cameras and arms." } else if no_recordings {
+                "Choose a dataset from Library."
             } else if evaluating {
-                "No policy runner is connected. Open Replay to inspect recorded motion; use Nexus Studio to validate a checkpoint."
+                "No policy runner connected. Recorded motion is available in Replay."
             } else {
                 "Choose a rig profile, then check connections before recording. No hardware is connected."
             });
@@ -327,7 +621,7 @@ impl App {
                 .set_visible(cx, !evaluating && !no_recordings);
             self.ui
                 .widget(cx, ids!(setup_rescan))
-                .set_visible(cx, !evaluating && !no_recordings);
+                .set_visible(cx, !evaluating && !no_recordings && !simulation_empty && !nano_record && !live_empty);
         }
         for (path, s) in [
             (ids!(page_library) as &[LiveId], Screen::Library),
@@ -336,7 +630,17 @@ impl App {
             (ids!(page_play), Screen::Play),
             (ids!(page_eval), Screen::Eval),
         ] {
-            self.ui.widget(cx, path).set_visible(cx, s == screen);
+            self.ui.widget(cx, path).set_visible(cx, s == screen || (s == Screen::Play && screen == Screen::Live));
+        }
+        if screen == Screen::Record && (self.backend.workflow().simulation || self.backend.hardware().nano.is_some()) { self.ui.widget(cx, ids!(page_record)).set_visible(cx,false); }
+        let teleop = matches!(screen, Screen::Live | Screen::Record) && self.backend.playback().live.is_some();
+        self.ui.widget(cx, ids!(hardware_teleop)).set_visible(cx, teleop);
+        if teleop { self.ui.widget(cx, ids!(page_play)).set_visible(cx, false); self.ui.widget(cx, ids!(page_record)).set_visible(cx, false); }
+        if setup && screen == Screen::Live { self.ui.widget(cx, ids!(page_play)).set_visible(cx,false); self.ui.widget(cx, ids!(hardware_teleop)).set_visible(cx,false); }
+        if self.backend.hardware().nano.is_some() && screen == Screen::Live {
+            self.ui.widget(cx, ids!(page_hardware)).set_visible(cx,true);
+            self.ui.widget(cx, ids!(page_play)).set_visible(cx,false);
+            self.ui.widget(cx, ids!(hardware_teleop)).set_visible(cx,false);
         }
     }
 }
@@ -344,7 +648,7 @@ impl App {
 impl MatchEvent for App {
     fn handle_startup(&mut self, cx: &mut Cx) {
         let args: Vec<String> = std::env::args().collect();
-        let saved = if args.iter().any(|a| a == "--demo") {
+        let saved = if args.iter().any(|a| a == "--demo" || a == "--live-socket") {
             None
         } else {
             preferences::path().and_then(|p| preferences::load(&p))
@@ -373,7 +677,9 @@ impl MatchEvent for App {
             if let Some(name) = args.get(i + 1) {
                 let target = match name.as_str() {
                     "record" => Some(Screen::Record),
+                    "play" if args.iter().any(|a| a == "--live-socket") => Some(Screen::Live),
                     "play" => Some(Screen::Play),
+                    "live" => Some(Screen::Live),
                     "hardware" => Some(Screen::Hardware),
                     "eval" => Some(Screen::Eval),
                     "library" => Some(Screen::Library),
@@ -388,6 +694,12 @@ impl MatchEvent for App {
         if args.iter().any(|a| a == "--light") {
             frame::set_light_mode(1.0);
         }
+        if let Some(connection) = self.backend.live_connection() {
+            self.ui.text_input(cx, ids!(live_source)).set_text(cx, &connection.source);
+        }
+        let flow = self.backend.workflow();
+        self.ui.text_input(cx, ids!(wf_task)).set_text(cx, &flow.task);
+        self.ui.text_input(cx, ids!(wf_destination)).set_text(cx, &flow.destination);
         self.sync(cx);
         self.started = true;
         self.playback_timer = cx.start_interval(1.0 / PLAYBACK_TIMER_FPS);
@@ -403,24 +715,77 @@ impl MatchEvent for App {
             .replace(now)
             .map(|t| now.duration_since(t).as_secs_f64())
             .unwrap_or(0.0);
+        let live_before=self.backend.playback().live.as_ref().map(|v|(v.sequence,v.connected,v.finished));
+        let was_live=self.backend.playback().live.is_some();
+        let screen_before = self.backend.screen();
         self.backend.poll();
+        if screen_before != self.backend.screen() { self.sync(cx); }
+        let live_after=self.backend.playback().live.as_ref().map(|v|(v.sequence,v.connected,v.finished));
+        if live_before!=live_after || (was_live && live_after.is_none()) {
+            self.ui.play_screen(cx, ids!(page_play)).sync(cx, self.backend.playback());
+            if matches!(self.backend.screen(), Screen::Live | Screen::Record) && self.backend.playback().live.is_some() {
+                self.ui.play_screen(cx, ids!(hardware_teleop)).sync(cx, self.backend.playback());
+            }
+            if self.monitor_open { self.ui.play_screen(cx, ids!(monitor_play)).sync(cx, self.backend.playback()); }
+            if was_live != live_after.is_some() { self.sync(cx); }
+            self.ui.redraw(cx);
+        }
         if self
             .last_refresh
             .is_none_or(|t| t.elapsed().as_millis() >= 100)
         {
             self.last_refresh = Some(now);
+            self.sync_live_controls(cx);
             self.ui.play_screen(cx, ids!(page_play)).adapt_layout(cx);
+            if matches!(self.backend.screen(), Screen::Live | Screen::Record) && self.backend.playback().live.is_some() {
+                self.ui.play_screen(cx, ids!(hardware_teleop)).adapt_layout(cx);
+            }
             if self.monitor_open {
                 self.ui.play_screen(cx, ids!(monitor_play)).adapt_layout(cx);
             }
             if std::env::var_os("DOROBOT_UX_REPORT").is_some() {
                 let play = self.backend.playback();
+                let robot_widget = self
+                    .ui
+                    .widget(cx, if matches!(self.backend.screen(), Screen::Live | Screen::Record) && play.live.is_some() { ids!(hardware_teleop.upper.grid.robot_panel.stage_3d) } else { ids!(page_play.upper.grid.robot_panel.stage_3d) });
+                let robot_probe = robot_widget.borrow::<makepad_urdf_player::robot_view::RobotView>().map(|rv| {
+                    let links: std::collections::BTreeMap<_,_> = rv.robot().map(|robot|
+                        robot.links.iter().enumerate().filter(|(_,link)|
+                            ["left_tool_mount", "right_tool_mount", "head_tilt"].contains(&link.name.as_str()))
+                        .map(|(i,link)| (link.name.clone(),robot.link_transforms[i].to_cols_array())).collect()
+                    ).unwrap_or_default();
+                    serde_json::json!({"names":rv.movable_joint_names(), "base_transform":rv.robot().map(|robot| robot.base_pose.to_cols_array()), "camera_target":rv.camera_target(), "camera_distance":rv.view_distance(), "colors":rv.robot().map(|robot| robot.links.iter().map(|link| (link.name.clone(),link.color)).collect::<std::collections::BTreeMap<_,_>>()), "links":links, "scene_items":rv.external_counts().1, "scene_transforms":rv.external_items().iter().map(|i| i.transform).collect::<Vec<_>>()})
+                });
+                let hardware_widget = self.ui.widget(cx, ids!(page_hardware.content.robot_panel.content.mirror.viewport));
+                let hardware_colors = hardware_widget.borrow::<makepad_urdf_player::robot_view::RobotView>().map(|rv| {
+                    rv.robot().map(|robot| robot.links.iter().map(|link| (link.name.clone(), link.color)).collect::<std::collections::BTreeMap<_,_>>()).unwrap_or_default()
+                });
+                let signals = self.ui.play_screen(cx, ids!(page_play)).signal_probe(cx);
+                let monitor_signals = self.ui.play_screen(cx, ids!(monitor_play)).signal_probe(cx);
                 dorobot_flex::ux_probe::write(
                     cx,
                     &self.ui,
                     serde_json::json!({
                         "screen": self.backend.screen().label(), "dark": frame::light_mode() < 0.5,
+                        "workflow": {"calibrated":self.backend.workflow().calibrated,"nano":self.backend.hardware().nano.as_ref().map(|n|serde_json::json!({"active":n.active,"mock":n.mock,"phase":n.phase,"acks":n.acks})),"simulation":self.backend.workflow().simulation,"active":self.backend.workflow().active,"ready":self.backend.workflow().ready,"phase":self.backend.workflow().phase,"frames":self.backend.workflow().frames,"saved":self.backend.workflow().saved,"dataset":self.backend.workflow().dataset,"detail":self.backend.workflow().detail},
                         "episode": play.selected, "playing": play.is_playing, "time": play.current_time,
+                        "recorded_joints": play.joints_now(),
+                        "signals": signals,
+                        "live":play.live.as_ref().map(|v|serde_json::json!({"sequence":v.sequence,"connected":v.connected,"finished":v.finished,"cameras":v.images.keys().collect::<Vec<_>>()})),
+                        "connection":self.backend.live_connection().map(|c|serde_json::json!({"phase":c.phase.label(),"preview_fps":c.preview_fps,"frame_age_ms":c.frame_age_ms,"received_frames":c.received_frames,"recording_ready":c.dataset.is_some()})),
+                        "base_pose":play.scene.as_ref().and_then(|s|s.frames.get(play.frame_index() as usize)).and_then(|f|f.base_pose.clone()),
+                        "monitor_signals": monitor_signals,
+                        "robot_probe": robot_probe,
+                        "hardware_colors": hardware_colors,
+                        "hardware_layout": self.ui.flex_panels(cx, ids!(page_hardware.content)).snapshot(),
+                        "hardware_camera_layout": self.ui.flex_panels(cx, ids!(hardware_teleop.upper.grid)).snapshot(),
+                        "control_model": self.ui.widget(cx, ids!(hardware_teleop.control_3d)).borrow::<makepad_urdf_player::robot_view::RobotView>().map(|v| serde_json::json!({"joints":v.joint_angles(),"highlights":v.control_highlights(),"angles":v.view_angles(),"distance":v.view_distance()})),
+                        "hardware_joints_done": self.backend.hardware().joints_done(),
+                        "nano_base": self.backend.hardware().nano.as_ref().map(|n| serde_json::json!({"active":n.active,"mock":n.mock,"phase":n.phase,"detail":n.detail,"command_ticks":n.command_ticks,"acks":n.acks})),
+                        "hardware_joints_total": self.backend.hardware().joints.len(),
+                        "hardware_steps": self.backend.hardware().steps.iter().map(|step| format!("{:?}", step.state)).collect::<Vec<_>>(),
+                        "scene_objects": play.scene.as_ref().map(|s| s.objects.len()),
+                        "viewer_joints": self.ui.robot_view(cx, ids!(page_play.upper.grid.robot_panel.stage_3d)).joint_angles(),
                         "speed": play.speed, "frames": play.stats.frames, "tag": play.selected.and_then(|id| play.episodes.iter().find(|e| e.index == id)).map(|e| format!("{:?}", e.tag)),
                         "monitor_open": self.monitor_open, "monitor_window": self.ui.window(cx, ids!(replay_window)).window_id().map(|w|w.id()),
                         "monitor_layout": self.ui.flex_panels(cx, ids!(monitor_play.upper.grid)).snapshot(),
@@ -442,6 +807,11 @@ impl MatchEvent for App {
                         "page_play.timeline.tl_body.controls.speed_btn",
                         "page_hardware.content.camera_a_panel.content.calib.joints.joint_0.readout",
                         "main_window.body.workspace.page_header.status",
+                        "main_window.body.workspace.page_header.page_title",
+                        "main_window.body.workspace.page_header",
+                        "page_play.toolbar",
+                        "page_play.timeline",
+                        "page_play.timeline.tl_head",
                         "nav_library",
                         "nav_record",
                         "nav_play",
@@ -450,6 +820,7 @@ impl MatchEvent for App {
                         "appearance",
                         "sidebar",
                         "sidebar_resize",
+                        "workflow", "source_row", "wf_rig_form", "wf_capture_fields", "wf_capture", "help_toggle", "wf_more", "wf_source", "capture_notice", "capture_return", "wf_edit", "wf_arm", "wf_nano", "wf_back", "wf_sim", "wf_real", "wf_start", "wf_stop", "wf_operate", "wf_rig", "wf_next", "wf_external", "wf_type", "wf_follower", "wf_leader", "wf_cameras", "wf_create", "wf_task", "wf_destination", "wf_browse", "wf_record", "wf_finish", "wf_save", "wf_discard", "wf_replay", "wf_guide", "wf_detail", "wf_count",
                         "setup_rig",
                         "setup_rescan",
                         "setup_replay",
@@ -461,6 +832,9 @@ impl MatchEvent for App {
                         "monitor_play.panels_btn",
                         "monitor_play.layout_reset",
                         "monitor_play.play_btn",
+                        "monitor_play.signals_btn",
+                        "monitor_play.signal_prev",
+                        "monitor_play.signal_next",
                         "monitor_play.upper.grid.robot_panel",
                         "monitor_play.upper.grid.error_panel",
                         "monitor_play.timeline.tl_body.controls.transport",
@@ -469,6 +843,7 @@ impl MatchEvent for App {
                         "robot_toggle",
                         "camera_a_toggle",
                         "camera_b_toggle",
+                        "camera_c_toggle",
                         "error_toggle",
                         "layout_reset",
                         "layout_cycle",
@@ -476,10 +851,12 @@ impl MatchEvent for App {
                         "robot_panel",
                         "camera_a_panel",
                         "camera_b_panel",
+                        "camera_c_panel",
                         "error_panel",
                         "stage_3d",
                         "stage_a",
                         "stage_b",
+                        "stage_c",
                         "stage_plot",
                         "robot_panel.head",
                         "robot_panel.head.maximize",
@@ -491,11 +868,44 @@ impl MatchEvent for App {
                         "camera_a_panel.head.maximize",
                         "camera_a_panel.head.close",
                         "camera_b_panel.head",
+                        "camera_c_panel.head",
                         "camera_b_panel.head.maximize",
+                        "camera_c_panel.head.maximize",
                         "camera_b_panel.head.close",
+                        "camera_c_panel.head.close",
                         "page_hardware.content.camera_a_panel.content.calib.actions.btn_continue",
                         "page_hardware.content.camera_a_panel.content.calib.actions.btn_restart",
                         "page_hardware.hardware_reset",
+                        "page_hardware.hardware_fit",
+                        "page_hardware.stepper",
+                        "page_hardware.layout_tools",
+                        "page_hardware.content",
+                        "page_hardware.content.robot_panel",
+                        "page_hardware.content.robot_panel.head",
+                        "page_hardware.content.robot_panel.head.maximize",
+                        "page_hardware.content.robot_panel.head.close",
+                        "page_hardware.content.robot_panel.content.mirror.viewport",
+                        "page_hardware.content.camera_a_panel",
+                        "page_hardware.content.camera_a_panel.head",
+                        "page_hardware.content.camera_a_panel.head.maximize",
+                        "page_hardware.content.camera_a_panel.head.close",
+                        "page_hardware.content.camera_a_panel.content.calib.banner",
+                        "page_hardware.content.camera_a_panel.content.calib.banner.ring",
+                        "page_hardware.content.camera_a_panel.content.calib.banner.btext.instruction",
+                        "page_hardware.content.camera_a_panel.content.calib.banner.btext.subline",
+                        "page_hardware.content.camera_a_panel.content.calib.rows",
+                        "page_hardware.content.camera_a_panel.content.calib.rows.joint_0.readout",
+                        "page_hardware.content.camera_a_panel.content.calib.rows.joint_5.readout",
+                        "page_hardware.stepper.step_0.dot",
+                        "page_hardware.stepper.step_1.dot",
+                        "page_hardware.stepper.step_2.dot",
+                        "page_hardware.stepper.step_3.dot",
+                        "page_hardware.stepper.step_4.dot",
+                        "page_hardware.stepper.step_0.dot.num",
+                        "page_hardware.stepper.step_1.dot.num",
+                        "page_hardware.stepper.step_2.dot.num",
+                        "page_hardware.stepper.step_3.dot.num",
+                        "page_hardware.stepper.step_4.dot.num",
                         "page_eval.pbar.btn_stop",
                         "page_record.transport.btn_record",
                         "page_record.transport.btn_save",
@@ -506,6 +916,8 @@ impl MatchEvent for App {
                         "episodes_btn",
                         "details_btn",
                         "signals_btn",
+                        "view_mode_btn",
+                        "monitor_play.view_mode_btn",
                         "signal_prev",
                         "signal_next",
                         "page_play.timeline.tl_body.lanes.content.lane_0",
@@ -525,18 +937,58 @@ impl MatchEvent for App {
                         "page_library.left_col.header.btn_pull",
                         "page_library.left_col.header.btn_open",
                         "hub_repo",
+                        "nav_live",
+                        "nav_play",
+                        "live_bar",
+                        "live_source",
+                        "live_connect",
+                        "live_disconnect",
+                        "live_recording",
+                        "gamepad_help",
+                        "gamepad_mapping",
+                        "gamepad_setup",
+                        "page_hardware.supported_robots.nano_select",
+                        "page_hardware.supported_robots.simulation_select",
+                        "page_hardware.supported_robots.rig_select",
+                        "page_hardware.content.camera_a_panel.content.calib.nano_controls",
+                        "page_hardware.content.camera_a_panel.content.calib.nano_controls.driver_state",
+                        "page_hardware.content.camera_a_panel.content.calib.nano_controls.serial_row.port",
+                        "page_hardware.content.camera_a_panel.content.calib.nano_controls.serial_row.scan",
+                        "page_hardware.content.camera_a_panel.content.calib.nano_controls.connection_row.connect",
+                        "page_hardware.content.camera_a_panel.content.calib.nano_controls.connection_row.test",
+                        "page_hardware.content.camera_a_panel.content.calib.nano_controls.connection_row.stop",
+                        "hardware_teleop",
+                        "hardware_teleop.upper.grid.robot_panel",
+                        "hardware_teleop.upper.grid.camera_a_panel",
+                        "hardware_teleop.upper.grid.camera_b_panel",
+                        "hardware_teleop.upper.grid.camera_c_panel",
+                        "hardware_teleop.toolbar.signals_btn",
+                        "hardware_teleop.toolbar.panels_btn",
+                        "hardware_teleop.toolbar.camera_hint",
+                        "hardware_teleop.panel_tools.layout_reset",
+                        "hardware_teleop.panel_tools.layout_cycle",
+                        "hardware_teleop.upper.grid.camera_a_panel.head.maximize",
+                        "hardware_teleop.upper.grid.camera_b_panel.head.maximize",
+                        "hardware_teleop.upper.grid.camera_c_panel.head.maximize",
+                        "hardware_teleop.upper.grid.robot_panel.head.maximize",
+                        "hardware_teleop.upper.grid.error_panel",
+                        "hardware_teleop.upper.grid.error_panel.head.maximize",
+                        "hardware_teleop.upper.grid.error_panel.control_body.control_3d",
+                        "hardware_teleop.upper.grid.error_panel.control_body.control_feedback",
+                        "hardware_teleop.upper.grid.error_panel.control_body.control_angles",
+                        "hardware_teleop.panel_tools.error_toggle",
                         "hub_cancel",
                         "page_play.upper.side",
                         "page_play.upper.tree",
                     ],
                 );
             }
-            self.ui.label(cx, ids!(main_window.body.workspace.page_header.status)).set_text(
-                cx,
-                self.backend
-                    .status()
-                    .unwrap_or("DEMO · simulated data; no hardware connected"),
-            );
+            self.ui
+                .label(cx, ids!(main_window.body.workspace.page_header.status))
+                .set_text(
+                    cx,
+                    self.display_status(),
+                );
             match self.backend.screen() {
                 Screen::Library => self
                     .ui
@@ -546,10 +998,8 @@ impl MatchEvent for App {
                     .ui
                     .record_screen(cx, ids!(page_record))
                     .sync(cx, self.backend.record()),
-                Screen::Hardware => self
-                    .ui
-                    .hardware_screen(cx, ids!(page_hardware))
-                    .sync(cx, self.backend.hardware()),
+                Screen::Hardware => self.sync_hardware(cx),
+                Screen::Live if self.backend.hardware().nano.is_some() => self.sync_hardware(cx),
                 _ => {}
             }
         }
@@ -583,11 +1033,12 @@ impl MatchEvent for App {
     fn handle_key_down(&mut self, cx: &mut Cx, e: &KeyEvent) {
         if e.modifiers.logo || e.modifiers.control {
             let target = match e.key_code {
-                KeyCode::Key1 => Some(Screen::Library),
-                KeyCode::Key2 => Some(Screen::Record),
-                KeyCode::Key3 => Some(Screen::Play),
-                KeyCode::Key4 => Some(Screen::Hardware),
-                KeyCode::Key5 => Some(Screen::Eval),
+                KeyCode::Key1 => Some(Screen::Hardware),
+                KeyCode::Key2 => Some(Screen::Live),
+                KeyCode::Key3 => Some(Screen::Record),
+                KeyCode::Key4 => Some(Screen::Play),
+                KeyCode::Key5 => Some(Screen::Library),
+                KeyCode::Key6 => Some(Screen::Eval),
                 _ => None,
             };
             if let Some(target) = target {
@@ -631,6 +1082,58 @@ impl MatchEvent for App {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         let mut dirty = false;
+        if self.ui.button(cx,ids!(help_toggle)).clicked(actions) { self.workflow_help = !self.workflow_help; dirty = true; }
+        if self.ui.button(cx,ids!(wf_more)).clicked(actions) { self.workflow_more = !self.workflow_more; dirty = true; }
+        if self.ui.text_input(cx, ids!(wf_task)).changed(actions).is_some() || self.ui.text_input(cx, ids!(wf_destination)).changed(actions).is_some() {
+            self.backend.dispatch(Intent::SetCapturePreferences { task: self.ui.text_input(cx, ids!(wf_task)).text(), destination: self.ui.text_input(cx, ids!(wf_destination)).text() });
+            dirty = true;
+        }
+        for (path, intent) in [
+            (ids!(capture_return), Intent::Navigate(Screen::Record)),
+            (ids!(wf_arm), Intent::SelectNanoBase(false)), (ids!(wf_nano), Intent::SelectNanoBase(true)),
+            (ids!(wf_sim), Intent::SelectSimulation(true)), (ids!(wf_real), Intent::SelectSimulation(false)),
+            (ids!(wf_start), Intent::StartSimulation), (ids!(wf_stop), Intent::StopSimulation),
+            (ids!(wf_back), Intent::Navigate(Screen::Hardware)), (ids!(wf_operate), Intent::Navigate(Screen::Live)), (ids!(wf_next), Intent::Navigate(Screen::Record)),
+            (ids!(wf_replay), Intent::OpenSavedRecording),
+        ] { if self.ui.button(cx,path).clicked(actions) { self.backend.dispatch(intent); dirty = true; } }
+        for (path, action) in [(ids!(wf_record), "record"), (ids!(wf_finish), "stop"), (ids!(wf_save), "save"), (ids!(wf_discard), "discard")] {
+            if self.ui.button(cx,path).clicked(actions) {
+                self.backend.dispatch(Intent::SimulationCapture { action: action.into(), task: self.ui.text_input(cx,ids!(wf_task)).text(), destination: self.ui.text_input(cx,ids!(wf_destination)).text() }); dirty = true;
+            }
+        }
+        if self.ui.button(cx,ids!(wf_external)).clicked(actions) { self.external_stream = true; self.backend.dispatch(Intent::Navigate(Screen::Live)); dirty = true; }
+        if self.ui.button(cx,ids!(wf_rig)).clicked(actions) {
+            cx.open_select_file_dialog(FileDialog::new().set_id(live_id!(rig_profile)).set_title("Choose a rig profile".into()).add_filter("Rig profile".into(),vec!["json".into()]));
+        }
+        if self.ui.button(cx,ids!(wf_browse)).clicked(actions) {
+            self.folder_request = Some(FolderRequest::Recording);
+            cx.open_select_folder_dialog(FileDialog::new().set_id(live_id!(dataset_folder)).set_title("Choose recording folder".into()));
+        }
+        if self.ui.button(cx,ids!(wf_edit)).clicked(actions) { self.rig_editing = !self.rig_editing; dirty = true; }
+        if self.ui.button(cx,ids!(wf_create)).clicked(actions) {
+            let previous = self.backend.rig_profile();
+            self.backend.dispatch(Intent::CreateRig { robot_type:self.ui.text_input(cx,ids!(wf_type)).text(), follower:self.ui.text_input(cx,ids!(wf_follower)).text(), leader:self.ui.text_input(cx,ids!(wf_leader)).text(), cameras:self.ui.text_input(cx,ids!(wf_cameras)).text(), task:self.ui.text_input(cx,ids!(wf_task)).text(), destination:self.ui.text_input(cx,ids!(wf_destination)).text() });
+            if self.backend.rig_profile() != previous { self.rig_editing = false; }
+            dirty = true;
+        }
+
+        if self.ui.button(cx, ids!(gamepad_setup)).clicked(actions) {
+            self.backend.dispatch(Intent::Navigate(if self.backend.screen() == Screen::Record { Screen::Hardware } else { Screen::Record }));
+            dirty = true;
+        }
+        if self.ui.button(cx, ids!(live_connect)).clicked(actions) {
+            let source = self.ui.text_input(cx, ids!(live_source)).text();
+            self.backend.dispatch(Intent::ConnectLive(source.trim().into()));
+            dirty = true;
+        }
+        if self.ui.button(cx, ids!(live_disconnect)).clicked(actions) {
+            self.backend.dispatch(Intent::DisconnectLive);
+            dirty = true;
+        }
+        if self.ui.button(cx, ids!(live_recording)).clicked(actions) {
+            self.backend.dispatch(Intent::OpenLiveRecording);
+            dirty = true;
+        }
         // The HAL opens Cocoa panels on its main thread and returns asynchronously.
         // Keep the original operation until either selection or cancellation arrives.
         for action in actions {
@@ -647,6 +1150,7 @@ impl MatchEvent for App {
                     }
                     FileDialogAction::FolderSelected(path) => {
                         match self.folder_request.take() {
+                            Some(FolderRequest::Recording) => { self.ui.text_input(cx,ids!(wf_destination)).set_text(cx, &path.to_string_lossy()); self.backend.dispatch(Intent::SetCapturePreferences { task:self.ui.text_input(cx,ids!(wf_task)).text(), destination:path.to_string_lossy().into_owned() }); },
                             Some(FolderRequest::Dataset) => {
                                 self.backend.dispatch(Intent::OpenFolder(path.clone()))
                             }
@@ -677,7 +1181,7 @@ impl MatchEvent for App {
         if self
             .ui
             .button(cx, ids!(page_play.new_window))
-            .clicked(actions)
+            .clicked(actions) || self.ui.button(cx, ids!(hardware_teleop.new_window)).clicked(actions)
         {
             self.monitor_open = true;
             self.ui.window(cx, ids!(replay_window)).show(cx);
@@ -686,10 +1190,14 @@ impl MatchEvent for App {
         if self.ui.button(cx, ids!(close_monitor)).clicked(actions) {
             self.hide_monitor(cx);
         }
-        for page in [ids!(page_play) as &[LiveId], ids!(monitor_play)] {
+        for page in [ids!(page_play) as &[LiveId], ids!(monitor_play), ids!(hardware_teleop)] {
             let root = self.ui.widget(cx, page);
             let play = self.ui.play_screen(cx, page);
             let grid = root.flex_panels(cx, ids!(upper.grid));
+            if root.button(cx, ids!(view_mode_btn)).clicked(actions) {
+                play.toggle_room_view(cx, self.backend.playback());
+                self.ui.redraw(cx);
+            }
             if root.button(cx, ids!(panels_btn)).clicked(actions) {
                 let tools = root.widget(cx, ids!(panel_tools));
                 tools.set_visible(cx, !tools.visible());
@@ -700,6 +1208,7 @@ impl MatchEvent for App {
                 (ids!(camera_a_toggle), 1),
                 (ids!(camera_b_toggle), 2),
                 (ids!(error_toggle), 3),
+                (ids!(camera_c_toggle), 4),
             ] {
                 if root.button(cx, id).clicked(actions) {
                     grid.toggle_panel(cx, panel);
@@ -777,12 +1286,7 @@ impl MatchEvent for App {
             .clicked(actions)
             || self.ui.button(cx, ids!(setup_rig)).clicked(actions)
         {
-            cx.open_select_file_dialog(
-                FileDialog::new()
-                    .set_id(live_id!(rig_profile))
-                    .set_title("Choose a rig profile".into())
-                    .add_filter("Rig profile".into(), vec!["json".into()]),
-            );
+            self.backend.dispatch(Intent::Navigate(Screen::Hardware)); dirty = true;
         }
         if self
             .ui
@@ -863,7 +1367,14 @@ impl MatchEvent for App {
             .hardware_screen(cx, ids!(page_hardware))
             .wizard_intent(cx, actions)
         {
+            let simulation = false;
             self.backend.dispatch(intent);
+            if simulation {
+                if let Some(connection) = self.backend.live_connection() {
+                    self.ui.text_input(cx, ids!(live_source)).set_text(cx, &connection.source);
+                }
+                self.backend.dispatch(Intent::Navigate(Screen::Hardware));
+            }
             dirty = true;
         }
 
@@ -929,7 +1440,7 @@ impl MatchEvent for App {
             }
         }
 
-        for page in [ids!(page_play) as &[LiveId], ids!(monitor_play)] {
+        for page in [ids!(page_play) as &[LiveId], ids!(monitor_play), ids!(hardware_teleop)] {
             // Play: episode selection and curation.
             let play = self.ui.play_screen(cx, page);
             if let Some(ep) = play.clicked_episode(cx, actions) {
@@ -1016,14 +1527,37 @@ impl AppMain for App {
         self.match_event(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
         if matches!(event, Event::LiveEdit | Event::ScriptReapply) && self.started {
+            // Refresh material-only edits without reopening meshes or losing
+            // the recorded pose. All Nano views use the same URDF palette.
+            for (path, model) in [
+                (ids!(page_hardware.content.robot_panel.content.mirror.viewport) as &[LiveId], self.backend.hardware().robot_urdf.as_ref()),
+                (ids!(page_play.upper.grid.robot_panel.stage_3d), self.backend.playback().robot_urdf.as_ref()),
+                (ids!(hardware_teleop.upper.grid.robot_panel.stage_3d), self.backend.playback().robot_urdf.as_ref()),
+                (ids!(hardware_teleop.upper.grid.error_panel.control_body.control_3d), self.backend.playback().robot_urdf.as_ref()),
+                (ids!(monitor_play.upper.grid.robot_panel.stage_3d), self.backend.playback().robot_urdf.as_ref()),
+            ] {
+                if let Some((urdf, _)) = model {
+                    let widget = self.ui.widget(cx, path);
+                    if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                        if let Err(error) = viewer.reload_materials(cx, urdf) {
+                            ::log::warn!("Could not refresh robot materials: {error}");
+                        }
+                    };
+                }
+            }
             self.ui
                 .play_screen(cx, ids!(page_play))
                 .restore_panel_design(cx);
+            self.ui.play_screen(cx, ids!(hardware_teleop)).restore_panel_design(cx);
+            self.ui.hardware_screen(cx, ids!(page_hardware)).restore_view_distance(cx);
             self.sync(cx);
         }
         // Scrolling the episode window produces no action, so it is picked up
         // here rather than in handle_actions, which would not run for it.
-        if self.ui.play_screen(cx, ids!(page_play)).take_scrolled() {
+        let play_scrolled = self.ui.play_screen(cx, ids!(page_play)).take_scrolled();
+        let monitor_scrolled = self.ui.play_screen(cx, ids!(monitor_play)).take_scrolled();
+        let hardware_scrolled = self.ui.play_screen(cx, ids!(hardware_teleop)).take_scrolled();
+        if play_scrolled || monitor_scrolled || hardware_scrolled {
             self.sync(cx);
             self.ui.redraw(cx);
         }

@@ -1,5 +1,60 @@
 # DoRobot Studio setup and workflows
 
+## Setup → Operate → Record → Replay
+
+The sidebar follows the recording journey. **Robot setup** stays a setup page;
+**Operate** holds live controls. Library and Evaluate are secondary destinations.
+Changing pages preserves a simulation, recording or unsaved take. A capture banner
+provides a return to Record when work is pending. Flexible panels and additional
+Replay windows remain available.
+
+- **Simulated Nano:** choose Simulation → Start simulation. Studio launches the
+  Dora graph and opens Operate after physics and the three cameras are ready.
+  First launch can take a few minutes to prepare GPU shaders. Model zero positions
+  and limits replace servo calibration; Stop simulation followed by Start creates
+  a fresh scene. Hold L1 to move, release to stop, and use R1 to switch control mode.
+- **Collect simulated data:** Record → enter task and save folder → Record episode
+  → Stop recording → Save episode → Open saved replay. Every take becomes its own
+  LeRobot dataset. All three RGB videos, depth, segmentation, camera poses and
+  intrinsics, measured joints, commands, scene motion and contact samples are kept.
+  Capture is 5 fps in simulation time; the UI separately reports preview throughput.
+  This is not a 30 fps real-time guarantee. Save waits for the complete sensor frame
+  count. Discard removes the pending take while preserving saved datasets.
+- **Real SO-100/101:** choose Real robot → SO-100 / SO-101 arms → enter follower and
+  leader ports, camera indexes, task and dataset folder → Use this rig. Existing
+  JSON profiles can also be loaded. Start calibration and follow the actual
+  LeRobot prompts, pressing Continue only when requested. After completion, open
+  Record. Leader control and capture start together. Stop → Save → Open saved replay.
+  Missing ports and incomplete calibration block capture with recovery instructions.
+- **Real Nano:** choose Real robot → Adora Nano · base only. Select its USB serial
+  port and connect, then Open controls. Bus test uses a mock serial bus and does
+  not move a simulated robot. This driver supports the mobile base only; arm/head
+  calibration and Nano camera recording remain unavailable. Leaving physical
+  controls stops the driver.
+
+Simulation requires `uv`, Dora CLI 1.0.1 and an AISLE checkout beside Studio;
+`DOROBOT_AISLE` and `DOROBOT_UV` can select other installations. Real arm capture
+uses `DOROBOT_PYTHON` and the dependencies below. Profiles and capture preferences
+are stored locally; restoring them never connects or drives hardware.
+
+Workflow checks are in `tools/ux/workflow_journeys.py`; the fixed scoring rubric is
+`tools/ux/workflow-rubric.json`. Physical robot calibration requires a separate
+hardware acceptance test and is not certified by a desktop UX score.
+
+The model-authored [desktop workflow review](../tools/ux/workflow-review.json)
+scores **95/100**, with the deductions, repair rounds, actual-input checks and
+sanitized evidence recorded per criterion. It covers the supported desktop flows
+on the prepared workstation, not complete physical Nano support or a human
+usability study. The saved simulation take was audited for all three videos,
+17 measured joints, raw checksums, camera poses and camera metadata.
+
+The subsequent [visual review](../tools/ux/visual-polish-review.json) scores
+**92/100** against a separate rubric that prioritizes hierarchy, text density,
+workspace and typography. It replaces the earlier review's visual assessment
+after user feedback: guidance and diagnostics are now disclosures, simulation
+has no explanatory side panel, and recording shows only the current actions.
+The original flexible panels and additional native replay window remain intact.
+
 ## Completed workflows
 
 | Area | Changes |
@@ -24,7 +79,7 @@ export DOROBOT_PYTHON="$PWD/.venv-capture/bin/python"
 cargo run -p dorobot-flex -- --dataset /path/to/dataset-or-library
 ```
 
-Copy `tools/capture/rig.example.json` to a profile and set the two serial ports, calibration IDs, task, output dataset, and OpenCV camera indexes or paths. Relative output paths resolve against the profile directory. LeRobot motor setup is required before calibration. Use **New Recording Session** to choose the profile, **Hardware → Continue** to calibrate, then **Record → Stop → Save**. Alternatively start with `--rig /path/to/rig.json`. The supplied IDs and ports are examples and do not identify attached hardware.
+Copy `tools/capture/rig.example.json` to a profile and set the two serial ports, calibration IDs, task, output dataset, and OpenCV camera indexes or paths. Relative output paths resolve against the profile directory. LeRobot motor setup is required before calibration. Use **Robot setup → Real robot → Load rig profile** to choose the profile, **Start calibration** to calibrate, then **Record → Stop → Save**. Alternatively start with `--rig /path/to/rig.json`. The supplied IDs and ports are examples and do not identify attached hardware.
 
 Saved captures use LeRobot v2.1. For current LeRobot training, convert a copy with its official converter (the converter moves/rewrites directories):
 

@@ -363,6 +363,33 @@ impl VideoPlayer {
         self.view.redraw(cx);
     }
 
+    /// Upload the Dora preview's already packed pixels without converting
+    /// every RGB pixel in the JIT UI thread. Sequence stays in the live bar.
+    pub fn set_live_frame(&mut self, cx: &mut Cx, width: usize, height: usize, data: &[u32]) {
+        if data.len() != width * height {
+            return;
+        }
+        self.video_width = width;
+        self.video_height = height;
+        let texture = Texture::new_with_format(
+            cx,
+            TextureFormat::VecBGRAu8_32 {
+                data: Some(data.to_vec()),
+                width,
+                height,
+                updated: TextureUpdated::Full,
+            },
+        );
+        let image = self.view.image(cx, ids!(video_area.frame_image));
+        image.set_texture(cx, Some(texture));
+        image.set_visible(cx, true);
+        self.view
+            .view(cx, ids!(video_area.placeholder))
+            .set_visible(cx, false);
+        self.has_video = true;
+        self.view.redraw(cx);
+    }
+
     /// Set episode info for seeking within concatenated video files
     ///
     /// In LeRobot v3.0, all episodes are stored in a single MP4 file.
@@ -394,9 +421,8 @@ impl VideoPlayer {
         if let Some(decoder) = &mut self.video_decoder {
             match decoder.get_frame(absolute_frame) {
                 Ok(frame) => {
-                    self.current_frame = episode_frame;
-                    self.set_frame(cx, frame.width as usize, frame.height as usize, &frame.data);
                     self.set_frame_info(cx, episode_frame, self.episode_frame_count);
+                    self.set_frame(cx, frame.width as usize, frame.height as usize, &frame.data);
                     return;
                 }
                 Err(e) => {
@@ -413,9 +439,8 @@ impl VideoPlayer {
         // Fall back to placeholder decoder
         if let Some(decoder) = &self.placeholder_decoder {
             let frame = decoder.get_frame_at_time(time);
-            self.current_frame = frame.frame_index;
-            self.set_frame(cx, frame.width as usize, frame.height as usize, &frame.data);
             self.set_frame_info(cx, frame.frame_index, self.total_frames);
+            self.set_frame(cx, frame.width as usize, frame.height as usize, &frame.data);
         }
     }
 
@@ -598,6 +623,7 @@ impl VideoPlayerRef {
     delegate_ref_method!(set_fps_display, cx, fps: f64);
     delegate_ref_method!(set_placeholder_text, cx, text: &str);
     delegate_ref_method!(set_frame, cx, width: usize, height: usize, data: &[u8]);
+    delegate_ref_method!(set_live_frame, cx, width: usize, height: usize, data: &[u32]);
     delegate_ref_method!(clear, cx);
     delegate_ref_method!(show_frame_at_time, cx, time: f64);
     delegate_ref_method!(set_has_video, cx, has_video: bool);

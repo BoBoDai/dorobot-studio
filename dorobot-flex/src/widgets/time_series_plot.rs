@@ -85,6 +85,7 @@ script_mod! {
                 }
 
                 max_label := Label{
+                    padding: 0
                     draw_text +: {
                         text_style: mod.widgets.flex.TEXT_SMALL{}
                         dark_mode: instance(0.0)
@@ -100,6 +101,7 @@ script_mod! {
                 View{ height: Fill }
 
                 min_label := Label{
+                    padding: 0
                     draw_text +: {
                         text_style: mod.widgets.flex.TEXT_SMALL{}
                         dark_mode: instance(0.0)
@@ -117,7 +119,6 @@ script_mod! {
             plot_area := View{
                 width: Fill
                 height: Fill
-                cursor: MouseCursor.Hand
 
                 show_bg: true
                 draw_bg +: {
@@ -254,13 +255,16 @@ pub struct TimeSeriesPlot {
 
 impl Widget for TimeSeriesPlot {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
-        self.view.handle_event(cx, event, scope);
-
-        // Handle mouse interaction for cursor
-        match event.hits(cx, self.view.area()) {
+        // Hit the plot before its children so a cursor-bearing View cannot
+        // consume the press. Resolve the current area after parent layout.
+        let area = self.view.view(cx, ids!(content.plot_area)).area();
+        match event.hits(cx, area) {
             Hit::FingerDown(fe) => {
                 // Convert mouse X to time
-                let rect = self.view.area().rect(cx);
+                let rect = self.view.view(cx, ids!(content.plot_area)).area().rect(cx);
+                if !rect.contains(fe.abs) || rect.size.x <= 0.0 {
+                    return;
+                }
                 let rel_x = (fe.abs.x - rect.pos.x) / rect.size.x;
                 let time =
                     self.time_range.0 + rel_x as f64 * (self.time_range.1 - self.time_range.0);
@@ -277,7 +281,10 @@ impl Widget for TimeSeriesPlot {
             }
             Hit::FingerMove(fe) => {
                 // Convert mouse X to time
-                let rect = self.view.area().rect(cx);
+                let rect = self.view.view(cx, ids!(content.plot_area)).area().rect(cx);
+                if rect.size.x <= 0.0 {
+                    return;
+                }
                 let rel_x = (fe.abs.x - rect.pos.x) / rect.size.x;
                 let time =
                     self.time_range.0 + rel_x as f64 * (self.time_range.1 - self.time_range.0);
@@ -292,16 +299,24 @@ impl Widget for TimeSeriesPlot {
 
                 self.view.redraw(cx);
             }
-            Hit::FingerHoverOut(_) => {
-                // Optionally hide cursor on hover out
+            Hit::FingerHoverIn(_) | Hit::FingerHoverOver(_) => {
+                cx.set_cursor(MouseCursor::Hand);
             }
             _ => {}
         }
+        self.view.handle_event(cx, event, scope);
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         // Apply theme
         let dm = get_global_dark_mode();
+        let light = (1.0 - dm) as f32;
+        if self.light != light {
+            self.light = light;
+            for (i, channel) in self.channels.iter_mut().enumerate() {
+                (channel.color, channel.dash) = channel_style(i, light);
+            }
+        }
         let mut header = self.view.view(cx, ids!(header));
         script_apply_eval!(cx, header, { draw_bg +: { dark_mode: #(dm) } });
         let mut title = self.view.label(cx, ids!(header.title));
@@ -326,6 +341,7 @@ impl Widget for TimeSeriesPlot {
         if !self.channels.is_empty() && self.plot_rect.size.x > 10.0 && self.plot_rect.size.y > 10.0
         {
             self.draw_waveforms(cx);
+            self.draw_playhead(cx);
         }
 
         DrawStep::done()
@@ -340,6 +356,27 @@ pub enum TimeSeriesPlotAction {
 }
 
 impl TimeSeriesPlot {
+    fn draw_playhead(&mut self, cx: &mut Cx2d) {
+        if !self.show_cursor {
+            return;
+        }
+        let span = self.time_range.1 - self.time_range.0;
+        if span <= 0.0 {
+            return;
+        }
+        let rect = self.plot_rect;
+        let fraction = ((self.cursor_time - self.time_range.0) / span).clamp(0.0, 1.0);
+        let x = rect.pos.x + fraction * (rect.size.x - 1.5).max(0.0);
+        self.draw_line.color = pal::Th { l: self.light }.hot();
+        self.draw_line.draw_abs(
+            cx,
+            Rect {
+                pos: dvec2(x, rect.pos.y),
+                size: dvec2(1.5, rect.size.y),
+            },
+        );
+    }
+
     /// Set the plot title
     pub fn set_title(&mut self, cx: &mut Cx, title: &str) {
         self.title = title.to_string();
@@ -528,7 +565,7 @@ impl TimeSeriesPlot {
             }
         }
 
-        if min_val < max_val {
+        if max_val - min_val > 1e-6 && min_val.is_finite() && max_val.is_finite() {
             // Add 5% padding
             let padding = (max_val - min_val) * 0.05;
             self.value_range = (min_val - padding, max_val + padding);
@@ -649,6 +686,21 @@ impl TimeSeriesPlot {
 }
 
 impl TimeSeriesPlotRef {
+    /// Read-only plot evidence, enabled by the application UX probe.
+    pub fn probe(&self, cx: &mut Cx) -> serde_json::Value {
+        let Some(inner) = self.borrow() else {
+            return serde_json::Value::Null;
+        };
+        let r = inner.view.view(cx, ids!(content.plot_area)).area().rect(cx);
+        serde_json::json!({
+            "channels": inner.channels.iter().map(|c| serde_json::json!({"name":c.name,"points":c.data.len()})).collect::<Vec<_>>(),
+            "cursor_time":inner.cursor_time, "show_cursor":inner.show_cursor,
+            "time_range":inner.time_range, "value_range":inner.value_range,
+            "values":inner.get_values_at_time(inner.cursor_time),
+            "rect":[r.pos.x,r.pos.y,r.size.x,r.size.y]
+        })
+    }
+
     pub fn set_title(&self, cx: &mut Cx, title: &str) {
         if let Some(mut inner) = self.borrow_mut() {
             inner.set_title(cx, title);

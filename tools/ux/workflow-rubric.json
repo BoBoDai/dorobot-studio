@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "target": 95,
+  "scope": "DoRobot Studio user journeys: robot setup, operate, record, save and replay. Desktop UI review and executable integration checks; physical robot calibration is not certified by this score.",
+  "evaluator": "Model-authored review with instrumented real-input evidence; not an independent human usability study.",
+  "hard_gates": [
+    "A new user can start a supported simulation without a terminal or socket path.",
+    "Simulation recording produces a real playable dataset with all three cameras and measured joints.",
+    "Real robot and simulation setup explain different calibration requirements.",
+    "Unsupported Nano arm calibration and camera acquisition are never presented as available.",
+    "Navigation preserves live operation, recording, pending takes and flexible panel layouts.",
+    "Errors, missing devices and incomplete calibration give an actionable recovery path.",
+    "No essential control is clipped at 1024x768 or 1440x900 in light or dark appearance."
+  ],
+  "dimensions": [
+    {"id":"navigation", "weight":20, "criteria":"One clear setup-to-replay sequence; current source, current page and next action are unambiguous; advanced tools do not compete with the primary task."},
+    {"id":"setup_calibration", "weight":20, "criteria":"Real and simulated setup are distinct; capabilities, prerequisites, calibration prompts, completion and blocking conditions are accurate and actionable."},
+    {"id":"simulation_operation", "weight":15, "criteria":"Start, readiness, controls, reset, stop and reconnection work in the app; the user can identify the robot and environment."},
+    {"id":"capture_replay", "weight":25, "criteria":"Choose task and destination, record, stop, review, save/discard and open replay form one complete journey; actual captured data matches the UI's claims."},
+    {"id":"recovery_continuity", "weight":10, "criteria":"Navigation and appearance preserve work; busy/disabled states explain why; failures retain data and offer recovery."},
+    {"id":"visual_clarity", "weight":10, "criteria":"Readable text, compact headers, consistent centered controls, visible state and unclipped responsive layout; preserve user-preferred panel behavior."}
+  ],
+  "anchors": {"0":"Blocked", "0.5":"Requires undocumented knowledge", "0.8":"Usable with evident friction or an untested required UI state", "0.95":"Clear, complete and verified with only minor friction", "1":"All stated criteria verified without a material UX defect"},
+  "scoring": "Freeze this rubric before changes. Cite evidence and outstanding limitations per dimension. A failed hard gate prevents a passing verdict regardless of numeric score. Missing real hardware must be disclosed separately; never substitute mock calibration for physical verification."
+}

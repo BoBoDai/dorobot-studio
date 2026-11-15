@@ -104,7 +104,7 @@ def record(p, staging):
     try:
         # Never enter a hidden interactive calibration from the Record button.
         if not robot.calibration or not leader.calibration:
-            raise RuntimeError("Calibration is missing. Open Hardware and calibrate both arms first.")
+            raise RuntimeError("Calibration is missing. Open Robot setup and calibrate the leader and follower first.")
         robot.connect(calibrate=False)
         leader.connect(calibrate=False)
         if not robot.is_calibrated or not leader.is_calibrated:
@@ -194,6 +194,15 @@ def calibrate_child(p):
         disconnect(robot)
         disconnect(leader)
 
+def readable_calibration_prompt(text):
+    """Convert the PTY's rolling terminal output into readable UI instructions."""
+    import re
+    text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", text)
+    text = re.sub(r"\x1b\][^\x07]*(?:\x07|\x1b\\)", "", text)
+    text = re.sub(r"\x1b[^\n]*$", "", text)
+    return text.replace("\r", "\n").replace("\x08", "").strip()[-1200:]
+
+
 def calibrate(profile):
     # LeRobot's range sweep uses a terminal to detect Enter; provide a PTY,
     # and relay it to Hardware's instructions and Continue button.
@@ -202,6 +211,7 @@ def calibrate(profile):
     if pid == 0:
         os.execl(sys.executable, sys.executable, __file__, "calibrate-child", profile)
     cancelled = False
+    console_text = ""
     def cancel(*_):
         nonlocal cancelled
         cancelled = True
@@ -223,7 +233,8 @@ def calibrate(profile):
                     break
                 if not data:
                     break
-                emit("prompt", message=data.decode(errors="replace"))
+                console_text = (console_text + data.decode(errors="replace"))[-8192:]
+                emit("prompt", message=readable_calibration_prompt(console_text))
     finally:
         os.close(fd)
         # Bound shutdown even if a serial read stops answering. The child is
@@ -239,7 +250,7 @@ def calibrate(profile):
                 os.kill(pid, signal.SIGKILL)
                 _, status = os.waitpid(pid, 0)
     if os.waitstatus_to_exitcode(status) != 0:
-        raise RuntimeError("Calibration failed or was cancelled")
+        raise RuntimeError("Calibration failed or was cancelled. " + readable_calibration_prompt(console_text)[-800:])
     emit("calibrated")
 
 def main():

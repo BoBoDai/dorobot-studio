@@ -17,7 +17,11 @@
 
 pub mod capture;
 pub mod files;
+pub mod live;
 pub mod mock;
+pub mod scene;
+pub mod supported;
+pub mod workflow;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -170,6 +174,8 @@ pub struct JointCalibration {
 
 #[derive(Clone, Debug, Default)]
 pub struct HardwareState {
+    /// Present when the supported Nano base driver is selected.
+    pub nano: Option<supported::NanoState>,
     pub robot_label: String,
     pub can_advance: bool,
     pub steps: Vec<WizardStep>,
@@ -230,6 +236,7 @@ pub struct LiveJoint {
 
 #[derive(Clone, Debug, Default)]
 pub struct RecordState {
+    pub ready_to_record: bool,
     pub robot_urdf: Option<(PathBuf, PathBuf)>,
     pub pose: Vec<f32>,
     pub profile_label: String,
@@ -342,11 +349,14 @@ pub struct PlaybackState {
     /// Measured joint values per frame, for the 3D mirror. Frame-major, unlike
     /// the plot series, because the viewer wants one pose at a time.
     pub joint_frames: Vec<Vec<f32>>,
+    pub scene: Option<scene::SceneReplay>,
+    pub live: Option<live::LiveView>,
 }
 
 impl PlaybackState {
     /// Frame the playhead currently sits on.
     pub fn frame_index(&self) -> u64 {
+        if self.live.is_some() { return self.joint_frames.len().saturating_sub(1) as u64; }
         ((self.current_time * self.stats.fps).max(0.0).round() as u64)
             .min(self.stats.frames.saturating_sub(1))
     }
@@ -430,24 +440,27 @@ pub enum Screen {
     Hardware,
     Record,
     Play,
+    Live,
     Eval,
 }
 
 impl Screen {
-    pub const ALL: [Screen; 5] = [
+    pub const ALL: [Screen; 6] = [
         Screen::Library,
         Screen::Hardware,
         Screen::Record,
         Screen::Play,
+        Screen::Live,
         Screen::Eval,
     ];
 
     pub fn label(&self) -> &'static str {
         match self {
             Self::Library => "Library",
-            Self::Hardware => "Hardware",
+            Self::Hardware => "Robot setup",
             Self::Record => "Record",
-            Self::Play => "Play",
+            Self::Play => "Replay",
+            Self::Live => "Operate",
             Self::Eval => "Eval",
         }
     }
@@ -459,8 +472,19 @@ impl Screen {
 pub enum Intent {
     Navigate(Screen),
     ConfigureRig(PathBuf),
+    SelectSimulation(bool),
+    SetCapturePreferences { task: String, destination: String },
+    StartSimulation,
+    StopSimulation,
+    SimulationCapture { action: String, task: String, destination: String },
+    OpenSavedRecording,
+    CreateRig { robot_type: String, follower: String, leader: String, cameras: String, task: String, destination: String },
     OpenFolder(PathBuf),
     UndoExclude,
+    SetLiveSource(String),
+    ConnectLive(PathBuf),
+    DisconnectLive,
+    OpenLiveRecording,
 
     // Library
     RescanDatasets,
@@ -473,6 +497,9 @@ pub enum Intent {
     NewRecordingSession,
 
     // Hardware
+    SelectNanoBase(bool),
+    ConnectNanoBase { mock: bool, port: String },
+    DisconnectNanoBase,
     WizardAdvance,
     WizardRestartStep,
 
@@ -513,11 +540,16 @@ pub trait Backend {
     fn status(&self) -> Option<&str> {
         None
     }
+    fn rig_profile(&self) -> Option<PathBuf> { None }
+    fn workflow(&self) -> workflow::WorkflowState { workflow::WorkflowState::default() }
     fn screen(&self) -> Screen;
     fn library(&self) -> &LibraryState;
     fn hardware(&self) -> &HardwareState;
     fn record(&self) -> &RecordState;
     fn playback(&self) -> &PlaybackState;
+    /// Saved replay remains independent of the live preview.
+    fn replay(&self) -> &PlaybackState { self.playback() }
+    fn live_connection(&self) -> Option<&live::ConnectionState> { None }
     fn eval(&self) -> &EvalState;
 
     /// Apply an intent. Must be cheap and non-blocking — anything slow is

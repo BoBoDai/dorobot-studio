@@ -233,3 +233,29 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 }
+
+/// Create an editable local rig profile without requiring a hand-written JSON file.
+pub fn create_profile(robot_type: &str, follower: &str, leader: &str, cameras: &str, task: &str, destination: &str) -> Result<PathBuf, String> {
+    if !matches!(robot_type.trim(), "so100" | "so101") { return Err("Robot type must be so100 or so101.".into()); }
+    if follower.trim().is_empty() || leader.trim().is_empty() || follower.trim() == leader.trim() { return Err("Enter different follower and leader serial ports.".into()); }
+    if task.trim().is_empty() { return Err("Describe the task to record.".into()); }
+    let dataset = PathBuf::from(destination.trim());
+    if !dataset.is_absolute() { return Err("Enter an absolute dataset folder.".into()); }
+    let mut camera_map = serde_json::Map::new();
+    for (i, id) in cameras.split(',').map(str::trim).filter(|s|!s.is_empty()).enumerate() {
+        let value = if let Ok(index) = id.parse::<u32>() { serde_json::json!(index) } else if id.starts_with('/') { serde_json::json!(id) } else { return Err("Use camera numbers (0,1) or device paths, separated by commas.".into()); };
+        if camera_map.values().any(|v|v == &value) { return Err("Each camera must use a different device.".into()); }
+        camera_map.insert(format!("camera_{}",i+1), value);
+    }
+    if camera_map.is_empty() { return Err("Add at least one camera, for example 0.".into()); }
+    let root = crate::preferences::path().and_then(|p|p.parent().map(PathBuf::from)).unwrap_or_else(std::env::temp_dir).join("rigs");
+    std::fs::create_dir_all(&root).map_err(|e|e.to_string())?;
+    let identity = |role: &str, port: &str| { use std::hash::{Hash,Hasher}; let mut h = std::collections::hash_map::DefaultHasher::new(); port.trim().hash(&mut h); format!("studio-{role}-{:x}",h.finish()) };
+    let profile = serde_json::json!({"robot_type":robot_type.trim(),"follower_port":follower.trim(),"leader_port":leader.trim(),
+        "follower_id":identity("follower",follower),"leader_id":identity("leader",leader),"task":task.trim(),"dataset":dataset,
+        "fps":30,"cameras":camera_map,"episode_target":50,"max_relative_target":5,"max_episode_seconds":300});
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos();
+    let path = root.join(format!("rig-{stamp}.json"));
+    std::fs::write(&path,serde_json::to_vec_pretty(&profile).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+    Ok(path)
+}

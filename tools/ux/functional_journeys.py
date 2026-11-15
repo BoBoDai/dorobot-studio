@@ -97,7 +97,7 @@ elif a.mode=='layout':
   shot('compact-details-'+('dark' if dark else 'light'))
 elif a.mode=='restart':
  expected=json.loads((a.out.parent/'expected-restart.json').read_text())
- wait(lambda r:r['state']['screen']=='Play')
+ wait(lambda r:r['state']['screen']=='Replay')
  check('restart restores panel order, sizes and visibility',layout()==expected['layout'])
  check('restart restores episode and paused playhead',read()['state']['episode']==expected['episode'] and abs(read()['state']['time']-expected['time'])<.01 and not read()['state']['playing'])
  if 'speed' in expected:check('restart restores playback speed without starting playback',read()['state']['speed']==expected['speed'] and not read()['state']['playing'])
@@ -162,7 +162,7 @@ else:
  check('extra window layout changes independently',layout()==saved)
  shot('native-replay-window',w=monitor)
  click('close_monitor',w=monitor);wait(lambda r:not r['state']['monitor_open'])
- check('closing extra window preserves main task',read()['state']['screen']=='Play' and layout()==saved)
+ check('closing extra window preserves main task',read()['state']['screen']=='Replay' and layout()==saved)
  click('new_window');wait(lambda r:r['state']['monitor_open']);check('extra window retains its layout after reopening',read()['state']['monitor_layout']['maximized']==0);click('close_monitor',w=monitor)
  check('extra window reopens after close',not read()['state']['monitor_open'])
  if read()['controls']['panel_tools']['visible']:click('panels_btn')

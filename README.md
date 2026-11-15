@@ -28,6 +28,11 @@ for runtime versions, source editing and tested limits.
 
 ### Adora Nano preview
 
+Nano's Feetech mobile base is also a supported robot in **Robot setup → Real robot → Adora Nano**. It has a simulated-bus test mode and an explicit USB connection
+for PS4/PS5 control through Dora. See the [driver guide](robots/adora_nano_feetech/README.md)
+for setup, supported capabilities and validation. This driver covers the base;
+arm and camera hardware drivers are not included in the supplied package.
+
 The Nano URDF and meshes are included in `data/adora_nano`. From this project:
 
 ```sh
@@ -41,6 +46,24 @@ This launcher builds without FFmpeg/video decoding; the standard build below
 includes video playback. Model provenance and limits are recorded alongside
 the assets.
 
+### Live streaming
+
+For the built-in scene, choose **Robot setup → Simulation → Start simulation**.
+Studio opens **Operate** when physics and all three cameras are ready. Use
+**Record → Stop → Save → Replay** to capture and review a take.
+
+For an existing external Dora source, choose **Robot setup → More → External
+stream**, enter its local socket path, and click **Connect**. The three Nano cameras, robot
+pose and joint signals share one sample clock. Studio displays the measured
+preview rate, reports stale input, and reconnects automatically. Disconnecting
+the viewer leaves the source recording running.
+
+Operate and Replay retain separate panel layouts and the replay playhead. When a
+source finishes, **Open recording** opens its finalized dataset in Replay.
+The [Nano room integration guide](tools/aisle-validation/README.md#mobile-nano-in-a-living-room)
+includes the Dora producer and full capture workflow. This workflow currently
+captures at 5 Hz; the Live mode does not imply 30 fps throughput.
+
 ## Overview
 
 Dorobot provides tools for visualizing robotics datasets, with a focus on **LeRobot** format datasets:
@@ -53,6 +76,7 @@ Dorobot provides tools for visualizing robotics datasets, with a focus on **LeRo
 The primary application for LeRobot dataset visualization featuring:
 
 - **Multi-camera video playback** with synchronized scrubbing
+- **Live Dora streaming** with connection controls, measured preview rate and automatic reconnection
 - **3D robot visualization** from URDF models
 - **Time series plots** for joint states and sensor data
 - **Flexible panel layout** with drag rearrangement, resizing, maximize/restore and local layout recovery

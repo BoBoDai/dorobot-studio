@@ -39,9 +39,7 @@ script_mod! {
     mod.widgets.ux.STOP        = #xFF453A   // pal::HOT_D
 
     // ----------------------------------------------------------------- type --
-    // Roboto for Latin, Noto Sans SC for Chinese. ("Open Sans SC" is not a
-    // released family; Noto Sans SC is the standard open Simplified-Chinese
-    // face and pairs cleanly with Roboto's humanist proportions.)
+    // PingFang follows the shared desktop sheet, with platform fallbacks.
     mod.widgets.ux.FONT_REGULAR = mod.widgets.nx.FONT_R{}
     mod.widgets.ux.FONT_MEDIUM = mod.widgets.nx.FONT_M{}
     mod.widgets.ux.FONT_BOLD = mod.widgets.nx.FONT_B{}
@@ -56,8 +54,10 @@ script_mod! {
 
     // Shared toolbar treatment, including pressed, focused and selected states.
     mod.widgets.ux.ToolButton = mod.widgets.nx.NxBtn{
-        height: 44
-        padding: Inset{left: 12. right: 12. top: 8. bottom: 8.}
+        height: 32 min_height: 32
+        margin: 0.0
+        align: Align{x: 0.5 y: 0.5}
+        padding: Inset{left: 10. right: 10. top: 0. bottom: 0.}
         draw_text +: {text_style: mod.widgets.ux.TEXT_BODY{}}
         draw_bg +: {
             pixel: fn() {
@@ -67,13 +67,56 @@ script_mod! {
                 let fill = mix(base, tint, max(self.on, self.hover * 0.5))
                 let pressed = mix(#x34404E, #xD5E5F9, self.light)
                 let edge = mix(#x48484A, #xD1D1D6, self.light)
-                sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, mod.widgets.nx.BUTTON_RADIUS)
+                sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, 4.0)
                 sdf.fill_keep(mix(fill, pressed, self.down))
                 sdf.stroke(mix(edge, mix(#x64B5FF, #x0060CC, self.light), self.focus), 1.0)
                 return sdf.result
             }
         }
     }
+
+    mod.widgets.ux.QuietButton = mod.widgets.ux.ToolButton{
+        draw_bg +: {
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, 4.0)
+                let tint = mix(#x303036, #xE9EDF3, self.light)
+                sdf.fill_keep(mix(#x00000000, tint, max(self.hover, self.on)))
+                sdf.stroke(mix(#x00000000, #x0A84FF, self.focus), 1.0)
+                return sdf.result
+            }
+        }
+    }
+    mod.widgets.ux.SegmentButton = mod.widgets.ux.ToolButton{
+        draw_bg +: {
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, 4.0)
+                let idle = mix(#x25252A, #xF2F3F5, self.light)
+                let selected = mix(#x1D3855, #xE5F0FF, self.light)
+                sdf.fill_keep(mix(idle, selected, max(self.on, self.hover * 0.4)))
+                sdf.stroke(mix(#x00000000, #x0A84FF, self.focus), 1.0)
+                return sdf.result
+            }
+        }
+    }
+    mod.widgets.ux.PrimaryButton = mod.widgets.ux.ToolButton{
+        draw_bg +: {
+            danger: instance(0.0)
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.5, 0.5, self.rect_size.x-1.0, self.rect_size.y-1.0, 4.0)
+                let base = mix(#x0878EE, #xD72F3D, self.danger)
+                let press = mix(#x0055B8, #xA31E2B, self.danger)
+                let fill = mix(base, press, max(self.down, self.hover * 0.35))
+                sdf.fill_keep(mix(fill, mix(#x333338, #xE5E5EA, self.light), self.disabled))
+                sdf.stroke(mix(#x00000000, #xAFD6FF, self.focus), 1.5)
+                return sdf.result
+            }
+        }
+        draw_text +: {get_color: fn() {return mix(#xFFFFFF, mix(#x8E8E93, #x636366, self.light), self.disabled)}}
+    }
+    mod.widgets.ux.StopButton = mod.widgets.ux.PrimaryButton{draw_bg +: {danger: 1.0}}
 
     // -------------------------------------------------------------- surfaces --
     // Panel with a hairline border, the base for every card and rail.
@@ -87,12 +130,12 @@ script_mod! {
         draw_bg +: {
             light: instance(0.0)
             border_size: 1.0
-            border_radius: 14.0
+            border_radius: 0.0
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 let fill = mix(#x1C1C1E, #xFFFFFF, self.light)
                 let edge = mix(#x38383A, #xE5E5EA, self.light)
-                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, 14.0)
+                sdf.box(0.5, 0.5, self.rect_size.x - 1.0, self.rect_size.y - 1.0, self.border_radius)
                 sdf.fill_keep(fill)
                 sdf.stroke(edge, 1.0)
                 return sdf.result
@@ -381,12 +424,12 @@ script_mod! {
     }
 
     // ------------------------------------------------------------- nav rail --
-    // One rail entry. `icon` picks the glyph, `active` drives the pill + tint.
+    // One rail entry. Live uses a red pulse only while frames are arriving.
     mod.widgets.ux.NavItem = View{
         width: Fill
-        height: 48
+        height: 40
         flow: Right
-        padding: 12.0
+        padding: Inset{left: 12.0 right: 12.0 top: 0.0 bottom: 0.0}
         align: Align{y: 0.5}
         spacing: 12.0
         cursor: MouseCursor.Hand
@@ -394,12 +437,15 @@ script_mod! {
         draw_bg +: {
             active: instance(0.0)
             light: instance(0.0)
+            streaming: instance(0.0)
+            pulse: instance(0.0)
             pixel: fn() {
                 let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                 let well = mix(#x19334D, #xE5F0FF, self.light)
                 let idle = mix(#x0F131B00, #xF7F8FB00, self.light)
-                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 10.0)
-                sdf.fill(mix(idle, well, self.active))
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 4.0)
+                let live_red = mix(#x800F1A, #xD70015, self.pulse)
+                sdf.fill(mix(mix(idle, well, self.active), live_red, self.streaming * self.active))
                 return sdf.result
             }
         }
@@ -415,11 +461,12 @@ script_mod! {
                 icon: instance(0.0)
                 active: instance(0.0)
                 light: instance(0.0)
+                streaming: instance(0.0)
                 pixel: fn() {
                     let sdf = Sdf2d.viewport(self.pos * self.rect_size)
                     let idle_c = mix(#xD1D1D6, #x38383A, self.light)
                     let on_c = mix(#x64B5FF, #x0060CC, self.light)
-                    let c = mix(idle_c, on_c, self.active)
+                    let c = mix(mix(idle_c, on_c, self.active), mix(#xFF453A, #xFFFFFF, self.active), self.streaming)
                     // Design space is 22 units square; scale it to the view.
                     let s = self.rect_size.x / 22.0
                     let w1 = 1.5 * s
@@ -457,26 +504,39 @@ script_mod! {
                         sdf.move_to(2.0 * s, 14.0 * s) sdf.line_to(5.0 * s, 14.0 * s) sdf.stroke(c, w2)
                         sdf.move_to(17.0 * s, 8.0 * s)  sdf.line_to(20.0 * s, 8.0 * s)  sdf.stroke(c, w2)
                         sdf.move_to(17.0 * s, 14.0 * s) sdf.line_to(20.0 * s, 14.0 * s) sdf.stroke(c, w2)
-                    } else {
+                    } else if self.icon < 4.5 {
                         // eval: bar chart
                         sdf.box(3.0 * s, 12.0 * s, 3.6 * s, 7.0 * s, 0.8 * s)  sdf.fill(c)
                         sdf.box(9.0 * s, 7.0 * s, 3.6 * s, 12.0 * s, 0.8 * s)  sdf.fill(c)
                         sdf.box(15.0 * s, 3.0 * s, 3.6 * s, 16.0 * s, 0.8 * s) sdf.fill(c)
+                    } else {
+                        // live: broadcast rings
+                        sdf.circle(11.0 * s, 11.0 * s, 8.5 * s) sdf.stroke(c, w2)
+                        sdf.circle(11.0 * s, 11.0 * s, 5.0 * s) sdf.stroke(c, w2)
+                        sdf.circle(11.0 * s, 11.0 * s, 1.8 * s) sdf.fill(c)
                     }
                     return sdf.result
                 }
             }
         }
         caption := Label{
+            // Center in the whole navigation row. The default Label padding
+            // overflowed the old 24px content height and pushed its ink down.
+            width: Fill height: Fit
+            padding: 0.0 margin: 0.0
+            align: Align{x: 0.0 y: 0.5}
             text: "Item"
             draw_text +: {
+                ink_centered: true
+                temp_y_shift: #(if cfg!(target_os = "macos") { -0.10f64 } else { 0.0f64 })
                 active: instance(0.0)
                 light: instance(0.0)
+                streaming: instance(0.0)
                 text_style: mod.widgets.ux.TEXT_NAV{}
                 get_color: fn() {
                     let idle_c = mix(#xD1D1D6, #x38383A, self.light)
                     let on_c = mix(#x64B5FF, #x0060CC, self.light)
-                    return mix(idle_c, on_c, self.active)
+                    return mix(mix(idle_c, on_c, self.active), mix(#xFF453A, #xFFFFFF, self.active), self.streaming)
                 }
             }
         }
@@ -499,20 +559,23 @@ script_mod! {
             }
         }
 
-        nav_library  := mod.widgets.ux.NavItem{ caption +: { text: "Library" }  glyph +: { draw_bg +: {icon: 0.0} } }
-        nav_record   := mod.widgets.ux.NavItem{ caption +: { text: "Record" }   glyph +: { draw_bg +: {icon: 1.0} } }
-        nav_play     := mod.widgets.ux.NavItem{ caption +: { text: "Replay" }     glyph +: { draw_bg +: {icon: 2.0} } }
-        nav_hardware := mod.widgets.ux.NavItem{ caption +: { text: "Hardware" } glyph +: { draw_bg +: {icon: 3.0} } }
-        nav_eval     := mod.widgets.ux.NavItem{ caption +: { text: "Evaluate" }     glyph +: { draw_bg +: {icon: 4.0} } }
+        nav_hardware := mod.widgets.ux.NavItem{ caption +: { text: "Robot setup" } glyph +: { draw_bg +: {icon: 3.0} } }
+        nav_live     := mod.widgets.ux.NavItem{ caption +: { text: "Operate" } glyph +: { draw_bg +: {icon: 5.0} } }
+        nav_record   := mod.widgets.ux.NavItem{ caption +: { text: "Record" } glyph +: { draw_bg +: {icon: 1.0} } }
+        nav_play     := mod.widgets.ux.NavItem{ caption +: { text: "Replay" } glyph +: { draw_bg +: {icon: 2.0} } }
+        View{height: 16 width: Fill}
+        nav_library  := mod.widgets.ux.NavItem{ caption +: { text: "Library" } glyph +: { draw_bg +: {icon: 0.0} } }
+        nav_eval     := mod.widgets.ux.NavItem{ caption +: { text: "Evaluate" } glyph +: { draw_bg +: {icon: 4.0} } }
     }
 }
 
 /// Nav rail ids in display order, paired with the screen each selects.
-pub const NAV_ITEMS: [(&[LiveId], Screen); 5] = [
-    (ids!(nav_library), Screen::Library),
+pub const NAV_ITEMS: [(&[LiveId], Screen); 6] = [
+    (ids!(nav_hardware), Screen::Hardware),
+    (ids!(nav_live), Screen::Live),
     (ids!(nav_record), Screen::Record),
     (ids!(nav_play), Screen::Play),
-    (ids!(nav_hardware), Screen::Hardware),
+    (ids!(nav_library), Screen::Library),
     (ids!(nav_eval), Screen::Eval),
 ];
 

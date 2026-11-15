@@ -73,6 +73,16 @@ pub fn load_robot_from_string(urdf_content: &str, assets_base: &str) -> LoadResu
     build_robot_from_urdf(&urdf, assets_base)
 }
 
+pub(crate) fn visual_color(visual: &urdf_rs::Visual, urdf: &urdf_rs::Robot) -> Option<[f32; 4]> {
+    let material = visual.material.as_ref()?;
+    let color = material.color.as_ref().or_else(|| {
+        urdf.materials.iter()
+            .find(|defined| defined.name == material.name)
+            .and_then(|defined| defined.color.as_ref())
+    })?;
+    Some([color.rgba[0] as f32, color.rgba[1] as f32, color.rgba[2] as f32, color.rgba[3] as f32])
+}
+
 /// Build a Robot struct from parsed URDF
 fn build_robot_from_urdf(urdf: &urdf_rs::Robot, assets_base: &str) -> LoadResult<Robot> {
     let mut robot = Robot::new(urdf.name.clone());
@@ -89,16 +99,8 @@ fn build_robot_from_urdf(urdf: &urdf_rs::Robot, assets_base: &str) -> LoadResult
         for visual in &link.visual {
             // Extract material color if present
             if robot_link.color.is_none() {
-                if let Some(ref material) = visual.material {
-                    if let Some(ref color) = material.color {
-                        robot_link.color = Some([
-                            color.rgba[0] as f32,
-                            color.rgba[1] as f32,
-                            color.rgba[2] as f32,
-                            color.rgba[3] as f32,
-                        ]);
-                    }
-                }
+                // Inline colours override references to robot-level materials.
+                robot_link.color = visual_color(visual, urdf);
             }
 
             // Primitives are built procedurally; only meshes hit the disk.
@@ -733,6 +735,23 @@ pub fn validate_robot(robot: &Robot) -> Vec<RobotWarning> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn named_materials_resolve_with_inline_precedence() {
+        for (visual, expected) in [
+            (r#"<material name="blue"/>"#, Some([0.1, 0.3, 0.8, 1.0])),
+            (r#"<material name="blue"><color rgba="0.9 0.8 0.7 1"/></material>"#,
+                Some([0.9, 0.8, 0.7, 1.0])),
+            (r#"<material name="undefined"/>"#, None),
+        ] {
+            let xml = format!(r#"<robot name="material_test">
+                <material name="blue"><color rgba="0.1 0.3 0.8 1"/></material>
+                <link name="base"><visual><geometry><box size="1 1 1"/></geometry>
+                {visual}</visual></link></robot>"#);
+            let robot = load_robot_from_string(&xml, "").unwrap();
+            assert_eq!(robot.links[0].color, expected, "{visual}");
+        }
+    }
 
     #[test]
     fn test_load_invalid_path() {
