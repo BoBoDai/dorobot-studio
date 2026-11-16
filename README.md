@@ -7,8 +7,9 @@ with the **Makepad** UI framework.
 simulation, controller mappings, camera layouts, recording/replay, real hardware
 calibration, Hub transfers and troubleshooting.
 
-Current source builds include a **globe icon** at the bottom of the sidebar to
-switch **English / 简体中文**. It remembers your choice without stopping
+Current source builds include a compact **EN / CN** button at the bottom of the
+sidebar. It shows the current language; click to switch **English / 简体中文**.
+It remembers your choice without stopping
 recording or playback. See [language support](docs/I18N.md).
 
 The standalone RC uses Rust for Studio, native Dora nodes, Nexus simulation,

@@ -116,13 +116,8 @@ script_mod! {
                         nav := mod.widgets.ux.NavRail{ width: Fill height: Fill }
                         sidebar_tools := View{width: Fill height: 32 flow: Right spacing: 4.
                             language_toggle := mod.widgets.ux.QuietButton{
-                                width: 32 height: 32 padding: 0. text: ""
+                                width: 32 height: 32 padding: 0. text: "EN"
                                 a11y_name: "Switch language: English / 简体中文"
-                                icon_walk: Walk{width: 18 height: 18}
-                                draw_icon +: {
-                                    svg: crate_resource("self:resources/icons/language.svg")
-                                    color: mod.theme.color_text
-                                }
                             }
                             appearance := mod.widgets.ux.QuietButton{width: Fill height: 32 text: "Light appearance"}
                         }
@@ -570,6 +565,15 @@ impl App {
             self.save_session();
         }
         let light = frame::light_mode();
+        // A JIT reapply can retain the previous globe's loaded SVG.
+        if let Some(mut button) = self.ui.widget(cx, ids!(language_toggle)).borrow_mut::<Button>() {
+            button.draw_icon.svg = None;
+            button.draw_icon.svg_doc = None;
+        }
+        self.ui.button(cx, ids!(language_toggle)).set_text(cx, match self.language {
+            Language::English => "EN",
+            Language::Chinese => "CN",
+        });
         dorobot_ux::sync_appearance(cx, light > 0.5);
         self.ui.button(cx, ids!(appearance)).set_text(
             cx,
