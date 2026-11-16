@@ -9,6 +9,7 @@ use std::{
 #[derive(Default, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Session {
+    pub language: crate::i18n::Language,
     pub dark: bool,
     pub screen: String,
     pub dataset: Option<String>,
@@ -37,6 +38,7 @@ fn default_sidebar_width() -> f64 {
 impl Session {
     pub fn snapshot(backend: &dyn Backend, dark: bool) -> Self {
         Self {
+            language: crate::i18n::Language::default(),
             dark,
             screen: backend.screen().label().into(),
             dataset: backend.dataset_id().map(str::to_owned),

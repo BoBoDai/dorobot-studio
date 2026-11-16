@@ -112,6 +112,13 @@ text fields do not expand shell abbreviations such as `~`.
 
 ## 4. Find your way around
 
+**Language (source builds after RC.2):** choose **English** or **简体中文** at the
+bottom of the sidebar. The change applies immediately to both Studio windows
+and is remembered at the next launch. Recording, playback, panel arrangements
+and text you are entering stay in place. Dataset names, tasks, paths and device
+identifiers retain their original text. This guide uses the English labels;
+the existing RC.2 download predates the switch. See [language support](I18N.md).
+
 | Page | Use it for |
 |---|---|
 | **Robot setup** | Choose simulation or hardware, start/stop simulation, configure a rig, calibrate, or connect the Nano base |

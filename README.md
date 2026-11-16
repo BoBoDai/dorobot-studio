@@ -7,6 +7,10 @@ with the **Makepad** UI framework.
 simulation, controller mappings, camera layouts, recording/replay, real hardware
 calibration, Hub transfers and troubleshooting.
 
+Current source builds include an **English / 简体中文** switch at the bottom of
+the sidebar. It applies immediately and remembers your choice without stopping
+recording or playback. See [language support](docs/I18N.md).
+
 The standalone RC uses Rust for Studio, native Dora nodes, Nexus simulation,
 controller/serial control, three-camera recording and dataset transfer. It
 packages no Python runtime or bindings. See the [native runtime](runtime/README.md)

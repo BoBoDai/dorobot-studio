@@ -3,10 +3,11 @@
 use dorobot_flex::api::{files::FileBackend, mock::MockBackend, Backend, Intent, Screen};
 use dorobot_flex::playback_controls::PlaybackAction;
 use dorobot_flex::preferences;
+use dorobot_flex::i18n::{self, Language, Localizer};
 use dorobot_flex::ui::flex_layout::FlexPanelsWidgetRefExt;
 use dorobot_flex::ui::{
     eval::EvalScreenWidgetRefExt, frame, hardware::HardwareScreenWidgetRefExt,
-    library::LibraryScreenWidgetRefExt, play::PlayScreenWidgetRefExt,
+    library::LibraryScreenWidgetRefExt, play::{self, PlayScreenWidgetRefExt},
     record::RecordScreenWidgetRefExt,
 };
 use dorobot_flex::widgets::time_series_plot::TimeSeriesPlotAction;
@@ -113,6 +114,10 @@ script_mod! {
                         Label{ width: Fill height: Fit margin: Inset{left: 8. top: 8. bottom: 12.} text: "DoRobot Studio"
                             draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
                         nav := mod.widgets.ux.NavRail{ width: Fill height: Fill }
+                        language_controls := View{width: Fill height: 32 flow: Right spacing: 4.
+                            language_en := mod.widgets.ux.SegmentButton{width: Fill text: "English"}
+                            language_zh := mod.widgets.ux.SegmentButton{width: Fill text: "简体中文"}
+                        }
                         appearance := mod.widgets.ux.QuietButton{width: Fill height: 32 text: "Light appearance"}
                     }
                     sidebar_resize := View{width: 8 height: Fill cursor: MouseCursor.ColResize}
@@ -279,6 +284,10 @@ enum FolderRequest {
 pub struct App {
     #[live]
     ui: WidgetRef,
+    #[rust]
+    language: Language,
+    #[rust]
+    localizer: Localizer,
     /// Production backend by default; generated fixtures require explicit demo mode.
     #[rust(make_backend())]
     backend: Box<dyn Backend>,
@@ -311,6 +320,45 @@ pub struct App {
 }
 
 impl App {
+    fn localize(&mut self, cx: &mut Cx) {
+        let mut protected = std::collections::HashSet::new();
+        let mut protect = |path: &str| {
+            let path: Vec<_> = path.split('.').map(LiveId::from_str).collect();
+            let widget = self.ui.widget(cx, &path);
+            if !widget.is_empty() { protected.insert(widget.widget_uid()); }
+        };
+        // These captions are data, not UI messages, even if a user names their
+        // dataset/task "Record". Editable values are excluded by Localizer too.
+        for i in 0..6 {
+            let row = if i < 3 { "row_a" } else { "row_b" };
+            for suffix in ["head.title", "body.name"] {
+                protect(&format!("page_library.left_col.grid.{row}.card_{i}.{suffix}"));
+            }
+            protect(&format!("page_record.body.left.traces.tr_body.trace_{i}.jn"));
+            protect(&format!("page_hardware.content.camera_a_panel.content.calib.joints.joint_{i}.jname"));
+        }
+        for i in 0..2 {
+            for suffix in ["dev_name", "dev_detail"] {
+                protect(&format!("page_library.hardware_rail.hw_body.dev_{i}.text_col.{suffix}"));
+            }
+            if self.backend.record().cameras.get(i).is_some() {
+                protect(&format!("page_record.body.left.cams.cam_{i}.head.title"));
+            }
+        }
+        if !self.backend.record().profile_label.is_empty() { protect("page_record.sbar.profile.label"); }
+        if !self.backend.record().task.is_empty() { protect("page_record.sbar.task"); }
+        if !self.backend.eval().checkpoint.is_empty() { protect("page_eval.pbar.ckpt.label"); }
+        for page in ["page_play", "hardware_teleop", "monitor_play"] {
+            for path in play::custom_camera_caption_paths(self.backend.playback()) {
+                protect(&format!("{page}.{path}"));
+            }
+            protect(&format!("{page}.upper.tree.tree_head.title"));
+            if self.backend.playback().live.is_none() { protect(&format!("{page}.upper.side.side_body.task_t")); }
+            for i in 0..3 { protect(&format!("{page}.upper.tree.tree_body.grp_{i}")); }
+        }
+        self.localizer.apply(cx, &self.ui, self.language, &protected);
+    }
+
     fn display_status(&self) -> &str {
         let status = self.backend.status().unwrap_or("Demo · no hardware connected");
         if status.starts_with("Simulation setup") { "Ready" }
@@ -488,6 +536,7 @@ impl App {
             let mut state =
                 preferences::Session::snapshot(&*self.backend, frame::light_mode() < 0.5);
             state.sidebar_width = self.sidebar_width;
+            state.language = self.language;
             if let Err(error) = preferences::save(&path, &state) {
                 ::log::warn!("Could not save UI preferences: {}", error.kind());
             }
@@ -508,6 +557,11 @@ impl App {
             self.save_session();
         }
         let light = frame::light_mode();
+        for (id, language) in [(ids!(language_en), Language::English), (ids!(language_zh), Language::Chinese)] {
+            let mut button = self.ui.widget(cx, id);
+            let on = if self.language == language { 1.0 } else { 0.0 };
+            script_apply_eval!(cx, button, {draw_bg +: {on: #(on)} draw_text +: {on: #(on)}});
+        }
         dorobot_ux::sync_appearance(cx, light > 0.5);
         self.ui.button(cx, ids!(appearance)).set_text(
             cx,
@@ -534,6 +588,8 @@ impl App {
             &self.ui,
             &[
                 (ids!(appearance), frame::Themed::Both),
+                (ids!(language_en), frame::Themed::Both),
+                (ids!(language_zh), frame::Themed::Both),
                 (ids!(setup_card), frame::Themed::Bg),
                 (ids!(setup_rescan), frame::Themed::Both),
                 (ids!(setup_replay), frame::Themed::Both),
@@ -642,6 +698,7 @@ impl App {
             self.ui.widget(cx, ids!(page_play)).set_visible(cx,false);
             self.ui.widget(cx, ids!(hardware_teleop)).set_visible(cx,false);
         }
+        self.localize(cx);
     }
 }
 
@@ -653,6 +710,9 @@ impl MatchEvent for App {
         } else {
             preferences::path().and_then(|p| preferences::load(&p))
         };
+        self.language = args.iter().position(|a| a == "--language").and_then(|i| args.get(i + 1))
+            .map(|value| Language::parse(value))
+            .unwrap_or_else(|| saved.as_ref().map_or(Language::English, |s| s.language));
         if let Some(saved) = &saved {
             if saved.sidebar_width.is_finite() {
                 self.sidebar_width = saved.sidebar_width.clamp(176.0, 320.0);
@@ -744,6 +804,7 @@ impl MatchEvent for App {
                 self.ui.play_screen(cx, ids!(monitor_play)).adapt_layout(cx);
             }
             if std::env::var_os("DOROBOT_UX_REPORT").is_some() {
+                self.localize(cx);
                 let play = self.backend.playback();
                 let robot_widget = self
                     .ui
@@ -791,6 +852,7 @@ impl MatchEvent for App {
                         "monitor_layout": self.ui.flex_panels(cx, ids!(monitor_play.upper.grid)).snapshot(),
                         "panel_layout": self.ui.flex_panels(cx, ids!(page_play.upper.grid)).snapshot(),
                         "recording": self.backend.record().recording, "saved": self.backend.record().saved, "discarded": self.backend.record().discarded,
+                        "language": self.language.code(), "untranslated": self.localizer.untranslated(),
                         "folder_pending": self.folder_request.is_some(), "status": self.backend.status(), "hub_open": self.hub_upload.is_some(), "robot_animating": self.ui.robot_view(cx, ids!(page_play.stage_3d)).is_animating(), "signals_visible": self.ui.widget(cx, ids!(page_play.timeline.tl_body.lanes)).visible()
                     }),
                     &[
@@ -818,6 +880,10 @@ impl MatchEvent for App {
                         "nav_hardware",
                         "nav_eval",
                         "appearance",
+                        "language_en", "language_zh", "wf_task", "wf_destination",
+                        "nav_hardware.caption", "nav_live.caption", "nav_record.caption", "nav_play.caption", "nav_library.caption", "nav_eval.caption",
+                        "page_library.left_col.header.page_title", "page_library.left_col.grid.row_a.card_0.body.name",
+                        "page_play.upper.side.side_body.task_t", "monitor_play.toolbar.panels_btn",
                         "sidebar",
                         "sidebar_resize",
                         "workflow", "source_row", "wf_rig_form", "wf_capture_fields", "wf_capture", "help_toggle", "wf_more", "wf_source", "capture_notice", "capture_return", "wf_edit", "wf_arm", "wf_nano", "wf_back", "wf_sim", "wf_real", "wf_start", "wf_stop", "wf_operate", "wf_rig", "wf_next", "wf_external", "wf_type", "wf_follower", "wf_leader", "wf_cameras", "wf_create", "wf_task", "wf_destination", "wf_browse", "wf_record", "wf_finish", "wf_save", "wf_discard", "wf_replay", "wf_guide", "wf_detail", "wf_count",
@@ -1103,11 +1169,11 @@ impl MatchEvent for App {
         }
         if self.ui.button(cx,ids!(wf_external)).clicked(actions) { self.external_stream = true; self.backend.dispatch(Intent::Navigate(Screen::Live)); dirty = true; }
         if self.ui.button(cx,ids!(wf_rig)).clicked(actions) {
-            cx.open_select_file_dialog(FileDialog::new().set_id(live_id!(rig_profile)).set_title("Choose a rig profile".into()).add_filter("Rig profile".into(),vec!["json".into()]));
+            cx.open_select_file_dialog(FileDialog::new().set_id(live_id!(rig_profile)).set_title(i18n::text(self.language, "Choose a rig profile")).add_filter(i18n::text(self.language, "Rig profile"),vec!["json".into()]));
         }
         if self.ui.button(cx,ids!(wf_browse)).clicked(actions) {
             self.folder_request = Some(FolderRequest::Recording);
-            cx.open_select_folder_dialog(FileDialog::new().set_id(live_id!(dataset_folder)).set_title("Choose recording folder".into()));
+            cx.open_select_folder_dialog(FileDialog::new().set_id(live_id!(dataset_folder)).set_title(i18n::text(self.language, "Choose recording folder")));
         }
         if self.ui.button(cx,ids!(wf_edit)).clicked(actions) { self.rig_editing = !self.rig_editing; dirty = true; }
         if self.ui.button(cx,ids!(wf_create)).clicked(actions) {
@@ -1275,6 +1341,12 @@ impl MatchEvent for App {
             }
         }
 
+        for (id, language) in [(ids!(language_en), Language::English), (ids!(language_zh), Language::Chinese)] {
+            if self.ui.button(cx, id).clicked(actions) && self.language != language {
+                self.language = language;
+                dirty = true;
+            }
+        }
         if self.ui.button(cx, ids!(appearance)).clicked(actions) {
             frame::toggle_light_mode();
             dirty = true;
@@ -1305,7 +1377,7 @@ impl MatchEvent for App {
             if self.folder_request.is_none() {
                 self.folder_request = Some(FolderRequest::Dataset);
                 cx.open_select_folder_dialog(
-                    FileDialog::new().set_title("Open LeRobot dataset or dataset library".into()),
+                    FileDialog::new().set_title(i18n::text(self.language, "Open LeRobot dataset or dataset library")),
                 );
             }
         }
@@ -1354,7 +1426,7 @@ impl MatchEvent for App {
                 } else if self.folder_request.is_none() {
                     self.folder_request = Some(FolderRequest::Download(repo));
                     cx.open_select_folder_dialog(
-                        FileDialog::new().set_title("Choose download parent folder".into()),
+                        FileDialog::new().set_title(i18n::text(self.language, "Choose download parent folder")),
                     );
                 }
                 dirty = true;
@@ -1561,5 +1633,6 @@ impl AppMain for App {
             self.sync(cx);
             self.ui.redraw(cx);
         }
+        if self.started && matches!(event, Event::Timer(_)) { self.localize(cx); }
     }
 }

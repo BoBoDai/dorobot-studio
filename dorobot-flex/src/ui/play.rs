@@ -1935,6 +1935,18 @@ fn camera_title(key: &str) -> String {
     }
 }
 
+/// Dataset-defined camera names are data; only Nano's built-in captions are UI.
+pub fn custom_camera_caption_paths(st: &PlaybackState) -> Vec<&'static str> {
+    if st.live.is_some() { return Vec::new(); }
+    camera_slots(st.video_paths.keys().map(String::as_str)).into_iter().zip([
+        ["camera_a_panel.head.title", "camera_a_toggle"],
+        ["camera_b_panel.head.title", "camera_b_toggle"],
+        ["camera_c_panel.head.title", "camera_c_toggle"],
+    ]).filter(|(key, _)| key.as_deref().is_some_and(|key|
+        !matches!(key.rsplit('.').next(), Some("head" | "left_wrist" | "right_wrist"))))
+        .flat_map(|(_, paths)| paths).collect()
+}
+
 #[cfg(test)]
 mod camera_tests {
     use super::*;
@@ -1967,6 +1979,10 @@ mod camera_tests {
             [Some("a".into()), Some("b".into()), Some("c".into())]
         );
         assert_eq!(camera_slots([].into_iter()), [None, None, None]);
+        let mut state = PlaybackState::default();
+        state.video_paths.insert("observation.images.Record".into(), "record.mp4".into());
+        state.video_paths.insert("observation.images.head".into(), "head.mp4".into());
+        assert_eq!(custom_camera_caption_paths(&state), ["camera_b_panel.head.title", "camera_b_toggle"]);
     }
 }
 

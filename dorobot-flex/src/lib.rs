@@ -14,6 +14,7 @@ pub use makepad_widgets;
 
 pub mod api;
 pub mod data;
+pub mod i18n;
 pub mod preferences;
 pub mod runtime;
 pub mod shared;
