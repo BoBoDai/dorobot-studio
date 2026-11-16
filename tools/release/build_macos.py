@@ -194,7 +194,7 @@ def main():
     for pkg in meta["packages"]:
         folder = Path(pkg["manifest_path"]).parent
         name = pkg["name"].replace("-", "_")
-        if (name == "makepad" or name.startswith("makepad_")) and (folder / "resources").is_dir():
+        if (name in ("makepad", "dorobot_flex") or name.startswith("makepad_")) and (folder / "resources").is_dir():
             shutil.copytree(folder / "resources", resources / "makepad" / name / "resources", dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns(".DS_Store", "__pycache__"))
         packages.append({"name": pkg["name"], "version": pkg["version"], "license": pkg.get("license"), "source": pkg.get("source")})

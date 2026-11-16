@@ -112,8 +112,9 @@ text fields do not expand shell abbreviations such as `~`.
 
 ## 4. Find your way around
 
-**Language (source builds after RC.2):** choose **English** or **简体中文** at the
-bottom of the sidebar. The change applies immediately to both Studio windows
+**Language (source builds after RC.2):** click the **globe icon** at the bottom
+of the sidebar to switch **English / 简体中文**. Hover to see the target language.
+The change applies immediately to both Studio windows
 and is remembered at the next launch. Recording, playback, panel arrangements
 and text you are entering stay in place. Dataset names, tasks, paths and device
 identifiers retain their original text. This guide uses the English labels;

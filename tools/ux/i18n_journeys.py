@@ -71,7 +71,8 @@ def check(name, ok):
 
 
 def language(value):
-    click("language_zh" if value == "zh-CN" else "language_en")
+    if wait(lambda r: "language" in r["state"])["state"]["language"] != value:
+        click("language_toggle")
     wait(lambda r: r["state"]["language"] == value)
 
 

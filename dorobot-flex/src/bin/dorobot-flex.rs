@@ -114,11 +114,18 @@ script_mod! {
                         Label{ width: Fill height: Fit margin: Inset{left: 8. top: 8. bottom: 12.} text: "DoRobot Studio"
                             draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
                         nav := mod.widgets.ux.NavRail{ width: Fill height: Fill }
-                        language_controls := View{width: Fill height: 32 flow: Right spacing: 4.
-                            language_en := mod.widgets.ux.SegmentButton{width: Fill text: "English"}
-                            language_zh := mod.widgets.ux.SegmentButton{width: Fill text: "简体中文"}
+                        sidebar_tools := View{width: Fill height: 32 flow: Right spacing: 4.
+                            language_toggle := mod.widgets.ux.QuietButton{
+                                width: 32 height: 32 padding: 0. text: ""
+                                a11y_name: "Switch language: English / 简体中文"
+                                icon_walk: Walk{width: 18 height: 18}
+                                draw_icon +: {
+                                    svg: crate_resource("self:resources/icons/language.svg")
+                                    color: mod.theme.color_text
+                                }
+                            }
+                            appearance := mod.widgets.ux.QuietButton{width: Fill height: 32 text: "Light appearance"}
                         }
-                        appearance := mod.widgets.ux.QuietButton{width: Fill height: 32 text: "Light appearance"}
                     }
                     sidebar_resize := View{width: 8 height: Fill cursor: MouseCursor.ColResize}
                     workspace := View{
@@ -251,6 +258,12 @@ script_mod! {
                             page_play := PlayScreen{visible: false}
                             page_eval := EvalScreen{visible: false}
 
+                        }
+                    }
+                    language_hint := Tooltip{
+                        width: 0 height: 0
+                        content +: {padding: 8.
+                            tooltip_label +: {width: Fit text: "English / 简体中文"}
                         }
                     }
                 }
@@ -557,11 +570,6 @@ impl App {
             self.save_session();
         }
         let light = frame::light_mode();
-        for (id, language) in [(ids!(language_en), Language::English), (ids!(language_zh), Language::Chinese)] {
-            let mut button = self.ui.widget(cx, id);
-            let on = if self.language == language { 1.0 } else { 0.0 };
-            script_apply_eval!(cx, button, {draw_bg +: {on: #(on)} draw_text +: {on: #(on)}});
-        }
         dorobot_ux::sync_appearance(cx, light > 0.5);
         self.ui.button(cx, ids!(appearance)).set_text(
             cx,
@@ -588,8 +596,7 @@ impl App {
             &self.ui,
             &[
                 (ids!(appearance), frame::Themed::Both),
-                (ids!(language_en), frame::Themed::Both),
-                (ids!(language_zh), frame::Themed::Both),
+                (ids!(language_toggle), frame::Themed::Both),
                 (ids!(setup_card), frame::Themed::Bg),
                 (ids!(setup_rescan), frame::Themed::Both),
                 (ids!(setup_replay), frame::Themed::Both),
@@ -880,7 +887,7 @@ impl MatchEvent for App {
                         "nav_hardware",
                         "nav_eval",
                         "appearance",
-                        "language_en", "language_zh", "wf_task", "wf_destination",
+                        "language_toggle", "wf_task", "wf_destination",
                         "nav_hardware.caption", "nav_live.caption", "nav_record.caption", "nav_play.caption", "nav_library.caption", "nav_eval.caption",
                         "page_library.left_col.header.page_title", "page_library.left_col.grid.row_a.card_0.body.name",
                         "page_play.upper.side.side_body.task_t", "monitor_play.toolbar.panels_btn",
@@ -1341,11 +1348,12 @@ impl MatchEvent for App {
             }
         }
 
-        for (id, language) in [(ids!(language_en), Language::English), (ids!(language_zh), Language::Chinese)] {
-            if self.ui.button(cx, id).clicked(actions) && self.language != language {
-                self.language = language;
-                dirty = true;
-            }
+        if self.ui.button(cx, ids!(language_toggle)).clicked(actions) {
+            self.language = match self.language {
+                Language::English => Language::Chinese,
+                Language::Chinese => Language::English,
+            };
+            dirty = true;
         }
         if self.ui.button(cx, ids!(appearance)).clicked(actions) {
             frame::toggle_light_mode();
@@ -1598,6 +1606,22 @@ impl AppMain for App {
         }
         self.match_event(cx, event);
         self.ui.handle_event(cx, event, &mut Scope::empty());
+        if let Event::MouseMove(e) = event {
+            let anchor = self.ui.widget(cx, ids!(language_toggle)).area().rect(cx);
+            let mut hint = self.ui.tooltip(cx, ids!(language_hint));
+            if Some(e.window_id) == self.ui.window(cx, ids!(main_window)).window_id() && anchor.contains(e.abs) {
+                hint.set_text(cx, match self.language {
+                    Language::English => "Switch to 简体中文",
+                    Language::Chinese => "切换为 English",
+                });
+                hint.show_anchored(cx, makepad_widgets::tooltip::TooltipAnchor {
+                    rect: anchor, side: makepad_widgets::tooltip::TooltipPosition::Top,
+                    gap: 6.0, natural_width: None,
+                });
+            } else {
+                hint.hide(cx);
+            }
+        }
         if matches!(event, Event::LiveEdit | Event::ScriptReapply) && self.started {
             // Refresh material-only edits without reopening meshes or losing
             // the recorded pose. All Nano views use the same URDF palette.
