@@ -22,6 +22,8 @@ struct Args {
 }
 #[derive(Subcommand)]
 enum Mode {
+    #[cfg(feature = "physics")]
+    AisleNode,
     Sim(Session),
     Base(Session),
     Node {
@@ -221,6 +223,8 @@ fn supervisor(args: Session, base: bool) -> Result<()> {
 }
 fn main() -> Result<()> {
     match Args::parse().mode {
+        #[cfg(feature = "physics")]
+        Mode::AisleNode => dorobot_nano_runtime::aisle::run(),
         Mode::Sim(a) => supervisor(a, false),
         Mode::Base(a) => supervisor(a, true),
         Mode::Capture {

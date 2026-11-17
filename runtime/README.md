@@ -15,7 +15,8 @@ AISLE Nano integration. The GPU physics/rendering engine is the same pinned
 Dimforge Nexus revision used by RC.1. Source provenance and licenses are under
 `vendor/` and `notices/`. The small pinned source subset avoids fetching upstream
 media and keeps shader build dependencies consistent. Physics engine source is
-unchanged; vendor workspace membership and local dependency patches are adjusted.
+unchanged except for a read-only contact-plan buffer accessor used by the active
+contact audit; vendor workspace membership and local dependency patches are adjusted.
 
 All Studio application logic, runtime nodes, serial control, recording and Hub
 transfers are Rust. Video codecs still use dynamically linked FFmpeg, and the
@@ -65,6 +66,34 @@ A saved episode contains three MPEG-4 videos, measured 17-joint state and motor
 targets, scene transforms, and lossless NPZ RGB/depth/segmentation/pose samples.
 Camera sampling remains 5 Hz of simulation time. Raw samples retain their source
 physics clock. Manual task success is explicitly unevaluated.
+
+## AISLE autonomous Nano experiments
+
+The `aisle-node` subcommand is an experimental simulator adapter launched by
+AISLE's native `aisle-nano rollout` supervisor. It loads a supplied furnished
+scene and connects typed Arrow RGB/depth, camera transforms and measured joint
+state to AISLE's Rust perception/IK policy. A separate guard supplies the only
+motion input; an independent judge receives object/contact truth. The complete
+robot rollout uses Rust and Dora 1.0.1.
+
+Use AISLE's `feat/nano-rust-indoor` branch and its `docs/nano-native.md` guide.
+Supply this checkout's `data/adora_nano/adora_nano.urdf`, the built native runtime,
+and Dora CLI 1.0.1 to the AISLE launcher. `aisle-node` itself expects the generated
+Dora environment and is not a standalone command to drive physical hardware.
+
+Each observation waits for a guarded command and judge acknowledgement. Missing
+messages retry the immutable observation without another physics step. The
+adapter applies URDF effort limits, bounds arm position-target lead to 0.10 rad,
+and resets wheel targets to measured angles each observation so stalled commands
+cannot accumulate. Contact auditing uses active GPU slots only; both-finger
+contact must occur in the same physics step.
+
+Each run exposes `preview.sock` and saves a Studio-compatible `dataset/` with all
+three cameras. `capture-result.json` reports capture completion, with task success
+left null. AISLE adds `meta/aisle-result.json` and provenance after checking the
+independent judgment, capture acknowledgement and normal Dora exit. The root
+`rollout.json` is the authoritative combined outcome. Self-collision remains
+disabled; the symmetric arm model and camera calibration are simulation assumptions.
 
 L1 release, disconnected/stale input and reordered commands are guarded. A
 physical Feetech worker has a separate watchdog thread, Studio lease and process

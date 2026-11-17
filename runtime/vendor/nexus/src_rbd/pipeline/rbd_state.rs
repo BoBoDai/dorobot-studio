@@ -752,6 +752,12 @@ impl RbdState {
         &self.contacts
     }
 
+    /// Live contact-slot bound for CPU audit consumers. Slots past `bound` can
+    /// retain prior-step data and must not be interpreted as current contacts.
+    pub fn contact_plan_buffer(&self) -> &Tensor<ContactPlan> {
+        &self.contact_plan
+    }
+
     /// GPU buffer holding the rigid-body contact constraints of the current
     /// step (impulses included). For debugging.
     pub fn rigid_contact_constraints(&self) -> &Tensor<TwoBodyConstraint> {

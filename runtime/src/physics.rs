@@ -50,9 +50,27 @@ pub struct Simulation {
     robot_ids: Vec<u32>,
     furniture_ids: Vec<u32>,
     cube_id: u32,
+    link_ids: HashMap<String, u32>,
 }
 fn gpu<T, E: std::fmt::Debug>(r: std::result::Result<T, E>) -> Result<T> {
     r.map_err(|e| anyhow::anyhow!("Nexus: {e:?}"))
+}
+fn active_pairs(
+    cs: &[nexus3d::rbd::queries::GpuIndexedContact],
+    live: usize,
+    tick: u64,
+) -> Vec<[i64; 3]> {
+    cs.iter()
+        .take(live)
+        .filter(|c| {
+            c.contact
+                .points_a
+                .iter()
+                .take(c.contact.len as usize)
+                .any(|p| p.dist.is_finite() && p.dist <= 0.0015)
+        })
+        .map(|c| [tick as i64, c.bodies.x as i64, c.bodies.y as i64])
+        .collect()
 }
 fn axis(n: usize) -> JointAxis {
     [
@@ -87,7 +105,14 @@ fn visual_pose(origin: &urdf_rs::Pose) -> Pose3 {
     )
 }
 impl Simulation {
+    pub fn actuator_settings(&self) -> Value {
+        json!(self.model.names.iter().zip(&self.joints).map(|(name,j)|json!({"joint":name,"effort_limit":j.force,"stiffness":j.kp,"damping":j.kv})).collect::<Vec<_>>())
+    }
     pub fn new(path: &Path) -> Result<Self> {
+        Self::with_scene(path, None)
+    }
+    /// Experimental AISLE scene, supplied explicitly; the Studio default stays fixed.
+    pub fn with_scene(path: &Path, scene: Option<&Path>) -> Result<Self> {
         let model = Model::read(path)?;
         let mut viewer = block_on(NexusViewer::new_headless_with_size(Vec::new(), 64, 64))
             .with_backend(BackendType::Metal)
@@ -113,7 +138,22 @@ impl Simulation {
         state.set_rbd_implicit_coriolis(viewer.backend(), false);
         state.set_rbd_substep_refresh(false, true);
         state.set_deterministic(viewer.backend(), true);
-        let specs: Vec<Spec> = serde_json::from_str(include_str!("../assets/living-room.json"))?;
+        let specs: Vec<Spec> = if let Some(scene) = scene {
+            serde_json::from_slice(&std::fs::read(scene)?)?
+        } else {
+            serde_json::from_str(include_str!("../assets/living-room.json"))?
+        };
+        ensure!(!specs.is_empty(), "Empty scene");
+        let mut names = std::collections::HashSet::new();
+        for s in &specs {
+            ensure!(
+                names.insert(&s.name)
+                    && s.size.iter().all(|v| v.is_finite() && *v > 0.)
+                    && s.position.iter().chain(&s.color).all(|v| v.is_finite()),
+                "Invalid scene object {}",
+                s.name
+            );
+        }
         let mut bodies = Vec::new();
         let mut objects = Vec::new();
         for spec in &specs {
@@ -230,7 +270,7 @@ impl Simulation {
                 );
             }
         }
-        let joints = model
+        let mut joints: Vec<Joint> = model
             .names
             .iter()
             .map(|n| {
@@ -239,6 +279,26 @@ impl Simulation {
                     .with_context(|| format!("Missing motor {n}"))
             })
             .collect::<Result<Vec<_>>>()?;
+        if scene.is_some() {
+            // Rapier's URDF importer does not apply effort limits. The AISLE
+            // profile enforces them explicitly, including the 1 Nm grippers.
+            for (name, joint) in model.names.iter().zip(&mut joints) {
+                let spec = urdf
+                    .joints
+                    .iter()
+                    .find(|j| j.name == *name)
+                    .context("Motor URDF limit")?;
+                ensure!(
+                    spec.limit.effort.is_finite() && spec.limit.effort > 0.,
+                    "Invalid effort limit"
+                );
+                joint.force = spec.limit.effort as f32;
+                if name.ends_with("j6_gripper") {
+                    joint.kp = 10.;
+                    joint.kv = 0.5;
+                }
+            }
+        }
         // The authored STL visuals preserve the orange arms, black lid and screen.
         let materials: HashMap<_, _> = urdf
             .materials
@@ -340,7 +400,10 @@ impl Simulation {
         let cube_id = state
             .rigid_body_gpu_index(
                 0,
-                bodies[objects.iter().position(|o| o.name == "cube_6").unwrap()],
+                bodies[objects
+                    .iter()
+                    .position(|o| o.name == "cube_6")
+                    .context("Scene needs tracked cube_6")?],
             )
             .unwrap();
         let mut cameras = Vec::new();
@@ -385,6 +448,10 @@ impl Simulation {
                 local,
             });
         }
+        let link_ids = links
+            .iter()
+            .map(|(name, body)| (name.clone(), state.rigid_body_gpu_index(0, *body).unwrap()))
+            .collect();
         let mut out = Self {
             state,
             pipeline: NexusPipeline::default(),
@@ -403,6 +470,7 @@ impl Simulation {
             robot_ids,
             furniture_ids,
             cube_id,
+            link_ids,
         };
         let parked: Vec<f64> = out
             .model
@@ -468,11 +536,14 @@ impl Simulation {
         let cs: Vec<nexus3d::rbd::queries::GpuIndexedContact> = gpu(block_on(
             self.viewer.backend().slow_read_vec(rbd.contacts().buffer()),
         ))?;
-        Ok(cs
-            .into_iter()
-            .filter(|c| c.contact.len > 0)
-            .map(|c| [self.tick as i64, c.bodies.x as i64, c.bodies.y as i64])
-            .collect())
+        let plan = gpu(block_on(
+            self.viewer
+                .backend()
+                .slow_read_vec(rbd.contact_plan_buffer().buffer()),
+        ))?;
+        let live = plan.first().context("Missing contact plan")?.bound as usize;
+        ensure!(live <= cs.len(), "Contact plan exceeds buffer");
+        Ok(active_pairs(&cs, live, self.tick))
     }
     pub fn measured(&self) -> Result<Vec<f64>> {
         let ws = block_on(self.state.read_multibody_links(self.viewer.backend()));
@@ -484,6 +555,22 @@ impl Simulation {
                     .context("GPU joint readback missing")
             })
             .collect()
+    }
+    /// Independent contact evidence. Both physical fingers must contact the cube.
+    pub fn gripper_contact(&self, side: &str, contacts: &[[i64; 3]]) -> bool {
+        let mut ticks = HashMap::<i64, u8>::new();
+        for (i, finger) in ["finger_a", "finger_b"].iter().enumerate() {
+            if let Some(id) = self.link_ids.get(&format!("{side}_{finger}")) {
+                for c in contacts {
+                    if (c[1] as u32 == *id && c[2] as u32 == self.cube_id)
+                        || (c[2] as u32 == *id && c[1] as u32 == self.cube_id)
+                    {
+                        *ticks.entry(c[0]).or_default() |= 1 << i;
+                    }
+                }
+            }
+        }
+        ticks.values().any(|mask| *mask == 3)
     }
     pub fn frame(
         &mut self,
@@ -588,5 +675,22 @@ impl Simulation {
         };
         frame.validate(recorded)?;
         Ok(frame)
+    }
+}
+
+#[cfg(test)]
+mod contact_tests {
+    use super::*;
+    /// TC-8: allocated GPU tail slots and separated candidates are not contacts.
+    #[test]
+    fn ignores_stale_contact_capacity_and_positive_separation() {
+        let mut c = nexus3d::rbd::queries::GpuIndexedContact::default();
+        c.contact.len = 1;
+        c.bodies.x = 2;
+        c.bodies.y = 7;
+        let mut separated = c;
+        separated.contact.points_a[0].dist = 0.1;
+        assert_eq!(active_pairs(&[c, separated, c], 2, 8), vec![[8, 2, 7]]);
+        assert!(active_pairs(&[c], 0, 8).is_empty());
     }
 }

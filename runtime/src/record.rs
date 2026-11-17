@@ -81,6 +81,25 @@ struct Take {
     cube_frames: u64,
     started: Instant,
 }
+/// Reuses the exact Studio dataset writer for a native AISLE episode.
+pub struct EpisodeCapture(Take);
+impl EpisodeCapture {
+    pub fn new(root: &Path, info: Value, task: &str) -> Result<Self> {
+        Ok(Self(Take::new(root, info, &json!({"id":1,"task":task}))?))
+    }
+    pub fn append(&mut self, frame: Frame) -> Result<()> {
+        self.0.append(frame)
+    }
+    pub fn finish(mut self, root: &Path) -> Result<PathBuf> {
+        self.0.finish()?;
+        fs::rename(self.0.path.join("raw"), self.0.path.join("lerobot/raw"))?;
+        let dataset = root.join("dataset");
+        ensure!(!dataset.exists(), "Dataset already exists");
+        fs::rename(self.0.path.join("lerobot"), &dataset)?;
+        fs::remove_dir_all(&self.0.path)?;
+        Ok(dataset)
+    }
+}
 impl Take {
     fn new(root: &Path, info: Value, request: &Value) -> Result<Self> {
         let task = request["task"].as_str().unwrap_or("").trim().to_owned();
@@ -373,7 +392,7 @@ impl Take {
         let start = &self.info["initial_objects"][cube];
         let displacement = (last[12].as_f64().unwrap_or(0.0) - start[0].as_f64().unwrap_or(0.0))
             .hypot(last[13].as_f64().unwrap_or(0.0) - start[1].as_f64().unwrap_or(0.0));
-        let result = json!({"success":true,"task_success":null,"navigation_success":null,"recording_kind":"manual teleoperation; task success not evaluated","frames":n,"camera_frames":CAMERAS.into_iter().map(|s|(s,n)).collect::<BTreeMap<_,_>>(),"fps":FPS,"sim_seconds":n as f64/FPS as f64,"wall_seconds":self.started.elapsed().as_secs_f64(),"base_distance_m":distance,"cube_push_m":displacement,"cube_contact_frames":self.cube_frames,"furniture_contact_frames":self.bad.len(),"furniture_contacts":self.bad,"contact_audit_hz":100,"root_pose_writes_during_rollout":0,"runtime":"rust","limitations":["Rigid furniture, no sofa cushion deformation","Solid-wheel collision meshes; simulation calibration, not hardware omni-wheel validation"]});
+        let result = json!({"success":if self.info["recording_kind"].is_string() {Value::Null} else {json!(true)},"capture_complete":true,"task_success":null,"navigation_success":null,"recording_kind":self.info["recording_kind"].as_str().unwrap_or("manual teleoperation; task success not evaluated"),"frames":n,"camera_frames":CAMERAS.into_iter().map(|s|(s,n)).collect::<BTreeMap<_,_>>(),"fps":FPS,"sim_seconds":n as f64/FPS as f64,"wall_seconds":self.started.elapsed().as_secs_f64(),"base_distance_m":distance,"cube_push_m":displacement,"cube_contact_frames":self.cube_frames,"furniture_contact_frames":self.bad.len(),"furniture_contacts":self.bad,"contact_audit_hz":100,"root_pose_writes_during_rollout":0,"runtime":"rust","limitations":["Rigid furniture, no sofa cushion deformation","Solid-wheel collision meshes; simulation calibration, not hardware omni-wheel validation"]});
         write_json(&self.path.join("result.json"), &result)?;
         write_json(&meta.join("capture-result.json"), &result)?;
         let mut capture = self.info.clone();

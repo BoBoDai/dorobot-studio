@@ -10,3 +10,5 @@ pub mod physics;
 pub mod preview;
 pub mod record;
 pub mod video;
+#[cfg(feature = "physics")]
+pub mod aisle;
