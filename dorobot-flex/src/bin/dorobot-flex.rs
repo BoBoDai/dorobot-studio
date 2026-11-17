@@ -1,6 +1,6 @@
 // DoRobot Studio: real datasets and LeRobot capture, with explicit --demo fixtures.
 
-use dorobot_studio_plugin::{PanelContext, PluginRegistry};
+use dorobot_studio_plugin::{PanelContext, PanelDescriptor, PluginRegistry};
 use dorobot_flex::api::{files::FileBackend, mock::MockBackend, Backend, Intent, Screen};
 use dorobot_flex::playback_controls::PlaybackAction;
 use dorobot_flex::preferences;
@@ -113,10 +113,16 @@ script_mod! {
                         show_bg: true draw_bg.color: mod.theme.color_bg_container
                         Label{ width: Fill height: Fit margin: Inset{left: 8. top: 8. bottom: 12.} text: "DoRobot Studio"
                             draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
-                        nav := mod.widgets.ux.NavRail{ width: Fill height: Fill }
-                        Label{width: Fill text: "Plugin toolbox" padding: Inset{left: 8. top: 6. bottom: 4.}
+                        Label{width: Fill text: "Plugins" padding: Inset{left: 12. top: 6. bottom: 0.}
                             draw_text +: {color: mod.theme.color_text_disabled text_style: mod.widgets.ux.TEXT_META{}}}
-                        plugin_tools := View{width: Fill height: Fit flow: Down spacing: 2.}
+                        plugin_tools := View{width: Fill height: Fit flow: Down spacing: 4.}
+                        View{width: Fill height: 1 show_bg: true draw_bg.color: mod.theme.color_bg_app}
+                        data_workspace := mod.widgets.ux.QuietButton{
+                            width: Fill height: 40 min_height: 40 text: "Data workspace"
+                            align: Align{x: 0.0 y: 0.5} padding: Inset{left: 12. right: 12.}
+                            draw_text +: {text_style: mod.widgets.ux.TEXT_NAV{}}
+                        }
+                        Filler{}
                         sidebar_tools := View{width: Fill height: 32 flow: Right spacing: 4.
                             language_toggle := mod.widgets.ux.QuietButton{
                                 width: 32 height: 32 padding: 0. text: "EN"
@@ -136,6 +142,15 @@ script_mod! {
                             status := Label{width: Fill height: Fit padding: 0.0 max_lines: 1 text_overflow: Ellipsis text: ""
                                 draw_text +: {color: mod.theme.color_text_disabled text_style: mod.widgets.ux.TEXT_META{}} }
                             help_toggle := mod.widgets.ux.QuietButton{text: "Help"}
+                        }
+                        workspace_tabs := View{
+                            width: Fill height: 42 flow: Right padding: Inset{left: 6. right: 12. bottom: 4.}
+                            plugin_tabs := View{width: Fill height: Fill flow: Right spacing: 2.}
+                            data_tabs := View{width: Fill height: Fill flow: Right spacing: 2.
+                                tab_library := mod.widgets.ux.WorkspaceTab{text: "Library"}
+                                tab_play := mod.widgets.ux.WorkspaceTab{text: "Replay"}
+                                tab_eval := mod.widgets.ux.WorkspaceTab{text: "Evaluate"}
+                            }
                         }
                         hub_form := View{ visible: false width: Fill height: Fit flow: Right spacing: 8. padding: 12.
                             hub_repo := TextInput{width: Fill height: 44 empty_text: "Dataset repository: owner/name"}
@@ -321,12 +336,44 @@ pub struct App {
     sidebar_width: f64,
     #[rust]
     resizing_sidebar: bool,
+    #[rust(Screen::Library)]
+    data_screen: Screen,
 }
 
 impl App {
     fn navigate(&mut self, screen: Screen) {
         self.plugins.follow_navigation();
-        self.backend.dispatch(Intent::Navigate(screen));
+        let target = if self.plugins.screen_available(screen) { screen } else { self.data_screen };
+        self.backend.dispatch(Intent::Navigate(target));
+    }
+    fn open_panel(&mut self, panel: PanelDescriptor) {
+        if let Some(screen) = panel.legacy_screen {
+            self.navigate(screen);
+        } else if let Err(error) = self.plugins.select(panel.id) {
+            ::log::warn!("{error}");
+        }
+    }
+    fn sync_workspace_navigation(&mut self, cx: &mut Cx) {
+        if self.plugins.selected().is_none() && !self.plugins.screen_available(self.backend.screen()) {
+            self.navigate(self.data_screen);
+        }
+        let screen = self.backend.screen();
+        self.plugins.sync_navigation(cx, screen);
+        let plugin = self.plugins.active_plugin(screen);
+        let data = plugin.is_none() && self.plugins.selected().is_none()
+            && matches!(screen, Screen::Library | Screen::Play | Screen::Eval);
+        if data && matches!(screen, Screen::Library | Screen::Play | Screen::Eval) {
+            self.data_screen = screen;
+        }
+        self.ui.label(cx, ids!(page_title)).set_text(cx, plugin.map_or("Data workspace", |p| p.title));
+        self.ui.widget(cx, ids!(workspace_tabs.plugin_tabs)).set_visible(cx, !data);
+        self.ui.widget(cx, ids!(workspace_tabs.data_tabs)).set_visible(cx, data);
+        let light = frame::light_mode();
+        frame::sync_nav_button(cx, &self.ui.widget(cx, ids!(data_workspace)), data, light);
+        let data_tabs = self.ui.widget(cx, ids!(workspace_tabs.data_tabs));
+        for (path, target) in [(ids!(tab_library) as &[LiveId], Screen::Library), (ids!(tab_play), Screen::Play), (ids!(tab_eval), Screen::Eval)] {
+            frame::sync_nav_button(cx, &data_tabs.widget(cx, path), data && screen == target, light);
+        }
     }
     fn sync_plugins(&mut self, cx: &mut Cx) {
         let live_controls = self.backend.screen() != Screen::Live || self.external_stream
@@ -485,17 +532,6 @@ impl App {
         }
         let connection = self.backend.live_connection();
         let active = connection.is_some_and(|c| c.phase.active());
-        let streaming = if connection.is_some_and(|c| c.phase == dorobot_flex::api::live::ConnectionPhase::Streaming) { 1.0 } else { 0.0 };
-        // Blink on the existing UI timer, independent of frame rate or replay.
-        // Keep the caption legible in both phases; stale/ended feeds never pulse.
-        let pulse = if (Cx::time_now() / 0.6) as u64 % 2 == 0 { 1.0 } else { 0.0 };
-        let mut live_nav = self.ui.widget(cx, ids!(nav_live));
-        script_apply_eval!(cx, live_nav, { draw_bg +: { streaming: #(streaming) pulse: #(pulse) } });
-        let mut glyph = live_nav.widget(cx, ids!(glyph));
-        script_apply_eval!(cx, glyph, { draw_bg +: { streaming: #(streaming) } });
-        let mut caption = live_nav.widget(cx, ids!(caption));
-        script_apply_eval!(cx, caption, { draw_text +: { streaming: #(streaming) } });
-        live_nav.redraw(cx);
         self.ui.button(cx, ids!(live_connect)).set_text(cx, if active { "Reconnect" } else { "Connect" });
         self.ui.button(cx, ids!(live_connect)).set_enabled(cx, connection.is_some());
         self.ui.button(cx, ids!(live_disconnect)).set_enabled(cx, active);
@@ -557,17 +593,7 @@ impl App {
                 "Dark appearance"
             },
         );
-        self.ui.label(cx, ids!(page_title)).set_text(
-            cx,
-            match self.backend.screen() {
-                Screen::Library => "Library",
-                Screen::Record => "Record",
-                Screen::Play => "Replay",
-                Screen::Live => "Operate",
-                Screen::Hardware => "Robot setup",
-                Screen::Eval => "Evaluate",
-            },
-        );
+        self.sync_workspace_navigation(cx);
         frame::theme_chrome(cx, &self.ui, light);
         frame::apply_light(
             cx,
@@ -589,8 +615,6 @@ impl App {
         if let Some(mut sidebar) = self.ui.widget(cx, ids!(sidebar)).borrow_mut::<View>() {
             sidebar.walk.width = Size::Fixed(self.sidebar_width);
         }
-        let nav = self.ui.widget(cx, ids!(nav));
-        frame::sync_nav(cx, &nav, self.backend.screen());
         self.sync_live_controls(cx);
 
         self.ui
@@ -691,10 +715,66 @@ impl App {
     }
 }
 
+#[cfg(test)]
+mod navigation_tests {
+    use super::*;
+
+    fn app_with_disabled_control() -> App {
+        let backend = Box::new(MockBackend::new());
+        let mut plugins = dorobot_flex::plugins::builtin_plugins();
+        plugins.set_enabled("dorobot.control", false, &*backend).unwrap();
+        App {
+            ui: WidgetRef::default(), language: Language::English, localizer: Localizer::default(),
+            backend, plugins, started: false, rig_editing: false, external_stream: false,
+            workflow_help: false, workflow_more: false, playback_timer: Timer::default(),
+            last_tick: None, last_refresh: None, hub_upload: None, folder_request: None,
+            monitor_open: false, sidebar_width: 196.0, resizing_sidebar: false, data_screen: Screen::Play,
+        }
+    }
+
+    #[test]
+    fn disabled_plugin_navigation_returns_to_the_recent_data_page() {
+        let mut app = app_with_disabled_control();
+        app.navigate(Screen::Live);
+        assert_eq!(app.backend.screen(), Screen::Play);
+    }
+
+    #[test]
+    fn disabled_plugin_current_screen_is_replaced_before_syncing_navigation() {
+        let mut app = app_with_disabled_control();
+        app.backend.dispatch(Intent::Navigate(Screen::Hardware));
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        cx.init_cx_os();
+        cx.with_vm(|vm| {
+            dorobot_studio_core::register_ui(vm);
+            let value = script_eval!(vm, {
+                use mod.prelude.widgets.* use mod.widgets.*
+                View{
+                    data_workspace := mod.widgets.ux.QuietButton{}
+                    page_title := Label{}
+                    workspace_tabs := View{
+                        plugin_tabs := View{}
+                        data_tabs := View{
+                            tab_library := mod.widgets.ux.WorkspaceTab{}
+                            tab_play := mod.widgets.ux.WorkspaceTab{}
+                            tab_eval := mod.widgets.ux.WorkspaceTab{}
+                        }
+                    }
+                }
+            });
+            app.ui = WidgetRef::script_from_value(vm, value);
+        });
+        app.sync_workspace_navigation(&mut cx);
+        assert_eq!(app.backend.screen(), Screen::Play);
+        cx.with_vm(|vm| assert!(vm.take_errors().is_empty()));
+    }
+}
+
 impl MatchEvent for App {
     fn handle_startup(&mut self, cx: &mut Cx) {
         self.plugins.mount(cx, &self.ui.widget(cx, ids!(pages))).expect("插件界面挂载失败");
         self.plugins.mount_toolbox(cx, &self.ui.widget(cx, ids!(plugin_tools))).expect("插件工具箱挂载失败");
+        self.plugins.mount_tabs(cx, &self.ui.widget(cx, ids!(workspace_tabs.plugin_tabs))).expect("插件标签栏挂载失败");
         let args: Vec<String> = std::env::args().collect();
         let saved = if args.iter().any(|a| a == "--demo" || a == "--live-socket") {
             None
@@ -865,14 +945,11 @@ impl MatchEvent for App {
                         "page_play.toolbar",
                         "page_play.timeline",
                         "page_play.timeline.tl_head",
-                        "nav_library",
-                        "nav_record",
-                        "nav_play",
-                        "nav_hardware",
-                        "nav_eval",
+                        "data_workspace", "plugin_tools", "plugin_tabs", "data_tabs",
+                        "workspace_tabs.plugin_tabs.plugin_tab_page_hardware", "workspace_tabs.plugin_tabs.plugin_tab_hardware_teleop", "workspace_tabs.plugin_tabs.plugin_tab_page_record",
+                        "workspace_tabs.data_tabs.tab_library", "workspace_tabs.data_tabs.tab_play", "workspace_tabs.data_tabs.tab_eval",
                         "appearance",
                         "language_toggle", "wf_task", "wf_destination",
-                        "nav_hardware.caption", "nav_live.caption", "nav_record.caption", "nav_play.caption", "nav_library.caption", "nav_eval.caption",
                         "page_library.left_col.header.page_title", "page_library.left_col.grid.row_a.card_0.body.name",
                         "page_play.upper.side.side_body.task_t", "monitor_play.toolbar.panels_btn",
                         "sidebar",
@@ -994,8 +1071,6 @@ impl MatchEvent for App {
                         "page_library.left_col.header.btn_pull",
                         "page_library.left_col.header.btn_open",
                         "hub_repo",
-                        "nav_live",
-                        "nav_play",
                         "live_bar",
                         "live_source",
                         "live_connect",
@@ -1135,11 +1210,8 @@ impl MatchEvent for App {
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
         let mut dirty = self.plugins.handle_actions(cx, actions, &mut *self.backend);
-        if let Some(panel) = self.plugins.toolbox_selection(cx, actions) {
-            if let Some(screen) = panel.legacy_screen {
-                self.plugins.follow_navigation();
-                self.navigate(screen);
-            } else if let Err(error) = self.plugins.select(panel.id) { ::log::warn!("{error}"); }
+        if let Some(panel) = self.plugins.toolbox_selection(cx, actions).or_else(|| self.plugins.tab_selection(actions)) {
+            self.open_panel(panel);
             dirty = true;
         }
         if self.ui.button(cx,ids!(help_toggle)).clicked(actions) { self.workflow_help = !self.workflow_help; dirty = true; }
@@ -1323,14 +1395,13 @@ impl MatchEvent for App {
             self.backend.dispatch(Intent::WizardRestartStep);
             dirty = true;
         }
-        let nav = self.ui.widget(cx, ids!(nav));
-        for (path, screen) in frame::NAV_ITEMS {
-            let item = nav.widget(cx, path);
-            if item.is_empty() {
-                continue;
-            }
-            if frame::view_clicked(actions, item.widget_uid()) {
-                self.plugins.follow_navigation();
+        if self.ui.button(cx, ids!(data_workspace)).clicked(actions) {
+            self.navigate(self.data_screen);
+            dirty = true;
+        }
+        let data_tabs = self.ui.widget(cx, ids!(workspace_tabs.data_tabs));
+        for (path, screen) in [(ids!(tab_library) as &[LiveId], Screen::Library), (ids!(tab_play), Screen::Play), (ids!(tab_eval), Screen::Eval)] {
+            if data_tabs.visible() && data_tabs.button(cx, path).clicked(actions) {
                 self.navigate(screen);
                 dirty = true;
             }
@@ -1565,7 +1636,10 @@ impl AppMain for App {
             self.plugins.reapply(cx);
             let pages = self.ui.widget(cx, ids!(pages));
             let toolbox = self.ui.widget(cx, ids!(plugin_tools));
-            if let Err(error) = self.plugins.mount(cx, &pages).and_then(|_| self.plugins.mount_toolbox(cx, &toolbox)) {
+            let tabs = self.ui.widget(cx, ids!(workspace_tabs.plugin_tabs));
+            if let Err(error) = self.plugins.mount(cx, &pages)
+                .and_then(|_| self.plugins.mount_toolbox(cx, &toolbox))
+                .and_then(|_| self.plugins.mount_tabs(cx, &tabs)) {
                 ::log::error!("插件重载失败：{error}");
             }
             // Refresh material-only edits without reopening meshes or losing

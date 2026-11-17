@@ -14,6 +14,12 @@ def cmd(*args):
   if 'err' in value or value.get('verified') is False:raise RuntimeError(value)
  time.sleep(.3)
 def click(name):
+ # 旧版页面意图通过快捷键跳转，避免依赖侧栏分组层级。
+ nav = {"nav_hardware": "Key1", "nav_live": "Key2", "nav_record": "Key3",
+        "nav_play": "Key4", "nav_library": "Key5", "nav_eval": "Key6"}
+ if name in nav:
+  cmd("key", "c=" + nav[name], "logo=1", "wait=1")
+  return
  x,y,w,h=read()['controls'][name]['rect'];assert w>0 and h>0
  cmd('click',f'x={x+w/2}',f'y={y+h/2}')
 def apple(code):return subprocess.check_output(['osascript','-e',code],text=True,timeout=15).strip()

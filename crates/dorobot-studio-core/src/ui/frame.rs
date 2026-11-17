@@ -100,6 +100,25 @@ script_mod! {
             }
         }
     }
+    mod.widgets.ux.WorkspaceTab = mod.widgets.ux.QuietButton{
+        width: Fit height: 38 min_height: 38
+        padding: Inset{left: 16. right: 16. top: 0. bottom: 0.}
+        draw_text +: {text_style: mod.widgets.ux.TEXT_NAV{}}
+        draw_bg +: {
+            pixel: fn() {
+                let sdf = Sdf2d.viewport(self.pos * self.rect_size)
+                sdf.box(0.0, 0.0, self.rect_size.x, self.rect_size.y, 0.0)
+                let base = mix(#x1C1C1E, #xF2F2F7, self.light)
+                let selected = mix(#x20364E, #xE5F0FF, self.light)
+                sdf.fill(mix(base, selected, max(self.on * 0.6, self.hover * 0.3)))
+                sdf.box(10.0, self.rect_size.y - 2.0, self.rect_size.x - 20.0, 2.0, 1.0)
+                sdf.fill(mix(#x00000000, mix(#x64B5FF, #x0060CC, self.light), self.on))
+                sdf.box(1.0, 1.0, self.rect_size.x - 2.0, self.rect_size.y - 2.0, 4.0)
+                sdf.stroke(mix(#x00000000, #x0A84FF, self.focus), 1.0)
+                return sdf.result
+            }
+        }
+    }
     mod.widgets.ux.PrimaryButton = mod.widgets.ux.ToolButton{
         draw_bg +: {
             danger: instance(0.0)
@@ -603,6 +622,17 @@ pub fn sync_nav(cx: &mut Cx, rail: &WidgetRef, current: Screen) {
             });
         }
     }
+}
+
+/// 插件分组与顶部标签共用的选中及主题状态。
+pub fn sync_nav_button(cx: &mut Cx, button: &WidgetRef, selected: bool, light: f64) {
+    if button.is_empty() { return; }
+    let on = if selected { 1.0 } else { 0.0 };
+    let mut button = button.clone();
+    script_apply_eval!(cx, button, {
+        draw_bg +: {on: #(on) light: #(light)}
+        draw_text +: {on: #(on) light: #(light)}
+    });
 }
 
 // ============================================================================

@@ -372,5 +372,9 @@
   "Start simulation from Robot setup first.": "请先在机器人设置中启动仿真。",
   "Rig profile": "设备配置",
   "Preview disconnected. Source simulation and recording continue.": "预览已断开，数据源的仿真与录制仍在继续。",
-  "Plugin toolbox": "插件工具箱"
+  "Plugin toolbox": "插件工具箱",
+  "Plugins": "插件",
+  "Robot control": "机器人控制",
+  "Data collection": "数据采集",
+  "Data workspace": "数据工作区"
 }

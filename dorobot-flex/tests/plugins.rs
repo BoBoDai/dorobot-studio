@@ -198,10 +198,180 @@ fn every_builtin_factory_and_toolbox_has_no_script_errors() {
         WidgetRef::script_from_value(vm, value)
     });
     registry.mount_toolbox(&mut cx, &container).unwrap();
+    let tabs = cx.with_vm(|vm| {
+        let value = script_eval!(vm, { use mod.prelude.widgets.* use mod.widgets.* View{} });
+        WidgetRef::script_from_value(vm, value)
+    });
+    registry.mount_tabs(&mut cx, &tabs).unwrap();
+    registry.sync_navigation(&mut cx, dorobot_flex::api::Screen::Hardware);
     cx.with_vm(|vm| {
         let errors = vm.take_errors();
         assert!(errors.is_empty(), "{errors:?}");
     });
+}
+
+#[test]
+fn toolbox_has_one_entry_per_plugin_instead_of_one_per_panel() {
+    let (mut cx, mut registry) = setup();
+    let container = cx.with_vm(|vm| {
+        let value = script_eval!(vm, { use mod.prelude.widgets.* use mod.widgets.* View{} });
+        WidgetRef::script_from_value(vm, value)
+    });
+    registry.mount_toolbox(&mut cx, &container).unwrap();
+    let children = container.borrow::<View>().unwrap().children.clone();
+    assert_eq!(children.len(), 2, "侧栏应按插件分组，不逐个展开面板");
+    assert_eq!(children[0].1.text(), "Robot control");
+    assert_eq!(children[1].1.text(), "Data collection");
+}
+
+#[test]
+fn plugin_tabs_follow_navigation_and_group_entries_restore_the_last_tab() {
+    use dorobot_flex::api::Screen;
+    let (mut cx, mut registry) = setup();
+    let root = cx.with_vm(|vm| {
+        let value = script_eval!(vm, { use mod.prelude.widgets.* use mod.widgets.* View{toolbox := View{} tabs := View{}} });
+        WidgetRef::script_from_value(vm, value)
+    });
+    let toolbox = root.widget(&cx, ids!(toolbox));
+    let tabs = root.widget(&cx, ids!(tabs));
+    registry.mount_toolbox(&mut cx, &toolbox).unwrap();
+    registry.mount_tabs(&mut cx, &tabs).unwrap();
+    let setup = root.widget(&cx, ids!(plugin_tab_page_hardware));
+    let operate = root.widget(&cx, ids!(plugin_tab_hardware_teleop));
+    let record = root.widget(&cx, ids!(plugin_tab_page_record));
+    registry.sync_navigation(&mut cx, Screen::Hardware);
+    assert!(setup.visible() && operate.visible());
+    assert!(!record.visible());
+    let operate_click = cx.capture_actions(|cx| {
+        cx.widget_action(
+            operate.widget_uid(),
+            ButtonAction::Clicked(KeyModifiers::default()),
+        )
+    });
+    assert_eq!(
+        registry
+            .tab_selection(&operate_click)
+            .unwrap()
+            .legacy_screen,
+        Some(Screen::Live)
+    );
+    registry.sync_navigation(&mut cx, Screen::Live);
+    registry.sync_navigation(&mut cx, Screen::Record);
+    assert!(!setup.visible() && !operate.visible());
+    assert!(record.visible());
+    assert!(
+        registry.tab_selection(&operate_click).is_none(),
+        "隐藏标签不能触发跳转"
+    );
+    let control = root.widget(&cx, &[LiveId::from_str("toolbox_dorobot.control")]);
+    let group_click = cx.capture_actions(|cx| {
+        cx.widget_action(
+            control.widget_uid(),
+            ButtonAction::Clicked(KeyModifiers::default()),
+        )
+    });
+    assert_eq!(
+        registry
+            .toolbox_selection(&mut cx, &group_click)
+            .unwrap()
+            .id,
+        "hardware_teleop"
+    );
+    registry.sync_navigation(&mut cx, Screen::Play);
+    assert!(!setup.visible() && !operate.visible() && !record.visible());
+    cx.with_vm(|vm| assert!(vm.take_errors().is_empty()));
+}
+
+#[test]
+fn independent_plugin_navigation_survives_theme_reapply_and_blocks_disabled_entries() {
+    use dorobot_flex::api::Screen;
+    let (mut cx, mut registry) = setup();
+    registry.register(Box::new(ExtraPlugin)).unwrap();
+    let root = cx.with_vm(|vm| {
+        let value = script_eval!(vm, { use mod.prelude.widgets.* use mod.widgets.* View{toolbox := View{} tabs := View{}} });
+        WidgetRef::script_from_value(vm, value)
+    });
+    let toolbox = root.widget(&cx, ids!(toolbox));
+    let tabs = root.widget(&cx, ids!(tabs));
+    registry.mount_toolbox(&mut cx, &toolbox).unwrap();
+    registry.mount_tabs(&mut cx, &tabs).unwrap();
+    registry.select("independent_panel").unwrap();
+    registry.sync_navigation(&mut cx, Screen::Play);
+    assert_eq!(
+        registry.active_plugin(Screen::Play).unwrap().id,
+        "independent.example"
+    );
+    let tab = root.widget(&cx, ids!(plugin_tab_independent_panel));
+    assert!(tab.visible());
+    registry.reapply(&mut cx);
+    toolbox.borrow_mut::<View>().unwrap().children.clear();
+    tabs.borrow_mut::<View>().unwrap().children.clear();
+    registry.mount_toolbox(&mut cx, &toolbox).unwrap();
+    registry.mount_tabs(&mut cx, &tabs).unwrap();
+    registry.sync_navigation(&mut cx, Screen::Play);
+    assert_eq!(
+        root.widget(&cx, ids!(plugin_tab_independent_panel))
+            .widget_uid(),
+        tab.widget_uid()
+    );
+    assert!(tab.visible());
+    let group = root.widget(&cx, &[LiveId::from_str("toolbox_independent.example")]);
+    let click = cx.capture_actions(|cx| {
+        cx.widget_action(
+            group.widget_uid(),
+            ButtonAction::Clicked(KeyModifiers::default()),
+        )
+    });
+    assert_eq!(
+        registry.toolbox_selection(&mut cx, &click).unwrap().id,
+        "independent_panel"
+    );
+    registry
+        .set_enabled("independent.example", false, &MockBackend::new())
+        .unwrap();
+    registry.sync_navigation(&mut cx, Screen::Play);
+    assert!(!tab.visible());
+    assert!(registry.toolbox_selection(&mut cx, &click).is_none());
+    cx.with_vm(|vm| assert!(vm.take_errors().is_empty()));
+}
+
+#[test]
+fn plugin_panel_named_play_cannot_shadow_the_hosts_replay_tab() {
+    struct NamedPlay;
+    impl StudioPlugin for NamedPlay {
+        fn descriptor(&self) -> PluginDescriptor {
+            PluginDescriptor {
+                id: "example.play",
+                title: "Example",
+                api_version: API_VERSION,
+                panels: &[PanelDescriptor {
+                    id: "play",
+                    title: "Example play",
+                    legacy_screen: None,
+                }],
+            }
+        }
+        fn register(&self, _: &mut ScriptVm) {}
+        fn create(&self, panel: &str, vm: &mut ScriptVm) -> Result<Box<dyn PluginPanel>, String> {
+            ExtraPlugin.create(panel, vm)
+        }
+    }
+    let (mut cx, mut registry) = setup();
+    registry.register(Box::new(NamedPlay)).unwrap();
+    let root = cx.with_vm(|vm| {
+        let value = script_eval!(vm, {
+            use mod.prelude.widgets.* use mod.widgets.*
+            View{plugin_tabs := View{} data_tabs := View{tab_play := mod.widgets.ux.WorkspaceTab{text: "Replay"}}}
+        });
+        WidgetRef::script_from_value(vm, value)
+    });
+    let tabs = root.widget(&cx, ids!(plugin_tabs));
+    registry.mount_tabs(&mut cx, &tabs).unwrap();
+    let replay = root.widget(&cx, ids!(data_tabs.tab_play));
+    assert_eq!(
+        root.widget(&cx, ids!(tab_play)).widget_uid(),
+        replay.widget_uid()
+    );
 }
 
 #[test]

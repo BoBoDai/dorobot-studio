@@ -60,12 +60,21 @@ struct MountedPanel {
     visible: bool,
 }
 
+struct NavigationButton {
+    widget: WidgetRef,
+    id: LiveId,
+    owner: &'static str,
+    panel: Option<PanelDescriptor>,
+}
+
 #[derive(Default)]
 pub struct PluginRegistry {
     plugins: Vec<RegisteredPlugin>,
     mounted: Vec<MountedPanel>,
     selected: Option<String>,
-    toolbox_buttons: Vec<(WidgetRef, PanelDescriptor)>,
+    toolbox_buttons: Vec<NavigationButton>,
+    tab_buttons: Vec<NavigationButton>,
+    recent_panels: std::collections::HashMap<&'static str, &'static str>,
 }
 
 impl PluginRegistry {
@@ -251,50 +260,154 @@ impl PluginRegistry {
         Ok(())
     }
 
-    /// 工具箱从清单生成；宿主无需为每个插件写按钮分支。
+    /// 侧栏仅显示插件；其面板由右侧顶部标签栏呈现。
     pub fn mount_toolbox(&mut self, cx: &mut Cx, container: &WidgetRef) -> Result<(), String> {
-        if !self.toolbox_buttons.is_empty() {
-            let mut parent = container
-                .borrow_mut::<View>()
-                .ok_or("工具箱挂载点不是 View")?;
-            for (button, descriptor) in &self.toolbox_buttons {
-                let id = LiveId::from_str(&format!("toolbox_{}", descriptor.id));
-                if !parent.children.iter().any(|(child, _)| *child == id) {
-                    parent.children.push((id, button.clone()));
-                }
+        for descriptor in self.descriptors() {
+            if self
+                .toolbox_buttons
+                .iter()
+                .any(|b| b.owner == descriptor.id)
+            {
+                continue;
             }
-            drop(parent);
-            cx.widget_tree_mark_dirty(container.widget_uid());
-            return Ok(());
-        }
-        for descriptor in self.descriptors().iter().flat_map(|d| d.panels).copied() {
-            let button = cx.with_vm(|vm| {
-                let value = script_eval!(vm, { use mod.prelude.widgets.* use mod.widgets.* Button{width: Fill height: 28 min_height: 28} });
+            let widget = cx.with_vm(|vm| {
+                let value = script_eval!(vm, {
+                    use mod.prelude.widgets.* use mod.widgets.*
+                    mod.widgets.ux.QuietButton{width: Fill height: 40 min_height: 40
+                        align: Align{x: 0.0 y: 0.5} padding: Inset{left: 12. right: 12.}
+                        draw_text +: {text_style: mod.widgets.ux.TEXT_NAV{}}}
+                });
                 WidgetRef::script_from_value(vm, value)
             });
-            button.set_text(cx, descriptor.title);
-            container
-                .borrow_mut::<View>()
-                .ok_or("工具箱挂载点不是 View")?
-                .children
-                .push((
-                    LiveId::from_str(&format!("toolbox_{}", descriptor.id)),
-                    button.clone(),
-                ));
-            self.toolbox_buttons.push((button, descriptor));
+            widget.set_text(cx, descriptor.title);
+            self.toolbox_buttons.push(NavigationButton {
+                widget,
+                id: LiveId::from_str(&format!("toolbox_{}", descriptor.id)),
+                owner: descriptor.id,
+                panel: None,
+            });
         }
+        Self::mount_navigation(cx, container, &self.toolbox_buttons)
+    }
+
+    pub fn mount_tabs(&mut self, cx: &mut Cx, container: &WidgetRef) -> Result<(), String> {
+        for plugin in self.descriptors() {
+            for descriptor in plugin.panels {
+                if self
+                    .tab_buttons
+                    .iter()
+                    .any(|b| b.panel.is_some_and(|p| p.id == descriptor.id))
+                {
+                    continue;
+                }
+                let widget = cx.with_vm(|vm| {
+                    let value = script_eval!(vm, {
+                        use mod.prelude.widgets.* use mod.widgets.*
+                        mod.widgets.ux.WorkspaceTab{}
+                    });
+                    WidgetRef::script_from_value(vm, value)
+                });
+                widget.set_text(cx, descriptor.title);
+                widget.set_visible(cx, false);
+                self.tab_buttons.push(NavigationButton {
+                    widget,
+                    id: LiveId::from_str(&format!("plugin_tab_{}", descriptor.id)),
+                    owner: plugin.id,
+                    panel: Some(*descriptor),
+                });
+            }
+        }
+        Self::mount_navigation(cx, container, &self.tab_buttons)
+    }
+
+    fn mount_navigation(
+        cx: &mut Cx,
+        container: &WidgetRef,
+        buttons: &[NavigationButton],
+    ) -> Result<(), String> {
+        let mut parent = container
+            .borrow_mut::<View>()
+            .ok_or("导航挂载点不是 View")?;
+        for button in buttons {
+            if !parent.children.iter().any(|(id, _)| *id == button.id) {
+                parent.children.push((button.id, button.widget.clone()));
+            }
+        }
+        drop(parent);
         cx.widget_tree_mark_dirty(container.widget_uid());
+        container.redraw(cx);
         Ok(())
     }
     pub fn toolbox_selection(&self, _cx: &mut Cx, actions: &Actions) -> Option<PanelDescriptor> {
-        self.toolbox_buttons
+        let owner = self
+            .toolbox_buttons
             .iter()
-            .find(|(button, descriptor)| {
-                self.panel_owner(descriptor.id)
-                    .is_some_and(|owner| self.enabled(owner))
-                    && button.as_button().clicked(actions)
+            .find(|b| self.enabled(b.owner) && b.widget.as_button().clicked(actions))?
+            .owner;
+        let plugin = self.descriptors().into_iter().find(|d| d.id == owner)?;
+        plugin
+            .panels
+            .iter()
+            .find(|p| self.recent_panels.get(owner) == Some(&p.id))
+            .or_else(|| plugin.panels.first())
+            .copied()
+    }
+
+    pub fn tab_selection(&self, actions: &Actions) -> Option<PanelDescriptor> {
+        self.tab_buttons
+            .iter()
+            .find(|b| {
+                self.enabled(b.owner) && b.widget.visible() && b.widget.as_button().clicked(actions)
             })
-            .map(|(_, descriptor)| *descriptor)
+            .and_then(|b| b.panel)
+    }
+
+    pub fn active_panel(&self, screen: Screen) -> Option<PanelDescriptor> {
+        self.descriptors()
+            .into_iter()
+            .filter(|d| self.enabled(d.id))
+            .flat_map(|d| d.panels.iter().copied())
+            .find(|p| match self.selected() {
+                Some(id) => p.id == id,
+                None => p.legacy_screen == Some(screen),
+            })
+    }
+
+    pub fn active_plugin(&self, screen: Screen) -> Option<PluginDescriptor> {
+        let panel = self.active_panel(screen)?;
+        self.descriptors()
+            .into_iter()
+            .find(|d| d.panels.iter().any(|p| p.id == panel.id))
+    }
+
+    pub fn sync_navigation(&mut self, cx: &mut Cx, screen: Screen) {
+        let active = self.active_panel(screen);
+        let owner = active.and_then(|p| self.panel_owner(p.id));
+        if let (Some(owner), Some(panel)) = (owner, active) {
+            self.recent_panels.insert(owner, panel.id);
+        }
+        let light = dorobot_studio_core::ui::frame::light_mode();
+        for button in &self.toolbox_buttons {
+            button
+                .widget
+                .as_button()
+                .set_enabled(cx, self.enabled(button.owner));
+            dorobot_studio_core::ui::frame::sync_nav_button(
+                cx,
+                &button.widget,
+                owner == Some(button.owner),
+                light,
+            );
+        }
+        for button in &self.tab_buttons {
+            button.widget.set_visible(cx, owner == Some(button.owner));
+            dorobot_studio_core::ui::frame::sync_nav_button(
+                cx,
+                &button.widget,
+                active.is_some_and(|p| button.panel.is_some_and(|tab| tab.id == p.id)),
+                light,
+            );
+        }
     }
 
     /// 动态创建的根不在宿主 DSL 中，主题重载时单独重放它们的源对象。
@@ -312,8 +425,8 @@ impl PluginRegistry {
                     );
                 }
             }
-            for (button, _) in &self.toolbox_buttons {
-                let mut button = button.clone();
+            for button in self.toolbox_buttons.iter().chain(&self.tab_buttons) {
+                let mut button = button.widget.clone();
                 let source = button.script_source();
                 if source != ScriptObject::ZERO {
                     button.script_apply(

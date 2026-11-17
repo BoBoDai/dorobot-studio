@@ -51,6 +51,12 @@ def command(*args):
 
 
 def click(name, window=0):
+    # 旧版页面意图通过快捷键跳转，避免依赖侧栏分组层级。
+    nav = {"nav_hardware": "Key1", "nav_live": "Key2", "nav_record": "Key3",
+           "nav_play": "Key4", "nav_library": "Key5", "nav_eval": "Key6"}
+    if name in nav:
+        command("key", f"w={window}", "c=" + nav[name], "logo=1", "wait=1")
+        return
     r = wait(lambda r: r["controls"][name]["visible"] and r["controls"][name]["rect"][2] > 0)
     c = r["controls"][name]
     assert c["enabled"] is not False, name
@@ -86,17 +92,25 @@ def capture(name, window=0):
 try:
     if a.restore_only:
         r = wait(lambda r: r["state"]["language"] == "zh-CN")
-        check("Chinese preference survives a fresh app process", r["controls"]["nav_hardware.caption"]["text"] == "机器人设置")
+        check("Chinese preference survives a fresh app process", r["controls"]["data_workspace"]["text"] == "数据工作区")
         check("Restoring language does not start hardware or simulation", not r["state"]["workflow"]["active"] and not r["state"]["recording"])
         capture("restored-zh")
     else:
         language("en")
-        check("English labels render", read()["controls"]["nav_hardware.caption"]["text"] == "Robot setup")
+        check("English labels render", read()["controls"]["data_workspace"]["text"] == "Data workspace")
         language("zh-CN")
-        for nav, title in [("nav_hardware", "机器人设置"), ("nav_live", "操作"), ("nav_record", "录制"),
-                           ("nav_play", "回放"), ("nav_library", "数据集"), ("nav_eval", "评估")]:
+        for nav, screen, title, tab, caption in [
+            ("nav_hardware", "Robot setup", "机器人控制", "workspace_tabs.plugin_tabs.plugin_tab_page_hardware", "机器人设置"),
+            ("nav_live", "Operate", "机器人控制", "workspace_tabs.plugin_tabs.plugin_tab_hardware_teleop", "操作"),
+            ("nav_record", "Record", "数据采集", "workspace_tabs.plugin_tabs.plugin_tab_page_record", "录制"),
+            ("nav_play", "Replay", "数据工作区", "workspace_tabs.data_tabs.tab_play", "回放"),
+            ("nav_library", "Library", "数据工作区", "workspace_tabs.data_tabs.tab_library", "数据集"),
+            ("nav_eval", "Eval", "数据工作区", "workspace_tabs.data_tabs.tab_eval", "评估"),
+        ]:
             click(nav)
-            wait(lambda r: r["controls"]["main_window.body.workspace.page_header.page_title"]["text"] == title)
+            r = wait(lambda r: r["state"]["screen"] == screen
+                     and r["controls"]["main_window.body.workspace.page_header.page_title"]["text"] == title
+                     and r["controls"][tab]["visible"] and r["controls"][tab]["text"] == caption)
             check("Chinese navigation: " + nav, True)
         click("nav_library")
         check("A dataset named Record remains user text", read()["controls"]["page_library.left_col.grid.row_a.card_0.body.name"]["text"] == "Record")
