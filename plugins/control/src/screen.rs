@@ -4,11 +4,11 @@
 //! `makepad_urdf_player::RobotView` mounts once a rig profile supplies a URDF;
 //! until then it renders an empty viewport so the screen is still verifiable.
 
-use super::flex_layout::FlexPanelsWidgetExt;
+use dorobot_studio_core::ui::flex_layout::FlexPanelsWidgetExt;
 use makepad_widgets::*;
 
-use crate::api::{HardwareState, Intent, JointProgress, StepState};
-use crate::ui::frame::{apply_light, apply_light_in, Themed};
+use dorobot_studio_core::api::{HardwareState, Intent, JointProgress, StepState};
+use dorobot_studio_core::ui::frame::{apply_light, apply_light_in, Themed};
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -536,7 +536,7 @@ impl HardwareScreenRef {
         }
     }
     pub fn sync(&self, cx: &mut Cx, state: &HardwareState) {
-        let light = crate::ui::frame::light_mode();
+        let light = dorobot_studio_core::ui::frame::light_mode();
         let Some(mut inner) = self.borrow_mut() else {
             return;
         };
@@ -878,7 +878,7 @@ impl HardwareScreenRef {
             return Some(Intent::SelectNanoBase(false));
         }
         if v.button(cx, ids!(content.camera_a_panel.content.calib.nano_controls.serial_row.scan)).clicked(actions) {
-            let (ports, _) = crate::api::files::serial_ports();
+            let (ports, _) = dorobot_studio_core::api::files::serial_ports();
             let input = v.text_input(cx, ids!(content.camera_a_panel.content.calib.nano_controls.serial_row.port));
             // Repeated clicks cycle candidates; discovery alone never connects.
             let current = input.text();

@@ -7,8 +7,8 @@
 use dorobot_ux::kit::SparkWidgetRefExt;
 use makepad_widgets::*;
 
-use crate::api::{RecordState, TakeVerdict};
-use crate::ui::frame::{apply_light, apply_light_in, theme_chip, theme_panel_head, Themed};
+use dorobot_studio_core::api::{RecordState, TakeVerdict};
+use dorobot_studio_core::ui::frame::{apply_light, apply_light_in, theme_chip, theme_panel_head, Themed};
 
 script_mod! {
     use mod.prelude.widgets.*
@@ -412,7 +412,7 @@ const FILM_IDS: [&[LiveId]; 4] = [
 
 impl RecordScreenRef {
     pub fn sync(&self, cx: &mut Cx, st: &RecordState) {
-        let light = crate::ui::frame::light_mode();
+        let light = dorobot_studio_core::ui::frame::light_mode();
         let Some(mut inner) = self.borrow_mut() else {
             return;
         };

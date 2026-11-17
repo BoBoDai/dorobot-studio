@@ -1923,6 +1923,46 @@ dependencies = [
 name = "dorobot-flex"
 version = "0.1.0-rc.2"
 dependencies = [
+ "dorobot-plugin-collection",
+ "dorobot-plugin-control",
+ "dorobot-studio-core",
+ "dorobot-studio-plugin",
+ "dorobot-ux",
+ "env_logger",
+ "log",
+ "makepad-urdf-player",
+ "makepad-widgets",
+ "serde_json",
+ "urdf-rs",
+]
+
+[[package]]
+name = "dorobot-plugin-collection"
+version = "0.1.0-rc.2"
+dependencies = [
+ "dorobot-studio-core",
+ "dorobot-studio-plugin",
+ "dorobot-ux",
+ "makepad-urdf-player",
+ "makepad-widgets",
+]
+
+[[package]]
+name = "dorobot-plugin-control"
+version = "0.1.0-rc.2"
+dependencies = [
+ "dorobot-studio-core",
+ "dorobot-studio-plugin",
+ "dorobot-ux",
+ "log",
+ "makepad-urdf-player",
+ "makepad-widgets",
+]
+
+[[package]]
+name = "dorobot-studio-core"
+version = "0.1.0-rc.2"
+dependencies = [
  "anyhow",
  "arrow-array",
  "arrow-schema",
@@ -1940,6 +1980,14 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "urdf-rs",
+]
+
+[[package]]
+name = "dorobot-studio-plugin"
+version = "0.1.0-rc.2"
+dependencies = [
+ "dorobot-studio-core",
+ "makepad-widgets",
 ]
 
 [[package]]

@@ -1,5 +1,6 @@
 // DoRobot Studio: real datasets and LeRobot capture, with explicit --demo fixtures.
 
+use dorobot_studio_plugin::{PanelContext, PluginRegistry};
 use dorobot_flex::api::{files::FileBackend, mock::MockBackend, Backend, Intent, Screen};
 use dorobot_flex::playback_controls::PlaybackAction;
 use dorobot_flex::preferences;
@@ -8,7 +9,6 @@ use dorobot_flex::ui::flex_layout::FlexPanelsWidgetRefExt;
 use dorobot_flex::ui::{
     eval::EvalScreenWidgetRefExt, frame, hardware::HardwareScreenWidgetRefExt,
     library::LibraryScreenWidgetRefExt, play::{self, PlayScreenWidgetRefExt},
-    record::RecordScreenWidgetRefExt,
 };
 use dorobot_flex::widgets::time_series_plot::TimeSeriesPlotAction;
 use dorobot_flex::widgets::timeline::TimelineAction;
@@ -114,6 +114,9 @@ script_mod! {
                         Label{ width: Fill height: Fit margin: Inset{left: 8. top: 8. bottom: 12.} text: "DoRobot Studio"
                             draw_text +: {color: mod.theme.color_text text_style: mod.widgets.ux.TEXT_TITLE{}} }
                         nav := mod.widgets.ux.NavRail{ width: Fill height: Fill }
+                        Label{width: Fill text: "Plugin toolbox" padding: Inset{left: 8. top: 6. bottom: 4.}
+                            draw_text +: {color: mod.theme.color_text_disabled text_style: mod.widgets.ux.TEXT_META{}}}
+                        plugin_tools := View{width: Fill height: Fit flow: Down spacing: 2.}
                         sidebar_tools := View{width: Fill height: 32 flow: Right spacing: 4.
                             language_toggle := mod.widgets.ux.QuietButton{
                                 width: 32 height: 32 padding: 0. text: "EN"
@@ -241,15 +244,6 @@ script_mod! {
                         pages := View{
                             width: Fill height: Fill flow: Overlay
                             page_library := LibraryScreen{}
-                            page_hardware := HardwareScreen{visible: false}
-                            hardware_teleop := PlayScreen{visible: false
-                                toolbar +: {align: Align{y: 0.5}
-                                    camera_hint := Label{width: Fit text: "Click camera/map · Drag 3D"
-                                        draw_text +: {color: mod.theme.color_text_disabled text_style: mod.widgets.ux.TEXT_META{}}}
-                                }
-                                upper +: {grid +: {persistence_key: "hardware-camera-layout.json"}}
-                            }
-                            page_record := RecordScreen{visible: false}
                             page_play := PlayScreen{visible: false}
                             page_eval := EvalScreen{visible: false}
 
@@ -299,6 +293,8 @@ pub struct App {
     /// Production backend by default; generated fixtures require explicit demo mode.
     #[rust(make_backend())]
     backend: Box<dyn Backend>,
+    #[rust(dorobot_flex::plugins::builtin_plugins())]
+    plugins: PluginRegistry,
     #[rust(false)]
     started: bool,
     #[rust]
@@ -328,6 +324,17 @@ pub struct App {
 }
 
 impl App {
+    fn navigate(&mut self, screen: Screen) {
+        self.plugins.follow_navigation();
+        self.backend.dispatch(Intent::Navigate(screen));
+    }
+    fn sync_plugins(&mut self, cx: &mut Cx) {
+        let live_controls = self.backend.screen() != Screen::Live || self.external_stream
+            || self.backend.hardware().nano.is_some()
+            || self.backend.live_connection().is_some_and(|c| c.phase.active());
+        self.plugins.sync(cx, &PanelContext { backend: &*self.backend, rig_editing: self.rig_editing,
+            show_help: self.workflow_help, show_details: self.workflow_more, live_controls });
+    }
     fn localize(&mut self, cx: &mut Cx) {
         let mut protected = std::collections::HashSet::new();
         let mut protect = |path: &str| {
@@ -372,39 +379,6 @@ impl App {
         if status.starts_with("Simulation setup") { "Ready" }
         else if status.starts_with("Real robot setup") || status.starts_with("Choose a USB serial port") { "Not connected" }
         else { status }
-    }
-    fn sync_hardware(&self, cx: &mut Cx) {
-        let mut hardware = self.backend.hardware().clone();
-        if self.backend.workflow().simulation {
-            hardware.nano = None;
-            let assets = dorobot_flex::runtime::root().join("data/adora_nano");
-            hardware.robot_urdf = Some((assets.join("adora_nano.urdf"),assets));
-            hardware.can_advance = false; hardware.joints.clear(); hardware.steps.clear();
-            hardware.instruction.clear();
-        }
-        if !self.backend.workflow().simulation && hardware.nano.is_none() {
-            if self.rig_editing { hardware.can_advance = false; hardware.instruction = "Save this rig or cancel changes before calibrating.".into(); }
-            use dorobot_flex::api::{StepState, WizardStep};
-            let profile = !self.backend.record().profile_label.is_empty();
-            let calibrated = self.backend.workflow().calibrated;
-            let cameras = !self.backend.record().previews.is_empty();
-            hardware.steps = [("Profile",profile),("Devices",calibrated),("Calibrate",calibrated),("Cameras",cameras),("Record",self.backend.record().recording || self.backend.record().last_take.is_some())].into_iter().enumerate().map(|(i,(title,done))| WizardStep { title:title.into(), state:if done { StepState::Done } else if (i == 0 && !profile) || (i == 2 && profile && !calibrated) || (i == 3 && calibrated && !cameras) { StepState::Active } else { StepState::Pending } }).collect();
-        }
-        self.ui.hardware_screen(cx, ids!(page_hardware)).sync(cx, &hardware);
-        let sim_setup = self.backend.workflow().simulation;
-        self.ui.widget(cx, ids!(page_hardware.supported_robots)).set_visible(cx, false);
-        if !sim_setup && hardware.nano.is_none() {
-            self.ui.button(cx, ids!(page_hardware.content.camera_a_panel.content.calib.actions.btn_continue)).set_text(cx, if self.backend.record().busy { "Continue" } else if self.backend.workflow().calibrated { "Calibrate again" } else { "Start calibration" });
-        }
-        self.ui.hardware_screen(cx, ids!(page_hardware)).set_inspector_available(cx, !sim_setup && (hardware.nano.is_some() || !self.backend.record().profile_label.is_empty()));
-        self.ui.widget(cx, ids!(page_hardware.layout_tools.hardware_layout_hint)).set_visible(cx, self.workflow_help);
-        self.ui.widget(cx, ids!(page_hardware.layout_tools.hardware_reset)).set_visible(cx, self.workflow_more);
-        self.ui.widget(cx, ids!(page_hardware.content.camera_a_panel.content.calib.nano_controls.wheel_commands)).set_visible(cx, self.workflow_more);
-        if sim_setup {
-            self.ui.widget(cx, ids!(page_hardware.stepper)).set_visible(cx, false);
-            self.ui.widget(cx, ids!(page_hardware.content.camera_a_panel.content.calib.actions)).set_visible(cx, false);
-            self.ui.label(cx, ids!(page_hardware.content.camera_a_panel.head.title)).set_text(cx, "Simulation readiness");
-        }
     }
     fn sync_workflow(&self, cx: &mut Cx) {
         let state = self.backend.workflow();
@@ -622,10 +596,8 @@ impl App {
         self.ui
             .library_screen(cx, ids!(page_library))
             .sync(cx, self.backend.library());
-        self.sync_hardware(cx);
-        self.ui
-            .record_screen(cx, ids!(page_record))
-            .sync(cx, self.backend.record());
+
+
         self.ui
             .play_screen(cx, ids!(page_play))
             .sync(cx, self.backend.playback());
@@ -709,12 +681,20 @@ impl App {
             self.ui.widget(cx, ids!(page_play)).set_visible(cx,false);
             self.ui.widget(cx, ids!(hardware_teleop)).set_visible(cx,false);
         }
+        if self.plugins.selected().is_some() {
+            for path in [ids!(page_library) as &[LiveId], ids!(page_play), ids!(page_eval), ids!(setup_page), ids!(workflow), ids!(live_bar), ids!(gamepad_help)] {
+                self.ui.widget(cx, path).set_visible(cx, false);
+            }
+        }
+        self.sync_plugins(cx);
         self.localize(cx);
     }
 }
 
 impl MatchEvent for App {
     fn handle_startup(&mut self, cx: &mut Cx) {
+        self.plugins.mount(cx, &self.ui.widget(cx, ids!(pages))).expect("插件界面挂载失败");
+        self.plugins.mount_toolbox(cx, &self.ui.widget(cx, ids!(plugin_tools))).expect("插件工具箱挂载失败");
         let args: Vec<String> = std::env::args().collect();
         let saved = if args.iter().any(|a| a == "--demo" || a == "--live-socket") {
             None
@@ -757,7 +737,7 @@ impl MatchEvent for App {
                     _ => None,
                 };
                 if let Some(t) = target {
-                    self.backend.dispatch(Intent::Navigate(t));
+                    self.navigate(t);
                 }
             }
         }
@@ -1071,14 +1051,9 @@ impl MatchEvent for App {
                     .ui
                     .library_screen(cx, ids!(page_library))
                     .sync(cx, self.backend.library()),
-                Screen::Record => self
-                    .ui
-                    .record_screen(cx, ids!(page_record))
-                    .sync(cx, self.backend.record()),
-                Screen::Hardware => self.sync_hardware(cx),
-                Screen::Live if self.backend.hardware().nano.is_some() => self.sync_hardware(cx),
                 _ => {}
             }
+            self.sync_plugins(cx);
         }
         if !self.backend.playback().is_playing {
             return;
@@ -1119,7 +1094,7 @@ impl MatchEvent for App {
                 _ => None,
             };
             if let Some(target) = target {
-                self.backend.dispatch(Intent::Navigate(target));
+                self.navigate(target);
                 self.sync(cx);
                 return;
             }
@@ -1133,6 +1108,7 @@ impl MatchEvent for App {
             return;
         }
 
+        if self.plugins.selected().is_some() { return; }
         if e.key_code == KeyCode::Space && focused_control(&self.ui, cx) {
             return;
         }
@@ -1158,7 +1134,14 @@ impl MatchEvent for App {
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
-        let mut dirty = false;
+        let mut dirty = self.plugins.handle_actions(cx, actions, &mut *self.backend);
+        if let Some(panel) = self.plugins.toolbox_selection(cx, actions) {
+            if let Some(screen) = panel.legacy_screen {
+                self.plugins.follow_navigation();
+                self.navigate(screen);
+            } else if let Err(error) = self.plugins.select(panel.id) { ::log::warn!("{error}"); }
+            dirty = true;
+        }
         if self.ui.button(cx,ids!(help_toggle)).clicked(actions) { self.workflow_help = !self.workflow_help; dirty = true; }
         if self.ui.button(cx,ids!(wf_more)).clicked(actions) { self.workflow_more = !self.workflow_more; dirty = true; }
         if self.ui.text_input(cx, ids!(wf_task)).changed(actions).is_some() || self.ui.text_input(cx, ids!(wf_destination)).changed(actions).is_some() {
@@ -1172,13 +1155,13 @@ impl MatchEvent for App {
             (ids!(wf_start), Intent::StartSimulation), (ids!(wf_stop), Intent::StopSimulation),
             (ids!(wf_back), Intent::Navigate(Screen::Hardware)), (ids!(wf_operate), Intent::Navigate(Screen::Live)), (ids!(wf_next), Intent::Navigate(Screen::Record)),
             (ids!(wf_replay), Intent::OpenSavedRecording),
-        ] { if self.ui.button(cx,path).clicked(actions) { self.backend.dispatch(intent); dirty = true; } }
+        ] { if self.ui.button(cx,path).clicked(actions) { if matches!(intent, Intent::Navigate(_)) { self.plugins.follow_navigation(); } self.backend.dispatch(intent); dirty = true; } }
         for (path, action) in [(ids!(wf_record), "record"), (ids!(wf_finish), "stop"), (ids!(wf_save), "save"), (ids!(wf_discard), "discard")] {
             if self.ui.button(cx,path).clicked(actions) {
                 self.backend.dispatch(Intent::SimulationCapture { action: action.into(), task: self.ui.text_input(cx,ids!(wf_task)).text(), destination: self.ui.text_input(cx,ids!(wf_destination)).text() }); dirty = true;
             }
         }
-        if self.ui.button(cx,ids!(wf_external)).clicked(actions) { self.external_stream = true; self.backend.dispatch(Intent::Navigate(Screen::Live)); dirty = true; }
+        if self.ui.button(cx,ids!(wf_external)).clicked(actions) { self.external_stream = true; self.navigate(Screen::Live); dirty = true; }
         if self.ui.button(cx,ids!(wf_rig)).clicked(actions) {
             cx.open_select_file_dialog(FileDialog::new().set_id(live_id!(rig_profile)).set_title(i18n::text(self.language, "Choose a rig profile")).add_filter(i18n::text(self.language, "Rig profile"),vec!["json".into()]));
         }
@@ -1195,7 +1178,7 @@ impl MatchEvent for App {
         }
 
         if self.ui.button(cx, ids!(gamepad_setup)).clicked(actions) {
-            self.backend.dispatch(Intent::Navigate(if self.backend.screen() == Screen::Record { Screen::Hardware } else { Screen::Record }));
+            self.navigate(if self.backend.screen() == Screen::Record { Screen::Hardware } else { Screen::Record });
             dirty = true;
         }
         if self.ui.button(cx, ids!(live_connect)).clicked(actions) {
@@ -1333,7 +1316,7 @@ impl MatchEvent for App {
             } else {
                 Screen::Play
             };
-            self.backend.dispatch(Intent::Navigate(target));
+            self.navigate(target);
             dirty = true;
         }
         if self.ui.button(cx, ids!(setup_rescan)).clicked(actions) {
@@ -1347,7 +1330,8 @@ impl MatchEvent for App {
                 continue;
             }
             if frame::view_clicked(actions, item.widget_uid()) {
-                self.backend.dispatch(Intent::Navigate(screen));
+                self.plugins.follow_navigation();
+                self.navigate(screen);
                 dirty = true;
             }
         }
@@ -1370,7 +1354,7 @@ impl MatchEvent for App {
             .clicked(actions)
             || self.ui.button(cx, ids!(setup_rig)).clicked(actions)
         {
-            self.backend.dispatch(Intent::Navigate(Screen::Hardware)); dirty = true;
+            self.navigate(Screen::Hardware); dirty = true;
         }
         if self
             .ui
@@ -1393,24 +1377,9 @@ impl MatchEvent for App {
                 );
             }
         }
-        for (path, intent) in [
-            (
-                ids!(page_record.transport.btn_record) as &[LiveId],
-                if self.backend.record().recording {
-                    Intent::RecordStop
-                } else {
-                    Intent::RecordStart
-                },
-            ),
-            (ids!(page_record.transport.btn_save), Intent::SaveEpisode),
-            (ids!(page_record.transport.btn_discard), Intent::DiscardLast),
-            (ids!(page_record.transport.btn_rerecord), Intent::ReRecord),
-            (ids!(page_eval.pbar.btn_stop), Intent::StopRollout),
-        ] {
-            if self.ui.button(cx, path).clicked(actions) {
-                self.backend.dispatch(intent);
-                dirty = true;
-            }
+        if self.ui.button(cx, ids!(page_eval.pbar.btn_stop)).clicked(actions) {
+            self.backend.dispatch(Intent::StopRollout);
+            dirty = true;
         }
 
         if self
@@ -1445,27 +1414,10 @@ impl MatchEvent for App {
             }
         }
 
-        // Hardware: the wizard's own buttons.
-        if let Some(intent) = self
-            .ui
-            .hardware_screen(cx, ids!(page_hardware))
-            .wizard_intent(cx, actions)
-        {
-            let simulation = false;
-            self.backend.dispatch(intent);
-            if simulation {
-                if let Some(connection) = self.backend.live_connection() {
-                    self.ui.text_input(cx, ids!(live_source)).set_text(cx, &connection.source);
-                }
-                self.backend.dispatch(Intent::Navigate(Screen::Hardware));
-            }
-            dirty = true;
-        }
-
         // Library: open the clicked dataset.
         let lib = self.ui.library_screen(cx, ids!(page_library));
         if lib.clicked_setup(cx, actions) {
-            self.backend.dispatch(Intent::Navigate(Screen::Hardware));
+            self.navigate(Screen::Hardware);
             dirty = true;
         }
         if let Some(id) = lib.clicked_dataset(cx, actions, self.backend.library()) {
@@ -1552,25 +1504,8 @@ impl MatchEvent for App {
 
 impl AppMain for App {
     fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
-        dorobot_ux::install_ios(vm, !std::env::args().any(|a| a == "--dark"));
-        makepad_widgets::script_mod(vm);
-        // Shared tokens first: flex's styles alias onto them.
-        dorobot_ux::script_mod(vm);
-        // RobotView, and the XR scene it draws into, back the Play 3D pane
-        makepad_urdf_player::makepad_xr::script_mod(vm);
-        makepad_urdf_player::script_mod(vm);
-        // app-shell supplies the real draggable PanelGrid used by the Play screen
-        dorobot_flex::makepad_app_shell::script_mod_with_theme(vm, |vm| {
-            dorobot_flex::shared::shell_theme::script_mod(vm);
-        });
-        // TimeSeriesPlot lives in widgets and is used by the Play screen's plot
-        // pane, so both must register before ui::script_mod evaluates that DSL.
-        // shared goes first: it defines the mod.widgets.flex text styles the
-        // widgets module builds on.
-        dorobot_flex::shared::script_mod(vm);
-        dorobot_flex::widgets::script_mod(vm);
-        dorobot_flex::playback_controls::script_mod(vm);
-        dorobot_flex::ui::script_mod(vm);
+        dorobot_studio_core::register_ui(vm);
+        dorobot_flex::plugins::builtin_plugins().register_widgets(vm);
         self::script_mod(vm)
     }
 
@@ -1627,6 +1562,12 @@ impl AppMain for App {
             }
         }
         if matches!(event, Event::LiveEdit | Event::ScriptReapply) && self.started {
+            self.plugins.reapply(cx);
+            let pages = self.ui.widget(cx, ids!(pages));
+            let toolbox = self.ui.widget(cx, ids!(plugin_tools));
+            if let Err(error) = self.plugins.mount(cx, &pages).and_then(|_| self.plugins.mount_toolbox(cx, &toolbox)) {
+                ::log::error!("插件重载失败：{error}");
+            }
             // Refresh material-only edits without reopening meshes or losing
             // the recorded pose. All Nano views use the same URDF palette.
             for (path, model) in [

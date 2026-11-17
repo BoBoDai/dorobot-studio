@@ -7,7 +7,7 @@ use std::{
 };
 
 pub const NANO_LABEL: &str = "Adora Nano · Feetech base";
-pub const NANO_PROFILE: &str = include_str!("../../../robots/adora_nano_feetech/profile.json");
+pub const NANO_PROFILE: &str = include_str!("../../../../robots/adora_nano_feetech/profile.json");
 
 #[derive(Clone, Debug, Default)]
 pub struct NanoState {

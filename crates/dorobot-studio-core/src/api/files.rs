@@ -131,7 +131,7 @@ fn urdf_limits(path: &Path) -> Vec<(f32, f32)> {
 /// arm, so they are listed separately rather than offered as candidates: the
 /// SO-100 shows up through a USB serial bridge (`usbserial`/`usbmodem` here,
 /// `ttyUSB`/`ttyACM` on Linux).
-pub(crate) fn serial_ports() -> (Vec<String>, usize) {
+pub fn serial_ports() -> (Vec<String>, usize) {
     let Ok(entries) = fs::read_dir("/dev") else {
         return (Vec::new(), 0);
     };

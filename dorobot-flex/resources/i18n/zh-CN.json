@@ -371,5 +371,6 @@
   "Enter an absolute folder for recordings.": "请输入录制目录的绝对路径。",
   "Start simulation from Robot setup first.": "请先在机器人设置中启动仿真。",
   "Rig profile": "设备配置",
-  "Preview disconnected. Source simulation and recording continue.": "预览已断开，数据源的仿真与录制仍在继续。"
+  "Preview disconnected. Source simulation and recording continue.": "预览已断开，数据源的仿真与录制仍在继续。",
+  "Plugin toolbox": "插件工具箱"
 }

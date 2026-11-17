@@ -81,6 +81,10 @@ The [Nano room integration guide](tools/aisle-validation/README.md#mobile-nano-i
 retains the original AISLE validation experiments. The recording workflow currently
 captures at 5 Hz; the Live mode does not imply 30 fps throughput.
 
+## Rust 插件工作台验证
+
+采集、机器人设置和操作界面已拆为独立 Rust 插件包。插件工厂、共享 SDK、工具箱入口及贡献方法见 [插件开发指南](docs/PLUGINS.md)。当前采用与宿主一起编译的原生模块。
+
 ## Overview
 
 Dorobot provides tools for visualizing robotics datasets, with a focus on **LeRobot** format datasets:

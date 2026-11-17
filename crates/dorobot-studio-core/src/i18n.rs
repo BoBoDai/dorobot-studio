@@ -32,7 +32,7 @@ impl Language {
 fn catalog() -> &'static BTreeMap<String, String> {
     static CATALOG: OnceLock<BTreeMap<String, String>> = OnceLock::new();
     CATALOG.get_or_init(|| {
-        serde_json::from_str(include_str!("../resources/i18n/zh-CN.json"))
+        serde_json::from_str(include_str!("../../../dorobot-flex/resources/i18n/zh-CN.json"))
             .expect("Validated Chinese UI catalog")
     })
 }

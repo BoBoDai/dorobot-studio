@@ -5,6 +5,10 @@ members = [
     "crates/dorobot-types",
     "crates/dorobot-dora-bridge",
     "dorobot-flex",
+    "crates/dorobot-studio-core",
+    "crates/dorobot-studio-plugin",
+    "plugins/collection",
+    "plugins/control",
 ]
 
 [workspace.package]
