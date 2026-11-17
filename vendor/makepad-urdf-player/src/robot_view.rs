@@ -501,6 +501,13 @@ impl RobotView {
         }
     }
 
+    /// 挂载后台已解析的模型；网格上传仍由下一次绘制完成。
+    pub fn set_robot(&mut self, cx: &mut Cx, mut robot: Robot) {
+        ForwardKinematics::update(&mut robot);
+        self.last_action = self.adopt_robot(robot);
+        self.area.redraw(cx);
+    }
+
     /// Shared tail of the load paths: adopt a robot and refresh derived state.
     fn adopt_robot(&mut self, robot: Robot) -> RobotViewAction {
         self.movable = robot

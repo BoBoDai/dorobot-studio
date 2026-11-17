@@ -376,5 +376,7 @@
   "Plugins": "插件",
   "Robot control": "机器人控制",
   "Data collection": "数据采集",
-  "Data workspace": "数据工作区"
+  "Data workspace": "数据工作区",
+  "Loading robot model…": "正在加载机器人模型…",
+  "Could not load robot model: {0}": "机器人模型加载失败：{0}"
 }

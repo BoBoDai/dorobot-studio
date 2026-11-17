@@ -1,4 +1,5 @@
 use dorobot_flex::api::{mock::MockBackend, Backend, Intent};
+use dorobot_plugin_control::screen::HardwareScreenWidgetRefExt;
 use dorobot_studio_plugin::*;
 
 fn setup() -> (Cx, PluginRegistry) {
@@ -432,4 +433,175 @@ fn disconnected_operate_panel_respects_the_hosts_setup_gate() {
     };
     assert_eq!(panel.visible_in(&context), Some(false));
     panel.sync(&mut cx, &context);
+}
+
+#[test]
+fn hardware_model_switch_returns_before_parsing_and_only_displays_the_latest_choice() {
+    let (mut cx, registry) = setup();
+    let panel = cx
+        .with_vm(|vm| registry.create_instance("page_hardware", vm))
+        .unwrap();
+    let root = panel.root();
+    let stage = root.widget(&cx, ids!(content.robot_panel.content.mirror.viewport));
+    let dir = std::env::temp_dir().join(format!("dorobot-async-model-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    for name in ["first", "latest"] {
+        std::fs::write(dir.join(format!("{name}.urdf")), format!(
+            "<robot name=\"{name}\"><link name=\"base\"/><link name=\"arm\"><visual><geometry><box size=\"0.1 0.1 0.1\"/></geometry></visual></link><joint name=\"joint\" type=\"revolute\"><parent link=\"base\"/><child link=\"arm\"/><axis xyz=\"0 0 1\"/><limit lower=\"-1\" upper=\"1\" effort=\"1\" velocity=\"1\"/></joint></robot>"
+        )).unwrap();
+    }
+    let mut state = MockBackend::new().hardware().clone();
+    state.robot_urdf = Some((dir.join("first.urdf"), dir.clone()));
+    root.as_hardware_screen().sync(&mut cx, &state);
+    let status = root.widget(&cx, ids!(content.robot_panel.content.mirror.model_status));
+    assert!(!status.is_empty() && status.visible());
+    assert!(
+        stage
+            .borrow::<makepad_urdf_player::robot_view::RobotView>()
+            .unwrap()
+            .robot()
+            .is_none(),
+        "界面同步必须先返回，模型解析不能阻塞按钮反馈"
+    );
+    state.robot_urdf = Some((dir.join("latest.urdf"), dir.clone()));
+    state.live_angles = vec![0.7];
+    root.as_hardware_screen().sync(&mut cx, &state);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        root.handle_event(&mut cx, &Event::Signal, &mut Scope::empty());
+        let ready = stage
+            .borrow::<makepad_urdf_player::robot_view::RobotView>()
+            .unwrap()
+            .robot()
+            .map(|r| r.name.clone());
+        assert!(
+            ready.is_none() || ready.as_deref() == Some("latest"),
+            "不应挂载过期模型：{ready:?}"
+        );
+        if ready.as_deref() == Some("latest") {
+            assert_eq!(
+                stage
+                    .borrow::<makepad_urdf_player::robot_view::RobotView>()
+                    .unwrap()
+                    .joint_angles(),
+                [0.7]
+            );
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "最新模型未完成后台加载：{ready:?}"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    cx.with_vm(|vm| assert!(vm.take_errors().is_empty()));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+fn check_submenu_model_loading(panel_id: &str) {
+    use dorobot_flex::ui::play::PlayScreenWidgetRefExt;
+    use dorobot_plugin_collection::screen::RecordScreenWidgetRefExt;
+    let (mut cx, registry) = setup();
+    let panel = cx
+        .with_vm(|vm| registry.create_instance(panel_id, vm))
+        .unwrap();
+    let root = panel.root();
+    let dir =
+        std::env::temp_dir().join(format!("dorobot-submenu-{panel_id}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("model.urdf");
+    std::fs::write(
+        &path,
+        "<robot name=\"submenu\"><link name=\"base\"/><link name=\"arm\"><visual><geometry><box size=\"0.1 0.1 0.1\"/></geometry></visual></link><joint name=\"joint\" type=\"revolute\"><parent link=\"base\"/><child link=\"arm\"/><axis xyz=\"0 0 1\"/><limit lower=\"-1\" upper=\"1\" effort=\"1\" velocity=\"1\"/></joint></robot>",
+    )
+    .unwrap();
+    let model = Some((path.clone(), path.parent().unwrap().to_path_buf()));
+    let backend = MockBackend::new();
+    let stage = if panel_id == "page_record" {
+        let mut state = backend.record().clone();
+        state.robot_urdf = model;
+        state.last_take = None;
+        state.pose = vec![0.4];
+        root.as_record_screen().sync(&mut cx, &state);
+        root.widget(&cx, ids!(body.right.view3d.v3_body.robot_view))
+    } else {
+        let mut state = backend.playback().clone();
+        state.robot_urdf = model;
+        use dorobot_flex::api::scene::{BasePose, SceneFrame, SceneReplay};
+        state.current_time = 0.0;
+        state.stats.frames = 1;
+        state.state_names = vec!["joint".into()];
+        state.joint_frames = vec![vec![0.4]];
+        state.scene = Some(SceneReplay {
+            version: 2,
+            objects: Vec::new(),
+            frames: vec![SceneFrame {
+                timestamp: 0.,
+                sim_time_ns: 0,
+                transforms: Vec::new(),
+                base_pose: Some(BasePose {
+                    position: [1., 2., 0.],
+                    quat_xyzw: [0., 0., 0., 1.],
+                }),
+            }],
+        });
+        state.video_paths.clear();
+        root.as_play_screen().sync(&mut cx, &state);
+        root.widget(&cx, ids!(stage_3d))
+    };
+    assert!(
+        stage
+            .borrow::<makepad_urdf_player::robot_view::RobotView>()
+            .unwrap()
+            .robot()
+            .is_none(),
+        "{panel_id} 的首次同步不应阻塞解析模型"
+    );
+    assert!(!stage.visible(), "后台加载时应显示占位提示");
+    let camera_before = stage
+        .borrow::<makepad_urdf_player::robot_view::RobotView>()
+        .unwrap()
+        .camera_target();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        root.handle_event(&mut cx, &Event::Signal, &mut Scope::empty());
+        if stage
+            .borrow::<makepad_urdf_player::robot_view::RobotView>()
+            .unwrap()
+            .robot()
+            .is_some()
+        {
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    let viewer = stage
+        .borrow::<makepad_urdf_player::robot_view::RobotView>()
+        .unwrap();
+    assert_eq!(viewer.joint_angles(), [0.4], "模型首帧应立即使用当前姿态");
+    if panel_id != "page_record" {
+        assert_eq!(
+            viewer.camera_target(),
+            camera_before,
+            "异步加载不能重置场景相机"
+        );
+        assert_eq!(
+            &viewer.robot().unwrap().base_pose.to_cols_array()[12..15],
+            &[1., 2., 0.]
+        );
+    }
+    drop(viewer);
+    cx.with_vm(|vm| assert!(vm.take_errors().is_empty()));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn collection_submenu_loads_models_without_blocking_its_first_sync() {
+    check_submenu_model_loading("page_record");
+}
+
+#[test]
+fn operate_and_replay_submenu_loads_models_without_blocking_its_first_sync() {
+    check_submenu_model_loading("hardware_teleop");
 }

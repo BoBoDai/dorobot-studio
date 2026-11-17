@@ -380,17 +380,53 @@ script_mod! {
 #[derive(Script, ScriptHook, Widget)]
 pub struct RecordScreen {
     #[rust]
-    loaded_urdf: Option<std::path::PathBuf>,
+    loaded_urdf: Option<(std::path::PathBuf, std::path::PathBuf)>,
+    #[rust]
+    model_loader: dorobot_studio_core::data::robot_model::RobotModelLoader,
+    #[rust]
+    model_error: Option<String>,
+    #[rust]
+    latest_pose: Vec<f32>,
     #[deref]
     view: View,
 }
 
 impl Widget for RecordScreen {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        if matches!(event, Event::Signal) { self.finish_model(cx); }
         self.view.handle_event(cx, event, scope);
     }
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
         self.view.draw_walk(cx, scope, walk)
+    }
+}
+
+impl RecordScreen {
+    fn finish_model(&mut self, cx: &mut Cx) {
+        let Some(ready) = self.model_loader.take_ready() else { return; };
+        match ready {
+            Ok(robot) => {
+                let widget = self.view.widget(cx, ids!(body.right.view3d.v3_body.robot_view));
+                if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                    viewer.set_robot(cx, robot);
+                    viewer.set_joint_angles(cx, &self.latest_pose);
+                }
+                self.model_error = None;
+            }
+            Err(error) => self.model_error = Some(format!("Could not load robot model: {error}")),
+        }
+        self.sync_model_status(cx);
+        self.view.redraw(cx);
+    }
+
+    fn sync_model_status(&self, cx: &mut Cx) {
+        let waiting = self.loaded_urdf.is_none() || self.model_loader.loading() || self.model_error.is_some();
+        self.view.widget(cx, ids!(body.right.view3d.v3_body.robot_view)).set_visible(cx, !waiting);
+        let label = self.view.widget(cx, ids!(body.right.view3d.v3_body.no_robot));
+        label.set_visible(cx, waiting);
+        label.set_text(cx, self.model_error.as_deref().unwrap_or(if self.model_loader.loading() {
+            "Loading robot model…"
+        } else { "Choose a rig profile to preview your robot" }));
     }
 }
 
@@ -416,9 +452,18 @@ impl RecordScreenRef {
         let Some(mut inner) = self.borrow_mut() else {
             return;
         };
+        inner.latest_pose.clone_from(&st.pose);
+        if inner.model_loader.request(st.robot_urdf.clone()) {
+            inner.loaded_urdf = st.robot_urdf.clone();
+            inner.model_error = None;
+            let widget = inner.view.widget(cx, ids!(body.right.view3d.v3_body.robot_view));
+            if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                viewer.clear_robot(cx);
+            };
+        } else { inner.finish_model(cx); }
+        inner.sync_model_status(cx);
         let RecordScreen {
             view: root,
-            loaded_urdf,
             ..
         } = &mut *inner;
 
@@ -460,17 +505,9 @@ impl RecordScreenRef {
             let head = root.widget(cx, p);
             theme_panel_head(cx, &head, light);
         }
-        if let Some((path, assets)) = &st.robot_urdf {
-            let load = loaded_urdf.as_ref() != Some(path);
+        if st.robot_urdf.is_some() {
             let viewer = root.widget(cx, ids!(body.right.view3d.v3_body.robot_view));
             if let Some(mut v) = viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
-                if load {
-                    if v.load_robot(&path.to_string_lossy(), &assets.to_string_lossy())
-                        .is_ok()
-                    {
-                        *loaded_urdf = Some(path.clone());
-                    }
-                }
                 if !st.pose.is_empty() {
                     v.set_joint_angles(cx, &st.pose);
                 }
@@ -645,10 +682,6 @@ impl RecordScreenRef {
             theme_chip(cx, &chip, light);
         }
 
-        root.widget(cx, ids!(body.right.view3d.v3_body.robot_view))
-            .set_visible(cx, st.robot_urdf.is_some());
-        root.widget(cx, ids!(body.right.view3d.v3_body.no_robot))
-            .set_visible(cx, st.robot_urdf.is_none());
         root.label(cx, ids!(sbar.profile.label)).set_text(
             cx,
             if st.profile_label.is_empty() {

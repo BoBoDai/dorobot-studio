@@ -246,6 +246,8 @@ script_mod! {
                         // The real renderer, which brings its own studio gradient with
                         // it. This was a shader drawing a perspective grid with
                         // "RobotView mounts here" written across it.
+                        model_status := Label{visible: false width: Fill height: Fit padding: 8.
+                            draw_text +: {color: mod.theme.color_text_disabled text_style: mod.widgets.ux.TEXT_META{}}}
                         viewport := RobotView{
                         keyboard_controls: false width: Fill height: Fill
                         material_roughness: 0.68 material_metallic: 0.02
@@ -426,6 +428,12 @@ pub struct HardwareScreen {
     #[rust]
     loaded_urdf: Option<(std::path::PathBuf, std::path::PathBuf)>,
     #[rust]
+    model_loader: dorobot_studio_core::data::robot_model::RobotModelLoader,
+    #[rust]
+    model_error: Option<String>,
+    #[rust]
+    latest_pose: Vec<f32>,
+    #[rust]
     inspector_available: Option<bool>,
     #[rust]
     fit_pending: bool,
@@ -437,6 +445,7 @@ pub struct HardwareScreen {
 
 impl Widget for HardwareScreen {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        if matches!(event, Event::Signal) { self.finish_model(cx); }
         let actions = cx.capture_actions(|cx| self.view.handle_event(cx, event, scope));
         if self.view.button(cx, ids!(hardware_reset)).clicked(&actions) {
             self.view.flex_panels(cx, ids!(content)).reset(cx);
@@ -469,6 +478,32 @@ impl Widget for HardwareScreen {
             }
         }
         step
+    }
+}
+
+impl HardwareScreen {
+    fn finish_model(&mut self, cx: &mut Cx) {
+        let Some(ready) = self.model_loader.take_ready() else { return; };
+        match ready {
+            Ok(robot) => {
+                let widget = self.view.widget(cx, ids!(content.robot_panel.content.mirror.viewport));
+                if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                    viewer.set_robot(cx, robot);
+                    if !self.latest_pose.is_empty() { viewer.set_joint_angles(cx, &self.latest_pose); }
+                }
+                self.fit_pending = true;
+                self.model_error = None;
+            }
+            Err(error) => { self.model_error = Some(format!("Could not load robot model: {error}")); }
+        }
+        self.sync_model_status(cx);
+        self.view.redraw(cx);
+    }
+
+    fn sync_model_status(&self, cx: &mut Cx) {
+        let label = self.view.widget(cx, ids!(content.robot_panel.content.mirror.model_status));
+        label.set_visible(cx, self.model_loader.loading() || self.model_error.is_some());
+        label.set_text(cx, self.model_error.as_deref().unwrap_or("Loading robot model…"));
     }
 }
 
@@ -541,11 +576,20 @@ impl HardwareScreenRef {
             return;
         };
         let want = state.robot_urdf.clone();
+        inner.latest_pose.clone_from(&state.live_angles);
         let need_load = inner.loaded_urdf != want;
         if need_load {
             inner.loaded_urdf = want.clone();
-            inner.fit_pending = true;
+            inner.model_loader.request(want.clone());
+            inner.model_error = None;
+            let widget = inner.view.widget(cx, ids!(content.robot_panel.content.mirror.viewport));
+            if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                viewer.clear_robot(cx);
+            };
+        } else {
+            inner.finish_model(cx);
         }
+        inner.sync_model_status(cx);
         let root = &mut inner.view;
 
         let nano = state.nano.as_ref();
@@ -595,16 +639,6 @@ impl HardwareScreenRef {
         // then only posed. With no arm attached there are no live angles yet,
         // and it simply sits at its rest pose.
         let viewer = root.widget(cx, ids!(content.robot_panel.content.mirror.viewport));
-        if need_load {
-            if let (Some((urdf, assets)), Some(mut rv)) = (
-                want.as_ref(),
-                viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>(),
-            ) {
-                if let Err(e) = rv.load_robot(&urdf.to_string_lossy(), &assets.to_string_lossy()) {
-                    ::log::error!("hardware: urdf {} failed to load: {e}", urdf.display());
-                }
-            }
-        }
         if !state.live_angles.is_empty() {
             if let Some(mut rv) = viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>()
             {

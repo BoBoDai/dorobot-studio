@@ -81,3 +81,10 @@ makepad-urdf-player = { path = "vendor/makepad-urdf-player" }
 # Match the framework macro source when file dialogs also depend on bitflags.
 [patch.crates-io]
 bitflags = { git = "https://github.com/OctoSense-org/makepad.git", rev = "44d8220f12acfa46157019267e119e0866dd6b05" }
+
+# 网格法线计算在未优化的开发构建中会阻塞数秒，模型库单独启用优化。
+[profile.dev.package.makepad-urdf-player]
+opt-level = 2
+
+[profile.dev.package.stl_io]
+opt-level = 2

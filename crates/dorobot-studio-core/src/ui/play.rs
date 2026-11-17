@@ -643,7 +643,11 @@ pub struct PlayScreen {
     #[rust]
     loaded_dataset: String,
     #[rust]
-    loaded_robot: Option<(std::path::PathBuf, std::path::PathBuf)>,
+    model_loader: crate::data::robot_model::RobotModelLoader,
+    #[rust]
+    model_pose: ModelPose,
+    #[rust]
+    model_error: Option<String>,
     /// Footer height, dragged by its head.
     #[rust(208f64)]
     footer_h: f64,
@@ -652,7 +656,69 @@ pub struct PlayScreen {
     footer_drag: Option<(f64, f64)>,
 }
 
+#[derive(Default)]
+struct ModelPose {
+    names: Vec<String>,
+    joints: Vec<f32>,
+    base: Option<crate::api::scene::BasePose>,
+    scene: bool,
+    requested: bool,
+}
+
 impl PlayScreen {
+    fn capture_model_pose(&mut self, st: &PlaybackState) {
+        self.model_pose.names.clone_from(&st.state_names);
+        self.model_pose.joints.clear();
+        if let Some(joints) = st.joints_now() { self.model_pose.joints.extend_from_slice(joints); }
+        self.model_pose.base = st.scene.as_ref().and_then(|s| s.frames.get(st.frame_index() as usize)).and_then(|f| f.base_pose.clone());
+        self.model_pose.scene = st.scene.is_some();
+        self.model_pose.requested = st.robot_urdf.is_some();
+    }
+
+    fn finish_model(&mut self, cx: &mut Cx) {
+        let Some(ready) = self.model_loader.take_ready() else { return; };
+        match ready {
+            Ok(robot) => {
+                let control_robot = robot.clone();
+                let widget = self.view.widget(cx, ids!(stage_3d));
+                if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                    let camera = (viewer.camera_target(), viewer.view_angles(), viewer.view_distance());
+                    viewer.set_robot(cx, robot);
+                    let pose = named_pose(&self.model_pose.names, &self.model_pose.joints, &viewer.movable_joint_names());
+                    viewer.set_joint_angles(cx, &pose);
+                    if let Some(base) = &self.model_pose.base { viewer.set_base_pose(cx, base.position, base.quat_xyzw); }
+                    if self.model_pose.scene {
+                        viewer.set_camera_target(cx, camera.0);
+                        viewer.set_view_angles(cx, camera.1[0], camera.1[1]);
+                        viewer.set_view_distance(cx, camera.2);
+                    }
+                }
+                let widget = self.view.widget(cx, ids!(control_3d));
+                if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
+                    viewer.set_robot(cx, control_robot);
+                    let pose = named_pose(&self.model_pose.names, &self.model_pose.joints, &viewer.movable_joint_names());
+                    viewer.set_joint_angles(cx, &pose);
+                    viewer.set_camera_target(cx, [0., 0., 0.45]);
+                    viewer.set_view_angles(cx, std::f32::consts::FRAC_PI_2, -0.2);
+                    viewer.set_view_distance(cx, 1.35);
+                }
+                self.model_error = None;
+            }
+            Err(error) => self.model_error = Some(format!("Could not load robot model: {error}")),
+        }
+        self.sync_model_status(cx);
+        self.view.redraw(cx);
+    }
+
+    fn sync_model_status(&self, cx: &mut Cx) {
+        let waiting = !self.model_pose.requested || self.model_loader.loading() || self.model_error.is_some();
+        self.view.widget(cx, ids!(stage_3d)).set_visible(cx, !waiting);
+        self.view.widget(cx, ids!(no_robot)).set_visible(cx, waiting);
+        self.view.label(cx, ids!(no_robot_label)).set_text(cx, self.model_error.as_deref().unwrap_or(if self.model_loader.loading() {
+            "Loading robot model…"
+        } else { "No robot model in this dataset" }));
+    }
+
     fn update_signal_window(&mut self, cx: &mut Cx) {
         self.view
             .widget(cx, ids!(toolbar.signal_nav))
@@ -704,6 +770,7 @@ impl PlayScreen {
 
 impl Widget for PlayScreen {
     fn handle_event(&mut self, cx: &mut Cx, event: &Event, scope: &mut Scope) {
+        if matches!(event, Event::Signal) { self.finish_model(cx); }
         // The row window is driven here rather than by a ScrollY view: the rows
         // are fixed DSL widgets reused across a much longer list, so there is
         // nothing taller than the viewport for a scroll bar to move.
@@ -1027,6 +1094,15 @@ impl PlayScreenRef {
         let Some(mut inner) = self.borrow_mut() else {
             return;
         };
+        inner.capture_model_pose(st);
+        if inner.model_loader.request(st.robot_urdf.clone()) {
+            inner.model_error = None;
+            for path in [ids!(stage_3d) as &[LiveId], ids!(control_3d)] {
+                let widget = inner.view.widget(cx, path);
+                if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() { viewer.clear_robot(cx); };
+            }
+        } else { inner.finish_model(cx); }
+        inner.sync_model_status(cx);
         if inner.live_mode != st.live.is_some() {
             inner.live_mode = st.live.is_some();
             inner.view.flex_panels(cx, ids!(upper.grid)).set_live_mode(cx, inner.live_mode);
@@ -1061,12 +1137,6 @@ impl PlayScreenRef {
         // the view is borrowed.
         let need_media =
             inner.loaded_episode != st.selected || inner.loaded_dataset != st.dataset_name;
-        let robot_key = st.robot_urdf.as_ref().map(|(model, assets)| (
-            model.canonicalize().unwrap_or_else(|_| model.clone()),
-            assets.canonicalize().unwrap_or_else(|_| assets.clone()),
-        ));
-        let reload_robot = robot_key.is_some() && inner.loaded_robot != robot_key;
-        if need_media && reload_robot { inner.loaded_robot = robot_key; }
         if need_media {
             inner.loaded_episode = st.selected;
             inner.loaded_dataset = st.dataset_name.clone();
@@ -1185,11 +1255,6 @@ impl PlayScreenRef {
             root.label(cx, path).set_text(cx, if st.live.is_some() { "Waiting for stream" } else { message });
         }
 
-        root.widget(cx, ids!(upper.grid.robot_panel.no_robot))
-            .set_visible(cx, st.robot_urdf.is_none());
-        root.label(cx, ids!(no_robot_label)).set_text(cx, if st.live.is_some() { "Waiting for robot state" } else { "No robot model in this dataset" });
-        root.widget(cx, ids!(stage_3d))
-            .set_visible(cx, st.robot_urdf.is_some());
         let hardware_camera = root.flex_panels(cx, ids!(upper.grid)).is_hardware_camera();
         root.label(cx, ids!(robot_panel.head.title)).set_text(cx,
             if hardware_camera { "Trace map" } else { "3D view" });
@@ -1420,7 +1485,7 @@ impl PlayScreenRef {
         // ---- media: load once per episode, then follow the playhead --------
         Self::sync_camera_titles(cx, root, st);
         if need_media {
-            Self::load_media(cx, root, st, follow_robot, reload_robot);
+            Self::load_media(cx, root, st, follow_robot);
         }
         Self::follow_playhead(cx, root, st, &signal_indices, follow_robot);
 
@@ -1553,16 +1618,6 @@ impl PlayScreenRef {
         let (selected, active) = control_joints(st);
         let mut limits = Vec::new();
         if let Some(mut viewer) = widget.borrow_mut::<makepad_urdf_player::robot_view::RobotView>() {
-            if viewer.robot().is_none() {
-                let Some((model, assets)) = &st.robot_urdf else { return; };
-                if let Err(error) = viewer.load_robot(&model.to_string_lossy(), &assets.to_string_lossy()) {
-                    ::log::error!("control model: {error}");
-                    return;
-                }
-                viewer.set_camera_target(cx, [0., 0., 0.45]);
-                viewer.set_view_angles(cx, std::f32::consts::FRAC_PI_2, -0.2);
-                viewer.set_view_distance(cx, 1.35);
-            }
             // Keep the inspection model in the robot's own frame. Never reset
             // its orbit or zoom when a live joint sample arrives.
             if let Some(joints) = st.joints_now() {
@@ -1599,6 +1654,8 @@ impl PlayScreenRef {
         let Some(mut inner) = self.borrow_mut() else {
             return;
         };
+        inner.capture_model_pose(st);
+        inner.finish_model(cx);
         let signal_indices: Vec<_> = inner
             .signal_order
             .iter()
@@ -1673,7 +1730,7 @@ impl PlayScreenRef {
     /// Camera keys are matched by preference and then by position, the way the
     /// shipping player does it, so a dataset naming its cameras `top`/`wrist`
     /// lands in the same panes as one naming them `cam_high`/`cam_left_wrist`.
-    fn load_media(cx: &mut Cx, root: &mut View, st: &PlaybackState, follow_robot: bool, reload_robot: bool) {
+    fn load_media(cx: &mut Cx, root: &mut View, st: &PlaybackState, follow_robot: bool) {
         let [main, wrist, third] = if st.live.is_some() {
             [
                 Some("head".into()),
@@ -1716,15 +1773,10 @@ impl PlayScreenRef {
         }
 
         let viewer = root.widget(cx, ids!(stage_3d));
-        if let Some((urdf, assets)) = &st.robot_urdf {
+        if st.robot_urdf.is_some() {
             if let Some(mut rv) = viewer.borrow_mut::<makepad_urdf_player::robot_view::RobotView>()
             {
                 rv.clear_external(cx);
-                if reload_robot {
-                    if let Err(e) = rv.load_robot(&urdf.to_string_lossy(), &assets.to_string_lossy()) {
-                        ::log::error!("play: urdf {} failed to load: {e}", urdf.display());
-                    }
-                }
                 rv.set_base_pose(cx, [0., 0., 0.], [0., 0., 0., 1.]);
                 if st.scene.is_some() {
                     super::replay_scene::load(cx, &mut rv);

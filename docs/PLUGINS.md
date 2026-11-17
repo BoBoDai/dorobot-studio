@@ -45,6 +45,8 @@ cargo run --locked -p dorobot-flex --no-default-features
 
 宿主使用 `mount_toolbox` 挂载插件分组、`mount_tabs` 挂载面板标签，再通过 `sync_navigation` 同步当前页面。两种按钮都从描述生成；新增插件不需要单独编写导航入口。`toolbox_selection` 恢复上次标签，`tab_selection` 仅接受当前可见标签的事件。
 
+需要显示机器人模型的插件使用 `dorobot_studio_core::data::robot_model::RobotModelLoader` 在后台解析 URDF/STL，通过 `Signal` 或状态同步接收最新结果，再在界面线程调用 `RobotView::set_robot`。挂载前恢复最新关节角和场景相机，避免首帧跳回零姿态。加载器合并连续选择、忽略过期结果，并缓存最近两个未修改的模型；Makepad 控件和 GPU 操作仍留在界面线程。
+
 ## 添加插件
 
 1. 在独立目录建立 Rust crate，依赖 `dorobot-studio-plugin`，需要业务服务时依赖 `dorobot-studio-core`。统一使用工作区固定的 Makepad 修订。
