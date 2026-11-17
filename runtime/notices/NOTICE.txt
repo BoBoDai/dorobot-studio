@@ -1,0 +1,3 @@
+The native robot motor mapping and GPU readback adapter follow Dimforge Nexus ca2cc91 (MIT OR Apache-2.0); engine sources and LICENSE are in runtime/vendor/nexus.
+The SO-100/101 register addresses, calibration and normalization follow Hugging Face LeRobot v0.4.3, Copyright 2024-2026 The HuggingFace Inc. team, Apache-2.0.
+The Hub commit/LFS API implementation follows the public Hugging Face Hub protocol (Apache-2.0).

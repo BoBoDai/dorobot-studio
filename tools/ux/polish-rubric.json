@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "target": 95,
+  "scope": "DoRobot Studio desktop visual refinement; separate from the functional UX score. Nexus is not regraded.",
+  "evaluator": "model-authored visual review supported by real-input checks; not independent human validation",
+  "dimensions": [
+    {
+      "id": "geometry",
+      "weight": 20,
+      "criteria": "Consistent spacing, alignment, radii, containment and balanced proportions."
+    },
+    {
+      "id": "typography",
+      "weight": 15,
+      "criteria": "Clear hierarchy, readable metadata, deliberate wrapping and truncation."
+    },
+    {
+      "id": "color",
+      "weight": 15,
+      "criteria": "Coherent light/dark surfaces, accessible text contrast and restrained semantic color."
+    },
+    {
+      "id": "components",
+      "weight": 15,
+      "criteria": "Consistent buttons, panel headers, charts, selections and control states."
+    },
+    {
+      "id": "states",
+      "weight": 15,
+      "criteria": "Polished empty, unavailable, selected, focused, disabled and active states without duplicate messages."
+    },
+    {
+      "id": "density",
+      "weight": 10,
+      "criteria": "Useful space allocation at 1440×900 and 1024×768; no arbitrary oversized placeholders."
+    },
+    {
+      "id": "interaction",
+      "weight": 10,
+      "criteria": "Visual feedback for real input; flexible layouts, extra windows, curation, transport and persistence preserved."
+    }
+  ],
+  "hard_gates": [
+    "40 original screenshots: five screens × two sizes × two appearances × file and simulated states.",
+    "Inspect each final screenshot; no essential clipped or unreachable controls.",
+    "Functional real-input journeys pass including flexible panels and an extra native window.",
+    "No UI shader errors or panics in tested paths.",
+    "No private information in published evidence."
+  ],
+  "scoring": "Freeze before implementation. Deduct for observed defects; any failed hard gate prevents a pass regardless of total. Cite final evidence and disclose remaining limitations."
+}

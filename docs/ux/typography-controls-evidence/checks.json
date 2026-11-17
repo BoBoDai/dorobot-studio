@@ -1,0 +1,238 @@
+{
+  "refinement": [
+    {
+      "name": "1440\u00d7900 light recording session cues are fully contained",
+      "pass": true
+    },
+    {
+      "name": "1440\u00d7900 light camera setup guidance is fully contained",
+      "pass": true
+    },
+    {
+      "name": "1440\u00d7900 dark recording session cues are fully contained",
+      "pass": true
+    },
+    {
+      "name": "1440\u00d7900 dark camera setup guidance is fully contained",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 light recording session cues are fully contained",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 light camera setup guidance is fully contained",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 dark recording session cues are fully contained",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 dark camera setup guidance is fully contained",
+      "pass": true
+    },
+    {
+      "name": "arrangement button describes Column",
+      "pass": true
+    },
+    {
+      "name": "arrangement button describes Row",
+      "pass": true
+    },
+    {
+      "name": "arrangement button describes Grid",
+      "pass": true
+    },
+    {
+      "name": "1440\u00d7900 scrub track provides a 44px pointer target",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 scrub track provides a 44px pointer target",
+      "pass": true
+    }
+  ],
+  "refinement-demo": [
+    {
+      "name": "1440\u00d7900 light recording session cues are fully contained",
+      "pass": true
+    },
+    {
+      "name": "1440\u00d7900 light camera waiting text is fully contained",
+      "pass": true
+    },
+    {
+      "name": "1440\u00d7900 light absent take thumbnails have a visible explanation",
+      "pass": true
+    },
+    {
+      "name": "1440\u00d7900 dark recording session cues are fully contained",
+      "pass": true
+    },
+    {
+      "name": "1440\u00d7900 dark camera waiting text is fully contained",
+      "pass": true
+    },
+    {
+      "name": "1440\u00d7900 dark absent take thumbnails have a visible explanation",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 light recording session cues are fully contained",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 light camera waiting text is fully contained",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 light absent take thumbnails have a visible explanation",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 dark recording session cues are fully contained",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 dark camera waiting text is fully contained",
+      "pass": true
+    },
+    {
+      "name": "1024\u00d7768 dark absent take thumbnails have a visible explanation",
+      "pass": true
+    },
+    {
+      "name": "compact calibration scroll reveals both complete action buttons",
+      "pass": true
+    }
+  ],
+  "workflow": [
+    {
+      "name": "focused panel button does not also start playback",
+      "pass": true
+    },
+    {
+      "name": "drag moves title and its actual 3D/plot content",
+      "pass": true
+    },
+    {
+      "name": "vertical divider resizes panels",
+      "pass": true
+    },
+    {
+      "name": "horizontal divider resizes panels",
+      "pass": true
+    },
+    {
+      "name": "maximize shows the intended plot",
+      "pass": true
+    },
+    {
+      "name": "Escape restores panel grid",
+      "pass": true
+    },
+    {
+      "name": "closed camera can be reopened with content intact",
+      "pass": true
+    },
+    {
+      "name": "appearance and navigation retain custom layout",
+      "pass": true
+    },
+    {
+      "name": "native Replay window opens with independent layout",
+      "pass": true
+    },
+    {
+      "name": "both windows share transport and frame position",
+      "pass": true
+    },
+    {
+      "name": "extra window layout changes independently",
+      "pass": true
+    },
+    {
+      "name": "closing extra window preserves main task",
+      "pass": true
+    },
+    {
+      "name": "extra window retains its layout after reopening",
+      "pass": true
+    },
+    {
+      "name": "extra window reopens after close",
+      "pass": true
+    },
+    {
+      "name": "single-frame stepping",
+      "pass": true
+    },
+    {
+      "name": "pointer scrubbing moves the shared playhead",
+      "pass": true
+    },
+    {
+      "name": "bad tag persists through navigation",
+      "pass": true
+    },
+    {
+      "name": "exclude and Undo recover the same episode and tag",
+      "pass": true
+    },
+    {
+      "name": "cancel Hub form retains active episode",
+      "pass": true
+    },
+    {
+      "name": "missing rig keeps Record and Save disabled",
+      "pass": true
+    },
+    {
+      "name": "disabled Record cannot start capture",
+      "pass": true
+    },
+    {
+      "name": "hardware has calibration controls and a recovery action",
+      "pass": true
+    },
+    {
+      "name": "no policy runner keeps Stop disabled",
+      "pass": true
+    },
+    {
+      "name": "navigation divider is resizable",
+      "pass": true
+    }
+  ],
+  "workflow-demo": [
+    {
+      "name": "simulated completed take saves and clears review",
+      "pass": true
+    },
+    {
+      "name": "simulated record starts with an available Stop",
+      "pass": true
+    },
+    {
+      "name": "simulated stop presents Save, Discard and Re-record",
+      "pass": true
+    },
+    {
+      "name": "simulated re-record starts a fresh take",
+      "pass": true
+    },
+    {
+      "name": "simulated discard clears staged take",
+      "pass": true
+    },
+    {
+      "name": "incomplete calibration keeps Continue disabled",
+      "pass": true
+    },
+    {
+      "name": "simulated evaluation Stop disables itself after stopping",
+      "pass": true
+    }
+  ]
+}

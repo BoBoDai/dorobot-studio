@@ -44,6 +44,12 @@ def wait_for(predicate, timeout=10):
     raise AssertionError('UI state did not settle')
 
 def click(name):
+    # 旧版页面意图通过快捷键跳转，避免依赖侧栏分组层级。
+    nav = {"nav_hardware": "Key1", "nav_live": "Key2", "nav_record": "Key3",
+           "nav_play": "Key4", "nav_library": "Key5", "nav_eval": "Key6"}
+    if name in nav:
+        command("key", "w=0", "c=" + nav[name], "logo=1", "wait=1")
+        return
     item = report()['controls'][name]
     x, y, w, h = item['rect']
     assert item['visible'] and w > 0 and h > 0, name
@@ -58,7 +64,7 @@ def appearance(want):
         time.sleep(.6)
     raise AssertionError('Appearance did not change')
 
-screens = ([('Library','nav_library'), ('Record','nav_record'), ('Play','nav_play'), ('Hardware','nav_hardware'), ('Eval','nav_eval')]
+screens = ([('Library','nav_library'), ('Record','nav_record'), ('Replay','nav_play'), ('Robot setup','nav_hardware'), ('Operate','nav_live'), ('Eval','nav_eval')]
            if a.app == 'studio' else [(n, f'tab{i}') for i,n in enumerate(['Home','Scenes','Robots','Train','Inspect','Validate','Runs','Deploy'])])
 if a.screens:
     wanted = set(a.screens.split(','))
@@ -83,6 +89,6 @@ for size in a.sizes.split(','):
             (a.out/(stem+'.json')).write_text(json.dumps(r, indent=2)+'\n')
             receipts.append({'file': image.name, 'sha256': hashlib.sha256(image.read_bytes()).hexdigest(),
                              'screen': screen, 'size': [width,height], 'appearance': theme,
-                             'input': 'pointer click', 'capture': json.loads(capture.splitlines()[0])})
+                             'input': 'keyboard shortcut' if a.app == 'studio' else 'pointer click', 'capture': json.loads(capture.splitlines()[0])})
             print(stem, flush=True)
 (a.out/(a.app+'-receipts.json')).write_text(json.dumps(receipts, indent=2)+'\n')

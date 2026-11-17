@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "target_exclusive": 90,
+  "evaluator": "Model visual judgment from original rendered screenshots and instrumented interaction, not a human usability study.",
+  "scope": "Visual clarity of Robot setup, Operate, Record and Replay; preserve supported behavior.",
+  "dimensions": [
+    {
+      "id": "visual_hierarchy",
+      "weight": 30
+    },
+    {
+      "id": "text_density",
+      "weight": 25
+    },
+    {
+      "id": "workspace_and_spacing",
+      "weight": 20
+    },
+    {
+      "id": "controls_and_typography",
+      "weight": 15
+    },
+    {
+      "id": "interaction_continuity",
+      "weight": 10
+    }
+  ],
+  "gates": [
+    "Default setup has no repeated instructional paragraphs.",
+    "A visually distinct primary action is present when applicable.",
+    "Simulation has no permanent explanatory side panel.",
+    "Real robot capability limits and actionable errors remain visible.",
+    "Help and diagnostics can be expanded and dismissed.",
+    "Primary controls fit 1024x768 and 1440x900 in both themes.",
+    "Simulation record/save/replay and flexible layouts continue to work."
+  ],
+  "baseline": {
+    "score": 62,
+    "basis": "Current rendered real Nano setup: duplicated capability paragraphs, unprioritized buttons, long diagnostic sidebar and excessive header height.",
+    "previous_workflow_score_does_not_measure_visual_quality": true
+  }
+}

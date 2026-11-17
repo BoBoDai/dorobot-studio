@@ -1,0 +1,15 @@
+{
+  "nexus": {
+    "repository": "https://github.com/dimforge/nexus",
+    "revision": "ca2cc91d6a3cabbed1ccff9b7f08b22d76c7865d"
+  },
+  "khal": {
+    "repository": "https://github.com/dimforge/khal",
+    "revision": "57ad7b6badd5bbdaa59462de282847abe8080912"
+  },
+  "vortx": {
+    "repository": "https://github.com/dimforge/vortx",
+    "revision": "e7b9add21702a2656d7c39dbd848d33157e51b17"
+  },
+  "changes": "Runtime Rust sources only. Examples, Python bindings, tests and large media omitted. Workspace members and shader-build patches point to adjacent pinned sources; engine code unchanged."
+}

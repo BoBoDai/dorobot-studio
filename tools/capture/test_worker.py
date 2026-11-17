@@ -8,6 +8,14 @@ import unittest
 from unittest import mock
 import worker
 
+class PromptTests(unittest.TestCase):
+    def test_terminal_formatting_is_not_shown_in_calibration_instructions(self):
+        prompt = "\x1b[32mMove every joint\x1b[0m\rPress Enter when done\n\x1b[2K"
+        self.assertEqual(worker.readable_calibration_prompt(prompt), "Move every joint\nPress Enter when done")
+        self.assertNotIn("\x1b", worker.readable_calibration_prompt(prompt + "\x1b["))
+        self.assertLessEqual(len(worker.readable_calibration_prompt("x" * 3000)), 1200)
+
+
 class ProfileTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

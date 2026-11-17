@@ -71,6 +71,15 @@ def main():
         print("Makepad JIT runner is ready.")
         return
     os.environ["MAKEPAD_RUN_ALLOW_C"] = "1"
+    # The installed RC relocates FFmpeg into Contents/Frameworks. A JIT native
+    # dylib has no app executable rpath. Set this after the system Python starts
+    # (macOS may strip DYLD variables when launching a protected interpreter).
+    resources = os.environ.get("DOROBOT_RESOURCES")
+    if video and sys.platform == "darwin" and resources:
+        frameworks = Path(resources).resolve().parent / "Frameworks"
+        if frameworks.is_dir():
+            previous = os.environ.get("DYLD_LIBRARY_PATH", "")
+            os.environ["DYLD_LIBRARY_PATH"] = str(frameworks) + (":" + previous if previous else "")
     if mode == "nano":
         if CONFIG.get("optional_video"):
             dataset = PROJECT / "dataset" / "adora-nano-synthetic-preview"

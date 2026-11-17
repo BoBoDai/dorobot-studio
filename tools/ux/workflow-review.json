@@ -1,0 +1,884 @@
+{
+  "version": 1,
+  "date": "2026-11-14",
+  "rubric": "workflow-rubric.json",
+  "score": 95,
+  "maximum": 100,
+  "target": 95,
+  "verdict": "pass_for_reviewed_desktop_workflows",
+  "scope": "Desktop navigation and supported setup, operation, collection and replay workflows on the prepared local workstation. This score is not a claim of complete real Nano hardware support.",
+  "evaluator": "Model-authored UX judgment supported by Makepad instrumentation, pointer/keyboard input, captured pixels, tests and an actual saved dataset; not an independent human usability study.",
+  "physical_hardware_verified": false,
+  "dimensions": [
+    {
+      "id": "navigation",
+      "score": 19.5,
+      "maximum": 20,
+      "evidence": "Numbered setup, operate, record and replay sequence; current source and next action are visible. Active capture survives navigation with a return banner.",
+      "remaining_friction": "External stream remains an advanced setup action requiring technical knowledge."
+    },
+    {
+      "id": "setup_calibration",
+      "score": 18.5,
+      "maximum": 20,
+      "evidence": "Separate model initialization and physical calibration; guided rig form, readable calibration prompts, missing-device preflight, and explicit base-only Nano capabilities. Unapplied edits cannot calibrate the old rig.",
+      "remaining_friction": "Ports and camera IDs still require manual entry; dependency and initial motor setup remain prerequisites. Actual physical calibration is unverified."
+    },
+    {
+      "id": "simulation_operation",
+      "score": 14,
+      "maximum": 15,
+      "evidence": "The app starts the Dora graph, waits for physics and all three cameras, opens controls, and stops the session. No terminal or socket entry is needed on the prepared workstation.",
+      "remaining_friction": "Cold GPU preparation takes minutes; full sensor capture does not run at 30 wall-clock fps."
+    },
+    {
+      "id": "capture_replay",
+      "score": 24,
+      "maximum": 25,
+      "evidence": "Actual UI input completes record, stop, save and replay with three decoded camera videos and 17 measured joints; a subsequent discarded take preserves the saved dataset.",
+      "remaining_friction": "Each simulated take is a separate dataset, and full replay is available after Save."
+    },
+    {
+      "id": "recovery_continuity",
+      "score": 9.5,
+      "maximum": 10,
+      "evidence": "Pending capture blocks source/stop changes; late sensor frames are committed before review. Failed saves preserve the take for retry. Flexible panels and a second native replay window retain state.",
+      "remaining_friction": "Raw data retained after a simulator crash may need manual recovery."
+    },
+    {
+      "id": "visual_clarity",
+      "score": 9.5,
+      "maximum": 10,
+      "evidence": "Light and dark layouts checked at 1024x768 and 1440x900; compact controls, corrected calibration button width, wrapped gamepad mapping and preserved camera area.",
+      "remaining_friction": "The physical setup form is dense at the minimum window size."
+    }
+  ],
+  "hard_gates": [
+    {
+      "criterion": "A new user can start a supported simulation without a terminal or socket path.",
+      "passed": true,
+      "evidence": [
+        "simulation",
+        "simulation_shutdown"
+      ]
+    },
+    {
+      "criterion": "Simulation recording produces a real playable dataset with all three cameras and measured joints.",
+      "passed": true,
+      "evidence": [
+        "simulation",
+        "dataset_audit"
+      ]
+    },
+    {
+      "criterion": "Real robot and simulation setup explain different calibration requirements.",
+      "passed": true,
+      "evidence": [
+        "calibration_edits",
+        "real_errors",
+        "final-user-app.png"
+      ]
+    },
+    {
+      "criterion": "Unsupported Nano arm calibration and camera acquisition are never presented as available.",
+      "passed": true,
+      "evidence": [
+        "real_errors"
+      ]
+    },
+    {
+      "criterion": "Navigation preserves live operation, recording, pending takes and flexible panel layouts.",
+      "passed": true,
+      "evidence": [
+        "simulation",
+        "flexible_layouts"
+      ]
+    },
+    {
+      "criterion": "Errors, missing devices and incomplete calibration give an actionable recovery path.",
+      "passed": true,
+      "evidence": [
+        "real_errors",
+        "calibration_edits",
+        "unit_tests"
+      ]
+    },
+    {
+      "criterion": "No essential control is clipped at 1024x768 or 1440x900 in light or dark appearance.",
+      "passed": true,
+      "evidence": [
+        "visual_matrix",
+        "calibration-controls-final.png",
+        "operate-compact-final.png"
+      ]
+    }
+  ],
+  "review_rounds": [
+    {
+      "round": 1,
+      "status": "gates_failed",
+      "findings": [
+        "Setup was replaced by live controls.",
+        "Starting a simulation and saving its data were disconnected from the app journey.",
+        "Real and simulated calibration requirements were not sufficiently clear."
+      ],
+      "numeric_score": null
+    },
+    {
+      "round": 2,
+      "status": "repair_required",
+      "findings": [
+        "Stop could arrive before the last sensor frame.",
+        "Recording status could be stale.",
+        "Navigation and minimum-width controls needed clearer state and wrapping."
+      ],
+      "numeric_score": null
+    },
+    {
+      "round": 3,
+      "status": "repair_required",
+      "findings": [
+        "Calibration action text clipped at minimum width.",
+        "Operate repeated setup instructions above cameras.",
+        "Camera metadata needed to be preserved in the saved dataset.",
+        "Editing a replacement profile left the old calibration action available."
+      ],
+      "numeric_score": null
+    },
+    {
+      "round": 4,
+      "status": "pass_for_reviewed_desktop_workflows",
+      "score": 95,
+      "findings": [
+        "Final simulation and real-device error journeys pass.",
+        "Saved data audit and flexible/native window checks pass.",
+        "Final calibration edit guard and original user app were verified."
+      ]
+    }
+  ],
+  "validation": {
+    "rust": {
+      "passed": 55,
+      "failed": 0,
+      "command": "cargo test -p dorobot-flex --lib"
+    },
+    "final_compile": {
+      "passed": true,
+      "command": "cargo check -p dorobot-flex --bin dorobot-flex",
+      "note": "Existing warnings remain."
+    },
+    "jit": {
+      "errors": 0,
+      "body_owners": 1391,
+      "command": "./tools/run_jit.sh --check --video"
+    },
+    "simulation_python": {
+      "passed": 46,
+      "skipped": 1,
+      "failed": 0,
+      "skip_reason": "Optional standalone Dora guard-graph test; the new complete Dora graph was exercised by the simulation UI journey."
+    },
+    "capture_python": {
+      "passed": 6,
+      "failed": 0,
+      "device": "Mock device, real OpenCV encoding. Final prompt-only rerun on system Python: 5 passed, 1 encoder dependency skip."
+    },
+    "unit_tests": [
+      "Reordered/late sensor delivery before Stop",
+      "Save failure retains data and retry succeeds",
+      "Second take and discard",
+      "Empty take recovery",
+      "Calibration prompt escape cleaning",
+      "Navigation and recording gates"
+    ],
+    "journeys": {
+      "simulation": {
+        "passed": true,
+        "checks": [
+          {
+            "check": "Start simulation reaches Operate with 3 live cameras",
+            "passed": true
+          },
+          {
+            "check": "Setup preserves recording and blocks simulation shutdown",
+            "passed": true
+          },
+          {
+            "check": "Library navigation preserves recording",
+            "passed": true
+          },
+          {
+            "check": "Stop waits for every sensor frame",
+            "passed": true
+          },
+          {
+            "check": "Unsaved take survives navigation",
+            "passed": true
+          },
+          {
+            "check": "Save commits a discoverable dataset",
+            "passed": true
+          },
+          {
+            "check": "Replay loads all 17 measured joints",
+            "passed": true
+          },
+          {
+            "check": "Saved replay advances independently of the live source",
+            "passed": true
+          },
+          {
+            "check": "Discard removes only the new take and preserves saved data",
+            "passed": true
+          }
+        ],
+        "screenshots": [
+          {
+            "screenshot": "operate.png",
+            "sha256": "fbc6553134cb0e41520e811e2d283c1d75e80247078293bb8aeecc2bcdd353c5"
+          },
+          {
+            "screenshot": "recording.png",
+            "sha256": "3f0d27100163d879a1f46835bc1f8525274f703a063276b95dea24e7e9220507"
+          },
+          {
+            "screenshot": "review.png",
+            "sha256": "a09ca7f632d7698c0aa65f5a37b1141c1244b9167b98fb1331d92ab11fcba454"
+          },
+          {
+            "screenshot": "saved-replay.png",
+            "sha256": "80f770a8fe779fbeb3a73a4856290dece11081b5366f545e57e6113c4ced54ed"
+          }
+        ]
+      },
+      "simulation_shutdown": {
+        "passed": true,
+        "checks": [
+          {
+            "check": "Start simulation reaches Operate with 3 live cameras",
+            "passed": true
+          },
+          {
+            "check": "Setup preserves recording and blocks simulation shutdown",
+            "passed": true
+          },
+          {
+            "check": "Library navigation preserves recording",
+            "passed": true
+          },
+          {
+            "check": "Stop waits for every sensor frame",
+            "passed": true
+          },
+          {
+            "check": "Unsaved take survives navigation",
+            "passed": true
+          },
+          {
+            "check": "Save commits a discoverable dataset",
+            "passed": true
+          },
+          {
+            "check": "Replay loads all 17 measured joints",
+            "passed": true
+          },
+          {
+            "check": "Saved replay advances independently of the live source",
+            "passed": true
+          },
+          {
+            "check": "Discard removes only the new take and preserves saved data",
+            "passed": true
+          },
+          {
+            "check": "Explicit simulation stop is reported as normal completion",
+            "passed": true
+          }
+        ],
+        "screenshots": [
+          {
+            "screenshot": "operate.png",
+            "sha256": "08ba997405197e7cd2ec5a23b0a312a2e6615784c0431ebaaedcf6935d721b87"
+          },
+          {
+            "screenshot": "recording.png",
+            "sha256": "d27216e97fd7133bfbfd9eb8d440b23c850da8097b178ceeb8f7092ee0de419b"
+          },
+          {
+            "screenshot": "review.png",
+            "sha256": "3014041f39d10fc6f66ec4f5fdbf573d17eaee8fa6daa2279141b8cf4b242d4d"
+          },
+          {
+            "screenshot": "saved-replay.png",
+            "sha256": "d29717c327b0d61f600e9a438c01c8dfd81287a2979fa6a2a761b714c4c07a5f"
+          }
+        ]
+      },
+      "real_errors": {
+        "passed": true,
+        "checks": [
+          {
+            "check": "Invalid profile gives an actionable error",
+            "passed": true
+          },
+          {
+            "check": "Missing hardware is blocked before calibration",
+            "passed": true
+          },
+          {
+            "check": "Physical capture is gated by calibration",
+            "passed": true
+          },
+          {
+            "check": "Nano capabilities explicitly exclude arm calibration and cameras",
+            "passed": true
+          },
+          {
+            "check": "Nano mock base remains connected in Operate",
+            "passed": true
+          },
+          {
+            "check": "Leaving physical controls stops the base driver",
+            "passed": true
+          }
+        ],
+        "screenshots": [
+          {
+            "screenshot": "real-profile-form.png",
+            "sha256": "8c7a4526ef0e9cff812afbec7d889623cdd7dfa832186bd36db080b5acf37e3d"
+          },
+          {
+            "screenshot": "missing-device.png",
+            "sha256": "b0395aff977fb5299dfd9e35ecab73582a69c13b2da5a2343a780d2c1c2b04e7"
+          },
+          {
+            "screenshot": "nano-base-setup.png",
+            "sha256": "2387e360867e1882ac2bd16b97375f9671886be1706eead01913a41f13d83b21"
+          },
+          {
+            "screenshot": "nano-bus-controls.png",
+            "sha256": "0610f33e77d9a9bbbd19c7468d8807e6686bffc25fcb2b2366d13bcc64e4425f"
+          }
+        ]
+      },
+      "flexible_layouts": {
+        "passed": true,
+        "checks": [
+          {
+            "check": "Camera maximize, restore, close and reopen retain content",
+            "passed": true
+          },
+          {
+            "check": "Navigation and appearance preserve all 5 panel slots",
+            "passed": true
+          },
+          {
+            "check": "Second native window controls shared replay",
+            "passed": true
+          },
+          {
+            "check": "Closing the native window retains the main replay and layout",
+            "passed": true
+          },
+          {
+            "check": "Dragging a panel reorders real contents and survives navigation",
+            "passed": true
+          },
+          {
+            "check": "Dragging the divider changes split_x from 0.5 to 0.581699",
+            "passed": true
+          }
+        ],
+        "screenshots": []
+      },
+      "calibration_edits": {
+        "passed": true,
+        "checks": [
+          {
+            "check": "Unapplied profile edits disable calibration",
+            "passed": true
+          },
+          {
+            "check": "Cancel changes restores current rig and calibration action",
+            "passed": true
+          }
+        ],
+        "screenshots": []
+      }
+    },
+    "dataset_audit": {
+      "passed": true,
+      "frames": 14,
+      "camera_decoded_frames": {
+        "head": 14,
+        "left_wrist": 14,
+        "right_wrist": 14
+      },
+      "joints": 17,
+      "raw_checksums_verified": 14,
+      "camera_poses_verified": 42,
+      "intrinsics": "nominal simulation values, preserved with provenance",
+      "source_clock": "continuous 200 ms steps",
+      "task_success": "not evaluated"
+    },
+    "visual_matrix": {
+      "real": {
+        "captures": 24,
+        "receipts": [
+          {
+            "file": "studio-1440x900-light-library.png",
+            "sha256": "386760bbbd1e293801a61371bdb1be16e2ed3e9b49200856ee13135242a8c820",
+            "screen": "Library",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-light-record.png",
+            "sha256": "32ed7a4de7e64a047268cf3ed85786506a150c5f9179fdd0712b792610cf9958",
+            "screen": "Record",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-light-replay.png",
+            "sha256": "05aa1aa7d5d3f6469e33a9f48829ab77fde733d72c86197a2939588c7e7b69a1",
+            "screen": "Replay",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-light-robot setup.png",
+            "sha256": "d55d1fdef698395a44cb91253e166176b5443722e282e1e1e18e6259ba883812",
+            "screen": "Robot setup",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-light-operate.png",
+            "sha256": "f505c7fa73aad568d78eac2e3e50d3cc8fa3d85f0b7f048ff0bcb4691e1097e8",
+            "screen": "Operate",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-light-eval.png",
+            "sha256": "89f7136f7a875048214964b713e8de6e1f62ded5c28e382b6a99e12e091078ae",
+            "screen": "Eval",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-dark-library.png",
+            "sha256": "75bb530b7aad97144b61a56279bb1ae0088878a29602cf582a3c83cb665c1b3d",
+            "screen": "Library",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1440x900-dark-record.png",
+            "sha256": "8967dfc3010df81185c244d18dfc2183fe46144d26b6deefcd42bc34556a6d5c",
+            "screen": "Record",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1440x900-dark-replay.png",
+            "sha256": "eccd9e533bcd1c4bd9c71a50ac519b7817c168c6b42c2031b18d1d8c417cb5be",
+            "screen": "Replay",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1440x900-dark-robot setup.png",
+            "sha256": "8d970bf5d4de1df8f1f896fadf02849f83be66c6edb6dc20302787d63c3f8000",
+            "screen": "Robot setup",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1440x900-dark-operate.png",
+            "sha256": "6c1cd07d11821ed4f32efdfd211151dadd25bff02018977201af8b355ca3cc79",
+            "screen": "Operate",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1440x900-dark-eval.png",
+            "sha256": "018621c8cc91276137efd48c213a477083a9c17fe6196a39c10882ef540821c6",
+            "screen": "Eval",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-light-library.png",
+            "sha256": "3ab028d5bb5a511142cd0f002c03d5576cd622397407e27646aa21855ee69c8f",
+            "screen": "Library",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-light-record.png",
+            "sha256": "0abafe34d7e74e16aaf32f284bb28a21b34a35f6a8603c4ad1357be66d848baa",
+            "screen": "Record",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-light-replay.png",
+            "sha256": "37dd2911f6ba13b2eb63ac9e1e243db450f529e75ea0f5f0abb2bfdffddb5b50",
+            "screen": "Replay",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-light-robot setup.png",
+            "sha256": "09da9a7165b096c79218d01ec6b1bba49133efec7044b2d0fa320939ed701f31",
+            "screen": "Robot setup",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-light-operate.png",
+            "sha256": "80c9ddd54cabdcd9f60c78af2e8795eb8747838acd83475a1ea442c8f5ed745c",
+            "screen": "Operate",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-light-eval.png",
+            "sha256": "7f7266e216f2b8a51a750b8b1773a27e4ee545d073e2f367a9c4071677e4cb5f",
+            "screen": "Eval",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-dark-library.png",
+            "sha256": "32a8aaeea5583f049c2b0c1359f37d5a26025e7a3db9769d89a9410fd86afc6d",
+            "screen": "Library",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-dark-record.png",
+            "sha256": "0c1ed584db8e57aad1b63eecf999ddfb33d9d6ad2ed1222ee96d5753bf8ff2f6",
+            "screen": "Record",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-dark-replay.png",
+            "sha256": "0632a3148418e1011048d1b4215d6606acfc6abe9a8903f4cb6f29d8c7e15dfa",
+            "screen": "Replay",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-dark-robot setup.png",
+            "sha256": "a5735b38c8882979ea14701f7d7d70902e5cd6f2a69fdd62d1303ed7b314ce96",
+            "screen": "Robot setup",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-dark-operate.png",
+            "sha256": "84da67e0227fe5236c8171597fba1bc34bdb0be3a8ac32c7baa2763fb57a41ee",
+            "screen": "Operate",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-dark-eval.png",
+            "sha256": "5d8a1926109ac3c841292ae2306381c14b9bf9c02f0e828fdea5fea4ae73f40b",
+            "screen": "Eval",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          }
+        ]
+      },
+      "simulation": {
+        "captures": 16,
+        "receipts": [
+          {
+            "file": "studio-1440x900-light-record.png",
+            "sha256": "9c39cc9b48cbeba4f464d9e3a6514b5e88dc93743918b25bf7ffa84f25c039a4",
+            "screen": "Record",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-light-replay.png",
+            "sha256": "5bb94503c6bb5b11bc9991ed770090ef4919182a783dac4d7b257995fb78926c",
+            "screen": "Replay",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-light-robot setup.png",
+            "sha256": "5aeff98ca19b7c97ec14bcc955efd7529098322dce704417326aade0c7932976",
+            "screen": "Robot setup",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-light-operate.png",
+            "sha256": "97054b63e2c38927dd7c163b534b295e9b75ad51a69a23dabbd3d67e720f2ac1",
+            "screen": "Operate",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1440x900-dark-record.png",
+            "sha256": "959a2bbdf432de96024d0d9c2a687ddf2bc70e6a82e57197d6ed7430bdf81a08",
+            "screen": "Record",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1440x900-dark-replay.png",
+            "sha256": "cbc1d2a04a9d8fe820209a046a0d1e0cd5d1eabd2b8828281efd8e9b41d8c184",
+            "screen": "Replay",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1440x900-dark-robot setup.png",
+            "sha256": "655e01d02dbac4621f8faa93ffb904ad1526ec3e26a98b6b72644cd262a6016b",
+            "screen": "Robot setup",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1440x900-dark-operate.png",
+            "sha256": "a06fb243721f38992b0c6ddf80fbdc9c7079466ba6cdb76581dd492ff09c9109",
+            "screen": "Operate",
+            "size": [
+              1440,
+              900
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-light-record.png",
+            "sha256": "4be40eb6bc4bdd81345ecfc99eadea66873b72abc3bb0a70094b795a7689530e",
+            "screen": "Record",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-light-replay.png",
+            "sha256": "07b7c20a7105515d3daf58bf52194940cf500e7cb7abaa6a800b45cc31c4f5c6",
+            "screen": "Replay",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-light-robot setup.png",
+            "sha256": "e606b77a90d01d25c21bdede87f620b6959bb936604c0be9e5bac8a6333360ce",
+            "screen": "Robot setup",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-light-operate.png",
+            "sha256": "5361213f7d246f7ba67102fc103941f2c8d76be84462c3457d24001b6365fff5",
+            "screen": "Operate",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "light"
+          },
+          {
+            "file": "studio-1024x768-dark-record.png",
+            "sha256": "8525c57fc753dd7d4498f84b91804b599c30d21e0da73f03b2adfbab28d428c2",
+            "screen": "Record",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-dark-replay.png",
+            "sha256": "07b7c20a7105515d3daf58bf52194940cf500e7cb7abaa6a800b45cc31c4f5c6",
+            "screen": "Replay",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-dark-robot setup.png",
+            "sha256": "e606b77a90d01d25c21bdede87f620b6959bb936604c0be9e5bac8a6333360ce",
+            "screen": "Robot setup",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          },
+          {
+            "file": "studio-1024x768-dark-operate.png",
+            "sha256": "2cdde1a6700a8584d3612acc3dc41b3f0d7f4ec8302d6d19604b7821413ca8e2",
+            "screen": "Operate",
+            "size": [
+              1024,
+              768
+            ],
+            "appearance": "dark"
+          }
+        ]
+      }
+    },
+    "supplemental_screenshots": [
+      {
+        "file": "operate-compact-final.png",
+        "sha256": "482a15a8f3d3ec7663c0ee57fd3e1b206346492c417ad16b87a1cb0426515fbf"
+      },
+      {
+        "file": "form-1024-dark.png",
+        "sha256": "bcb0c09489de88af2ee3dfe720d7380b1ab4ac3c2b5b6b6407037f3143e8b6e6"
+      },
+      {
+        "file": "form-1024-light.png",
+        "sha256": "ff3daf6096edc9548b50a0d9004d88338592e579443738097b40905efe4c12e9"
+      },
+      {
+        "file": "calibration-controls-final.png",
+        "sha256": "68b8781590eaf869972992441fadbc7636d0cd9aba2a0825fb4ed2a50629a17b"
+      },
+      {
+        "file": "calibration-edits-guarded.png",
+        "sha256": "bfe3d33d64c5c814336e2286897376e24f3df474493695a53b029d13d9e9155f"
+      },
+      {
+        "file": "final-user-app.png",
+        "sha256": "1f49f7619d41ad1255b1ba7a8edbc981e19b4bad19b0c6ce4bf0fce24ac72d12"
+      },
+      {
+        "file": "native-replay-final.png",
+        "sha256": "0d3e068ef6a5ce8424a6107358ecd60b6d86f6ed9844c5789fbbd4415c54d432"
+      }
+    ],
+    "artifacts": "Screenshots, telemetry, dataset and raw test logs are local review artifacts, intentionally outside tracked source. This report retains sanitized checks and screenshot hashes."
+  },
+  "user_paths": {
+    "simulation": "Robot setup > Simulation > Start simulation > Operate > Record > task and folder > Record episode > Stop recording > Save episode > Open saved replay",
+    "simulation_calibration": "Model zero positions and joint limits are used; no servo calibration. Stop and start a session to reset the scene.",
+    "real_arms": "Robot setup > Real robot > SO-100 / SO-101 > ports, cameras, task and folder > Use this rig > Start calibration > follow prompts / Continue > Record > Stop > Save > Open saved replay",
+    "real_nano": "Robot setup > Real robot > Adora Nano (base only) > serial port > Connect > Open controls. Bus test is a mock bus, not a physics simulation."
+  },
+  "remaining_limits": [
+    "Physical Nano arm/head calibration and Nano camera acquisition are not supported by the supplied base driver.",
+    "Physical SO-100/101 calibration, serial timing, torque shutdown and physical camera acquisition require acceptance with the actual rig.",
+    "Simulation RGB capture is 5 fps in simulation time. Wall-clock preview/capture may be slower; no 30 fps real-time claim.",
+    "Simulation and real capture dependencies must already be installed; the desktop start flow was tested on the prepared workstation.",
+    "A cold simulation launch may take minutes for GPU shader preparation.",
+    "Each simulated take is its own dataset; incomplete crash data may require manual recovery.",
+    "Hub transfers were not tested against an authenticated account. Evaluate has no connected policy runner.",
+    "The 95/100 score assesses the reviewed desktop UX, not physical robot readiness or independent user satisfaction."
+  ]
+}

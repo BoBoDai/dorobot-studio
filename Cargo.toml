@@ -5,10 +5,14 @@ members = [
     "crates/dorobot-types",
     "crates/dorobot-dora-bridge",
     "dorobot-flex",
+    "crates/dorobot-studio-core",
+    "crates/dorobot-studio-plugin",
+    "plugins/collection",
+    "plugins/control",
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.0-rc.2"
 edition = "2021"
 license = "MIT"
 authors = ["dorobot team"]
@@ -48,7 +52,8 @@ serde_json = "1"
 parquet = { version = "56.1", default-features = false, features = ["arrow", "snap"] }
 
 # Video decoding
-ffmpeg-next = "8"
+# The pinned Makepad JIT supplies bitflags 2.10; ffmpeg-next 8.1 needs 2.11.
+ffmpeg-next = "=8.0.0"
 
 # Utilities
 parking_lot = "0.12"
@@ -76,3 +81,10 @@ makepad-urdf-player = { path = "vendor/makepad-urdf-player" }
 # Match the framework macro source when file dialogs also depend on bitflags.
 [patch.crates-io]
 bitflags = { git = "https://github.com/OctoSense-org/makepad.git", rev = "44d8220f12acfa46157019267e119e0866dd6b05" }
+
+# 网格法线计算在未优化的开发构建中会阻塞数秒，模型库单独启用优化。
+[profile.dev.package.makepad-urdf-player]
+opt-level = 2
+
+[profile.dev.package.stl_io]
+opt-level = 2

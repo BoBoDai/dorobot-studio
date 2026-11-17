@@ -1,0 +1,24 @@
+//! Physics simulation pipeline orchestrating broad-phase, narrow-phase, and constraint solving.
+//!
+//! This module provides the high-level physics pipeline that coordinates all stages of a physics
+//! simulation step on the GPU. The pipeline manages collision detection, contact generation,
+//! constraint solving, and integration.
+
+#[cfg(all(test, feature = "dim3"))]
+mod bench_narrow_phase;
+mod insertion_removal;
+mod lbvh_validation;
+mod rbd_state;
+mod rbd_state_from_rapier;
+mod rbd_step;
+#[cfg(all(test, feature = "dim3"))]
+mod test_batched_stacks;
+#[cfg(all(test, feature = "dim2"))]
+mod test_polyline_warmstart;
+
+#[cfg(feature = "dim3")]
+pub use rbd_state::RbdSnapshot;
+pub use rbd_state::{
+    DebugContact, DebugLbvhNode, RbdCapacities, RbdGraphKey, RbdResizePolicy, RbdState, RunStats,
+};
+pub use rbd_step::RbdPipeline;

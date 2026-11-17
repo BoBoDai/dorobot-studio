@@ -1,0 +1,1399 @@
+use crate::backend::{
+    Backend, BufferUsages, DescriptorType, DeviceValue, Dispatch, DispatchGrid, Encoder,
+    GpuBackendError, GpuTimestamp, MaybeSendSync, ShaderBinding,
+};
+use crate::shader::{BindGroupLayoutInfo, ShaderArgsError};
+use async_channel::RecvError;
+use bytemuck::{AnyBitPattern, NoUninit};
+use regex::Regex;
+use smallvec::SmallVec;
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::ops::RangeBounds;
+use std::sync::{Arc, Mutex};
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use wgpu::wgt::CommandEncoderDescriptor;
+use wgpu::{
+    Adapter, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
+    BufferAddress, BufferBindingType, BufferDescriptor, BufferSlice, BufferView, CommandEncoder,
+    ComputePass, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
+    ExperimentalFeatures, Instance, PipelineCompilationOptions, PipelineLayoutDescriptor,
+    PollError, Queue, ShaderModule, ShaderRuntimeChecks, ShaderStages,
+};
+
+/// Runtime checks used for `create_shader_module_trusted`.
+///
+/// NOTE: we keep force_loop_boinding on to avoid what appears to be miscompilation of the
+///       some kernels on some platforms (Windows native + Nvidia gpu).
+fn shader_runtime_checks() -> ShaderRuntimeChecks {
+    ShaderRuntimeChecks {
+        force_loop_bounding: true,
+        ..ShaderRuntimeChecks::unchecked()
+    }
+}
+
+/// A WebGPU buffer slice that tracks its byte length for safe reinterpretation.
+#[derive(Clone, Copy)]
+pub struct WebGpuBufferSlice<'a> {
+    pub(crate) inner: BufferSlice<'a>,
+    pub(crate) byte_len: u64,
+}
+
+impl<'a> WebGpuBufferSlice<'a> {
+    /// Wraps a foreign `wgpu::Buffer` (e.g. one owned by another library sharing
+    /// this device) as a buffer slice spanning its whole range.
+    pub fn from_wgpu(buffer: &'a wgpu::Buffer) -> Self {
+        Self {
+            inner: buffer.slice(..),
+            byte_len: buffer.size(),
+        }
+    }
+}
+
+impl<'a> From<WebGpuBufferSlice<'a>> for wgpu::BindingResource<'a> {
+    fn from(slice: WebGpuBufferSlice<'a>) -> Self {
+        wgpu::BindingResource::try_from(slice.inner).expect("buffer slice can not be empty")
+    }
+}
+
+/// Wrapper for ShaderModule that includes binding information needed for push constants.
+#[cfg(feature = "push_constants")]
+#[derive(Clone)]
+pub struct WebGpuModule {
+    pub module: ShaderModule,
+    /// Binding entries extracted from the SPIR-V for creating explicit bind group layouts.
+    pub bindings: Vec<BindGroupLayoutEntry>,
+}
+
+/// A loaded WebGPU shader module (alias for `wgpu::ShaderModule` without push constants).
+#[cfg(not(feature = "push_constants"))]
+pub type WebGpuModule = ShaderModule;
+
+/// A WebGPU compute function with its bind group layouts.
+#[derive(Clone)]
+pub struct WebGpuFunction {
+    pub pipeline: ComputePipeline,
+    /// Bind group layouts indexed by set number. Empty vec means use auto-generated layouts.
+    pub bind_group_layouts: Arc<Vec<BindGroupLayout>>,
+}
+
+/// A WebGPU compute pass that carries its own device reference.
+///
+/// On wasm the pass may be a MERGED pass shared by successive `begin_pass`
+/// calls (see `WebGpuEncoder::open_pass`, wasm only); dropping the handle then returns
+/// the underlying pass to the encoder's cache instead of ending it.
+pub struct WebGpuPass {
+    pub(crate) pass: Option<ComputePass<'static>>,
+    pub(crate) device: Device,
+    /// wasm pass-merging: the encoder cache slot this pass returns to on drop
+    /// (`None` = plain pass, ends on drop as before).
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) home: Option<std::rc::Rc<std::cell::RefCell<Option<ComputePass<'static>>>>>,
+}
+
+impl WebGpuPass {
+    /// Begins a compute dispatch within this pass, binding the given function.
+    pub fn begin_dispatch<'a>(&'a mut self, function: &'a WebGpuFunction) -> WebGpuDispatch<'a> {
+        WebGpuDispatch::new(
+            &self.device,
+            self.pass.as_mut().expect("pass ended"),
+            function,
+        )
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Drop for WebGpuPass {
+    fn drop(&mut self) {
+        if let Some(home) = self.home.take() {
+            *home.borrow_mut() = self.pass.take();
+        }
+    }
+}
+
+/// A WebGPU command encoder that carries its own device reference.
+pub struct WebGpuEncoder {
+    pub(crate) encoder: CommandEncoder,
+    pub(crate) device: Device,
+    /// wasm pass-merging: the open compute pass shared by successive `begin_pass` calls, since
+    /// pass switches are costly in browsers and WebGPU guarantees storage-write visibility
+    /// between dispatches of one pass. Ended by buffer copies and at submit.
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) open_pass: std::rc::Rc<std::cell::RefCell<Option<ComputePass<'static>>>>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl WebGpuEncoder {
+    /// End the cached merged pass (if any) — required before encoder-level
+    /// commands (copies) and before `finish`.
+    fn close_open_pass(&mut self) {
+        drop(self.open_pass.borrow_mut().take());
+    }
+}
+
+/// wasm perf counters: every operation that crosses the wasm→browser GPU boundary, for
+/// profiling without a profiler build.
+#[cfg(target_arch = "wasm32")]
+pub mod perf_counters {
+    use core::sync::atomic::{AtomicU32, Ordering::Relaxed};
+    pub static SUBMITS: AtomicU32 = AtomicU32::new(0);
+    /// Compute passes actually OPENED (merged-cache hits don't count).
+    pub static PASSES: AtomicU32 = AtomicU32::new(0);
+    /// Encoder-level buffer copies — each one closes the merged pass.
+    pub static COPIES: AtomicU32 = AtomicU32::new(0);
+    /// queue.write_buffer uploads.
+    pub static WRITES: AtomicU32 = AtomicU32::new(0);
+    /// Buffer map requests (readbacks).
+    pub static MAPS: AtomicU32 = AtomicU32::new(0);
+
+    /// Take-and-zero all counters: (submits, passes, copies, writes, maps).
+    pub fn take() -> (u32, u32, u32, u32, u32) {
+        (
+            SUBMITS.swap(0, Relaxed),
+            PASSES.swap(0, Relaxed),
+            COPIES.swap(0, Relaxed),
+            WRITES.swap(0, Relaxed),
+            MAPS.swap(0, Relaxed),
+        )
+    }
+}
+
+/// Helper struct to initialize a device and its queue.
+#[derive(Clone)]
+pub struct WebGpu {
+    _instance: Instance, // TODO: do we have to keep this around?
+    _adapter: Adapter,   // TODO: do we have to keep this around?
+    device: Device,
+    queue: Queue,
+    hacks: Vec<(Regex, String)>,
+    /// If this flag is set, every buffer created by this backend will have the
+    /// `BufferUsages::COPY_SRC` flag. Useful for debugging.
+    pub force_buffer_copy_src: bool,
+    /// Whether the `SPIRV_SHADER_PASSTHROUGH` feature is enabled on this device.
+    spirv_passthrough_enabled: bool,
+    /// Whether `TIMESTAMP_QUERY` is supported on this device.
+    timestamp_supported: bool,
+    /// Per-size pool of `MAP_READ | COPY_DST` staging buffers, reused across
+    /// `slow_read_buffer` calls so we don't pay a fresh `create_buffer` /
+    /// `MTLBuffer.makeBuffer` (and its inverse on drop) every call. Keyed by
+    /// buffer size in bytes. `Vec` per size so concurrent callers with the
+    /// same payload size each get an exclusive buffer. `Arc` so cloned
+    /// `WebGpu` handles (which already share the same underlying device /
+    /// queue via wgpu's internal Arcs) also share the pool.
+    read_staging_pool: Arc<Mutex<HashMap<u64, Vec<Buffer>>>>,
+}
+
+impl WebGpu {
+    /// Creates a WebGPU backend with default features and limits.
+    pub async fn default() -> anyhow::Result<Self> {
+        Self::new(wgpu::Features::default(), wgpu::Limits::default()).await
+    }
+
+    #[allow(unused_mut)] // features and limits need mut depending on enabled cargo features.
+    /// Initializes a wgpu instance and create its queue.
+    pub async fn new(
+        mut features: wgpu::Features,
+        mut limits: wgpu::Limits,
+    ) -> anyhow::Result<Self> {
+        let instance = wgpu::Instance::default();
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                ..Default::default()
+            })
+            .await
+            .map_err(|_| anyhow::anyhow!("Failed to initialize gpu adapter."))?;
+        #[cfg(feature = "push_constants")]
+        {
+            features = features | wgpu::Features::IMMEDIATES | wgpu::Features::SUBGROUP;
+            // 128 bytes is the guaranteed minimum on Vulkan.
+            limits.max_immediate_size = 128;
+        }
+        #[cfg(feature = "subgroup_ops")]
+        {
+            features = features | wgpu::Features::SUBGROUP;
+        }
+
+        // Enable timestamp queries if the adapter supports it.
+        let timestamp_supported = adapter.features().contains(wgpu::Features::TIMESTAMP_QUERY);
+        if timestamp_supported {
+            features |= wgpu::Features::TIMESTAMP_QUERY;
+        }
+
+        // Enable SPIRV passthrough if the adapter supports it AND the backend is Vulkan.
+        // SPIR-V passthrough only makes sense on Vulkan where raw SPIR-V can be consumed
+        // directly by the driver. On other backends (Metal, DX12, etc.), the SPIR-V would
+        // still need to be transpiled, so passthrough would not work correctly.
+        let is_vulkan_backend = adapter.get_info().backend == wgpu::Backend::Vulkan;
+        let spirv_passthrough_enabled = is_vulkan_backend
+            && adapter
+                .features()
+                .contains(wgpu::Features::PASSTHROUGH_SHADERS);
+        if spirv_passthrough_enabled {
+            features |= wgpu::Features::PASSTHROUGH_SHADERS;
+        }
+
+        // SAFETY: we opt into experimental features to enable SPIRV passthrough.
+        // We only use this for the passthrough shader loading path, which is itself unsafe.
+        let experimental_features = if spirv_passthrough_enabled {
+            unsafe { ExperimentalFeatures::enabled() }
+        } else {
+            ExperimentalFeatures::default()
+        };
+
+        let (device, queue) = adapter
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: features,
+                required_limits: limits,
+                memory_hints: Default::default(),
+                trace: wgpu::Trace::Off,
+                experimental_features,
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+        Ok(Self {
+            _instance: instance,
+            _adapter: adapter,
+            device,
+            queue,
+            force_buffer_copy_src: false,
+            hacks: vec![],
+            spirv_passthrough_enabled,
+            timestamp_supported,
+            read_staging_pool: Arc::new(Mutex::new(HashMap::new())),
+        })
+    }
+
+    /// Builds a WebGPU backend on top of an already-created wgpu device/queue,
+    /// instead of creating its own (as [`Self::new`] does).
+    pub fn from_device(instance: Instance, adapter: Adapter, device: Device, queue: Queue) -> Self {
+        let timestamp_supported = device.features().contains(wgpu::Features::TIMESTAMP_QUERY);
+        let is_vulkan_backend = adapter.get_info().backend == wgpu::Backend::Vulkan;
+        let spirv_passthrough_enabled = is_vulkan_backend
+            && device
+                .features()
+                .contains(wgpu::Features::PASSTHROUGH_SHADERS);
+
+        Self {
+            _instance: instance,
+            _adapter: adapter,
+            device,
+            queue,
+            force_buffer_copy_src: false,
+            hacks: vec![],
+            spirv_passthrough_enabled,
+            timestamp_supported,
+            read_staging_pool: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Pop a `MAP_READ | COPY_DST` staging buffer of exactly `bytes_len` bytes
+    /// from the readback pool, allocating one if the pool is empty for that
+    /// size. Pairs with [`Self::release_read_staging`]. Used by [`Backend::slow_read_buffer`]
+    /// to avoid allocating a fresh GPU buffer (and freeing it) on every call.
+    fn acquire_read_staging(&self, bytes_len: u64) -> Buffer {
+        if let Some(buf) = self
+            .read_staging_pool
+            .lock()
+            .expect("read_staging_pool poisoned")
+            .get_mut(&bytes_len)
+            .and_then(|v| v.pop())
+        {
+            return buf;
+        }
+        self.device.create_buffer(&BufferDescriptor {
+            label: Some("khal-read-staging"),
+            size: bytes_len,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        })
+    }
+
+    /// Return a staging buffer to the pool so the next `slow_read_buffer` of
+    /// the same size can reuse it. Caller must have already `unmap`ed it.
+    fn release_read_staging(&self, bytes_len: u64, buf: Buffer) {
+        self.read_staging_pool
+            .lock()
+            .expect("read_staging_pool poisoned")
+            .entry(bytes_len)
+            .or_default()
+            .push(buf);
+    }
+
+    /// Adds a regex-based text replacement to apply to WGSL source before compilation.
+    pub fn append_hack(&mut self, regex: Regex, replace_pattern: String) {
+        self.hacks.push((regex, replace_pattern));
+    }
+
+    /// The `wgpu` device.
+    pub fn device(&self) -> &Device {
+        &self.device
+    }
+
+    /// The `wgpu` queue.
+    pub fn queue(&self) -> &Queue {
+        &self.queue
+    }
+
+    /// Whether GPU timestamp queries are supported on this device.
+    pub fn timestamp_supported(&self) -> bool {
+        self.timestamp_supported
+    }
+
+    /// Loads a SPIR-V module, extracting binding info for push constants support.
+    #[cfg(feature = "push_constants")]
+    fn load_module_spirv(&self, spirv_bytes: &[u8]) -> Result<WebGpuModule, WebGpuBackendError> {
+        let source = wgpu::util::make_spirv(spirv_bytes);
+        let shader_module = self
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: None,
+                source,
+            });
+        // TODO: Extract bindings from SPIR-V using naga for proper push_constants support
+        Ok(WebGpuModule {
+            module: shader_module,
+            bindings: Vec::new(),
+        })
+    }
+
+    /// Loads a SPIR-V module.
+    #[cfg(not(feature = "push_constants"))]
+    fn load_module_spirv(&self, spirv_bytes: &[u8]) -> Result<WebGpuModule, WebGpuBackendError> {
+        let source = wgpu::util::make_spirv(spirv_bytes);
+        let shader_module = unsafe {
+            self.device.create_shader_module_trusted(
+                wgpu::ShaderModuleDescriptor {
+                    label: None,
+                    source,
+                },
+                shader_runtime_checks(),
+            )
+        };
+        Ok(shader_module)
+    }
+
+    /// Loads a SPIR-V module using passthrough (bypassing naga validation/transpilation).
+    ///
+    /// Uses `create_shader_module_passthrough` to pass raw SPIR-V directly to the Vulkan driver.
+    /// Falls back to normal SPIR-V loading if `EXPERIMENTAL_PASSTHROUGH_SHADERS` is not available.
+    pub fn load_module_spirv_passthrough(
+        &self,
+        spirv_bytes: &[u8],
+    ) -> Result<WebGpuModule, WebGpuBackendError> {
+        if !self.spirv_passthrough_enabled {
+            return self.load_module_spirv(spirv_bytes);
+        }
+
+        let spirv = wgpu::util::make_spirv_raw(spirv_bytes);
+        // wgpu doesn't reflect passthrough modules, so it only knows the entry points we
+        // declare here. `create_compute_pipeline` then rejects any entry point missing
+        // from that list, so declare every entry point the module actually contains.
+        let entry_points = spirv_entry_points(&spirv);
+
+        // SAFETY: the caller has marked this shader as requiring passthrough loading,
+        // meaning it uses SPIR-V features not supported by naga. The SPIR-V bytecode
+        // is passed directly to the Vulkan driver without validation.
+        let shader_module = unsafe {
+            self.device
+                .create_shader_module_passthrough(wgpu::ShaderModuleDescriptorPassthrough {
+                    spirv: Some(spirv),
+                    entry_points: Cow::Owned(entry_points),
+                    ..Default::default()
+                })
+        };
+
+        #[cfg(feature = "push_constants")]
+        return Ok(WebGpuModule {
+            module: shader_module,
+            bindings: Vec::new(),
+        });
+
+        #[cfg(not(feature = "push_constants"))]
+        Ok(shader_module)
+    }
+}
+
+/// Lists the entry points declared by a SPIR-V module, with the workgroup size of each.
+///
+/// This reads the `OpEntryPoint` and `OpExecutionMode LocalSize` instructions directly
+/// from the SPIR-V words, without going through naga (passthrough modules are exactly the
+/// ones naga can't handle). Entry points without a `LocalSize` execution mode get a
+/// workgroup size of `(0, 0, 0)`; wgpu only uses that field on Metal anyway.
+fn spirv_entry_points(words: &[u32]) -> Vec<wgpu::PassthroughShaderEntryPoint<'static>> {
+    const HEADER_LEN: usize = 5;
+    const OP_ENTRY_POINT: u32 = 15;
+    const OP_EXECUTION_MODE: u32 = 16;
+    const EXECUTION_MODE_LOCAL_SIZE: u32 = 17;
+
+    // (function id, name)
+    let mut entry_points: Vec<(u32, String)> = Vec::new();
+    // (function id, workgroup size)
+    let mut local_sizes: Vec<(u32, (u32, u32, u32))> = Vec::new();
+
+    let mut i = HEADER_LEN;
+    while i < words.len() {
+        let word_count = (words[i] >> 16) as usize;
+        let opcode = words[i] & 0xffff;
+        if word_count == 0 {
+            break; // Malformed module; stop rather than loop forever.
+        }
+        let end = (i + word_count).min(words.len());
+
+        match opcode {
+            // OpEntryPoint: execution model, function id, literal name, interface ids...
+            OP_ENTRY_POINT if word_count >= 4 => {
+                let function_id = words[i + 2];
+                let bytes: Vec<u8> = words[i + 3..end]
+                    .iter()
+                    .flat_map(|w| w.to_le_bytes())
+                    .collect();
+                let len = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+                let name = String::from_utf8_lossy(&bytes[..len]).into_owned();
+                entry_points.push((function_id, name));
+            }
+            // OpExecutionMode: function id, mode, literals... (LocalSize has x, y, z)
+            OP_EXECUTION_MODE if word_count >= 6 && words[i + 2] == EXECUTION_MODE_LOCAL_SIZE => {
+                local_sizes.push((words[i + 1], (words[i + 3], words[i + 4], words[i + 5])));
+            }
+            _ => {}
+        }
+
+        i = end;
+    }
+
+    entry_points
+        .into_iter()
+        .map(|(function_id, name)| wgpu::PassthroughShaderEntryPoint {
+            name: Cow::Owned(name),
+            workgroup_size: local_sizes
+                .iter()
+                .find(|(id, _)| *id == function_id)
+                .map(|(_, size)| *size)
+                .unwrap_or((0, 0, 0)),
+        })
+        .collect()
+}
+
+/// Errors specific to the WebGPU backend.
+#[derive(thiserror::Error, Debug)]
+pub enum WebGpuBackendError {
+    #[error(transparent)]
+    ShaderArg(#[from] ShaderArgsError),
+    // #[error(transparent)]
+    // Wgpu(#[from] wgpu::Error), // Doesn't implement Send+Sync
+    #[error(transparent)]
+    BytemuckPod(#[from] bytemuck::PodCastError),
+    #[error("Failed to read buffer from GPU: {0}")]
+    BufferRead(RecvError),
+    #[error(transparent)]
+    DevicePoll(#[from] PollError),
+    #[error(transparent)]
+    Recv(#[from] RecvError),
+    #[error(transparent)]
+    MapRange(#[from] wgpu::MapRangeError),
+    #[error("Failed to parse SPIR-V: {0}")]
+    SpirVParse(String),
+    #[error("Naga validation failed: {0}")]
+    NagaValidation(String),
+    #[error("Failed to write WGSL: {0}")]
+    WgslWrite(String),
+}
+
+impl Backend for WebGpu {
+    const NAME: &'static str = "webgpu";
+    const TARGET: super::CompileTarget = super::CompileTarget::Wgsl;
+
+    type Error = WebGpuBackendError;
+    type Buffer<T: DeviceValue> = Buffer;
+    type BufferSlice<'b, T: DeviceValue> = WebGpuBufferSlice<'b>;
+    type Encoder = WebGpuEncoder;
+    type Pass = WebGpuPass;
+    type Timestamps = WebGpuTimestamps;
+    type Module = WebGpuModule;
+    type Function = WebGpuFunction;
+    type Dispatch<'a> = WebGpuDispatch<'a>;
+
+    fn as_webgpu(&self) -> Option<&WebGpu> {
+        Some(self)
+    }
+
+    /*
+     * Module/function loading.
+     */
+    fn load_module(&self, data: &str) -> Result<Self::Module, Self::Error> {
+        // HACK: do we still need this hack? (probably not, that was needed when we relied on Slang).
+        let mut data = data.replace("enable f16;", "").replace("f16", "f32");
+
+        // Apply other user-defined hacks.
+        for (reg, replace) in &self.hacks {
+            data = reg.replace_all(&data, replace).to_string();
+        }
+
+        let shader_module = unsafe {
+            self.device.create_shader_module_trusted(
+                wgpu::ShaderModuleDescriptor {
+                    label: None,
+                    source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(&data)),
+                },
+                shader_runtime_checks(),
+            )
+        };
+
+        #[cfg(feature = "push_constants")]
+        {
+            // For WGSL, we don't extract bindings - push constants mode uses SPIR-V
+            Ok(WebGpuModule {
+                module: shader_module,
+                bindings: Vec::new(),
+            })
+        }
+
+        #[cfg(not(feature = "push_constants"))]
+        Ok(shader_module)
+    }
+
+    fn load_module_bytes(&self, bytes: &[u8]) -> Result<Self::Module, Self::Error> {
+        // Check for SPIR-V magic number (0x07230203) at the start
+        if bytes.len() >= 4 {
+            let magic = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            if magic == 0x07230203 {
+                return self.load_module_spirv(bytes);
+            }
+        }
+        self.load_module(str::from_utf8(bytes).unwrap())
+    }
+
+    fn load_function(
+        &self,
+        module: &Self::Module,
+        entry_point: &str,
+        push_constant_size: u32,
+    ) -> Result<Self::Function, Self::Error> {
+        // Use empty layout info - will use auto-generated layouts
+        self.load_function_with_layouts(
+            module,
+            entry_point,
+            push_constant_size,
+            &BindGroupLayoutInfo::default(),
+        )
+    }
+
+    fn load_function_with_layouts(
+        &self,
+        module: &Self::Module,
+        entry_point: &str,
+        push_constant_size: u32,
+        layouts: &BindGroupLayoutInfo,
+    ) -> Result<Self::Function, Self::Error> {
+        // Create bind group layouts from the provided layout info
+        let bind_group_layouts: Vec<BindGroupLayout> = layouts
+            .groups
+            .iter()
+            .enumerate()
+            .map(|(set_idx, bindings)| {
+                let entries: Vec<BindGroupLayoutEntry> = bindings
+                    .iter()
+                    .map(|binding| BindGroupLayoutEntry {
+                        binding: binding.index,
+                        visibility: ShaderStages::COMPUTE,
+                        ty: match binding.descriptor_type {
+                            DescriptorType::Uniform => BindingType::Buffer {
+                                ty: BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            DescriptorType::Storage { read_only } => BindingType::Buffer {
+                                ty: BufferBindingType::Storage { read_only },
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                        },
+                        count: None,
+                    })
+                    .collect();
+
+                self.device
+                    .create_bind_group_layout(&BindGroupLayoutDescriptor {
+                        label: Some(&format!("{}:set{}", entry_point, set_idx)),
+                        entries: &entries,
+                    })
+            })
+            .collect();
+
+        // Create pipeline layout if we have explicit bind group layouts
+        let (shader_module, pipeline_layout) = if !bind_group_layouts.is_empty() {
+            let layout_refs: Vec<_> = bind_group_layouts.iter().map(Some).collect();
+
+            let layout = self
+                .device
+                .create_pipeline_layout(&PipelineLayoutDescriptor {
+                    label: Some(entry_point),
+                    bind_group_layouts: &layout_refs,
+                    immediate_size: push_constant_size,
+                });
+
+            #[cfg(feature = "push_constants")]
+            let sm = &module.module;
+            #[cfg(not(feature = "push_constants"))]
+            let sm = module;
+
+            (sm, Some(layout))
+        } else {
+            // No explicit layouts - let wgpu auto-generate from shader
+            #[cfg(feature = "push_constants")]
+            let sm = &module.module;
+            #[cfg(not(feature = "push_constants"))]
+            let sm = module;
+
+            let _ = push_constant_size;
+            (sm, None)
+        };
+
+        let pipeline = self
+            .device
+            .create_compute_pipeline(&ComputePipelineDescriptor {
+                label: Some(entry_point),
+                layout: pipeline_layout.as_ref(),
+                module: shader_module,
+                entry_point: Some(entry_point),
+                compilation_options: PipelineCompilationOptions {
+                    zero_initialize_workgroup_memory: false,
+                    ..Default::default()
+                },
+                cache: None,
+            });
+
+        Ok(WebGpuFunction {
+            pipeline,
+            bind_group_layouts: Arc::new(bind_group_layouts),
+        })
+    }
+
+    /*
+     * Kernel dispatch.
+     */
+    fn begin_encoding(&self) -> Self::Encoder {
+        WebGpuEncoder {
+            encoder: self
+                .device
+                .create_command_encoder(&CommandEncoderDescriptor::default()),
+            device: self.device.clone(),
+            #[cfg(target_arch = "wasm32")]
+            open_pass: Default::default(),
+        }
+    }
+
+    fn begin_dispatch<'a>(
+        &'a self,
+        pass: &'a mut Self::Pass,
+        function: &'a Self::Function,
+    ) -> WebGpuDispatch<'a> {
+        pass.begin_dispatch(function)
+    }
+
+    fn submit(&self, encoder: Self::Encoder) -> Result<(), Self::Error> {
+        #[cfg(target_arch = "wasm32")]
+        let mut encoder = encoder;
+        #[cfg(target_arch = "wasm32")]
+        encoder.close_open_pass();
+        #[cfg(target_arch = "wasm32")]
+        perf_counters::SUBMITS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        let _ = self.queue.submit(Some(encoder.encoder.finish()));
+        Ok(())
+    }
+
+    /*
+     * Buffer handling.
+     */
+    fn init_buffer<T: DeviceValue + NoUninit>(
+        &self,
+        data: &[T],
+        mut usage: BufferUsages,
+    ) -> Result<Self::Buffer<T>, Self::Error> {
+        if self.force_buffer_copy_src && !usage.contains(BufferUsages::MAP_READ) {
+            usage |= BufferUsages::COPY_SRC;
+        }
+
+        Ok(self.device.create_buffer_init(&BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::try_cast_slice(data)?,
+            usage: usage.into(),
+        }))
+    }
+
+    // fn init_buffer_bytes<T: Copy>(&self, data: &[u8], usage: BufferUsages) -> Result<Self::Buffer<T>, Self::Error> {
+    //     Ok(self.device.create_buffer_init(&BufferInitDescriptor {
+    //         label: None,
+    //         contents: data,
+    //         usage,
+    //     }))
+    // }
+
+    fn uninit_buffer<T: DeviceValue + NoUninit>(
+        &self,
+        len: usize,
+        mut usage: BufferUsages,
+    ) -> Result<Self::Buffer<T>, Self::Error> {
+        if self.force_buffer_copy_src && !usage.contains(BufferUsages::MAP_READ) {
+            usage |= BufferUsages::COPY_SRC;
+        }
+
+        let bytes_len = std::mem::size_of::<T>() as u64 * len as u64;
+        Ok(self.device.create_buffer(&BufferDescriptor {
+            label: None,
+            size: bytes_len,
+            usage: usage.into(),
+            mapped_at_creation: false,
+        }))
+    }
+
+    fn write_buffer<T: DeviceValue + NoUninit>(
+        &self,
+        buffer: &mut Self::Buffer<T>,
+        offset: u64,
+        data: &[T],
+    ) -> Result<(), Self::Error> {
+        #[cfg(target_arch = "wasm32")]
+        perf_counters::WRITES.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        let elt_sz = std::mem::size_of::<T>() as u64;
+        self.queue
+            .write_buffer(buffer, offset * elt_sz, bytemuck::cast_slice(data));
+        Ok(())
+    }
+
+    fn synchronize(&self) -> Result<(), Self::Error> {
+        self.device.poll(wgpu::PollType::wait_indefinitely())?;
+        Ok(())
+    }
+
+    fn poll(&self) {
+        // Non-blocking: process completed work and fire map callbacks.
+        let _ = self.device.poll(wgpu::PollType::Poll);
+    }
+
+    async fn read_buffer<T: MaybeSendSync + DeviceValue + AnyBitPattern>(
+        &self,
+        buffer: &Self::Buffer<T>,
+        out: &mut [T],
+    ) -> Result<(), Self::Error> {
+        let data = read_bytes(&self.device, buffer).await?;
+        let out_bytes = core::mem::size_of_val(out);
+        let copy_len = data.len().min(out_bytes);
+
+        #[allow(dead_code)]
+        if false {
+            // NOTE: we keep this (but don’t actually run it) as a safeguad to
+            //       ensure we don’t mistakenly remove the AnyBitPattern trait
+            //       bound on T, which is required for soundness of the `copy_nonoverlapping`
+            //       below.
+            let _ = bytemuck::try_cast_slice::<_, T>(&data[..copy_len])?;
+        }
+        // SAFETY:
+        // - `out` is valid, aligned, and large enough for `copy_len` bytes
+        // - `T: AnyBitPattern` guarantees any byte pattern is a valid `T`
+        // - Source and destination do not overlap (GPU mapped memory vs heap)
+        // We don’t just use bytemuck::cast_slice because the `data` view might
+        // not have the necessary alignment in all platforms.
+        unsafe {
+            core::ptr::copy_nonoverlapping(data.as_ptr(), out.as_mut_ptr() as *mut u8, copy_len);
+        }
+        drop(data);
+        buffer.unmap();
+        Ok(())
+    }
+
+    async fn slow_read_buffer<T: MaybeSendSync + DeviceValue + AnyBitPattern>(
+        &self,
+        buffer: &Self::Buffer<T>,
+        out: &mut [T],
+    ) -> Result<(), Self::Error> {
+        // Reuse a pooled staging buffer of the exact size to avoid a `create_buffer`/drop
+        // round-trip on every read (especially expensive on Metal).
+        let bytes_len = buffer.size();
+        let staging = self.acquire_read_staging(bytes_len);
+        let mut encoder = self.begin_encoding();
+        encoder
+            .encoder
+            .copy_buffer_to_buffer(buffer, 0, &staging, 0, bytes_len);
+        self.submit(encoder)?;
+
+        // `read_buffer` does the map_async + memcpy + unmap. After this call
+        // the staging buffer is back in `MAP_READ | COPY_DST` ready state and
+        // safe to return to the pool.
+        let result = self.read_buffer(&staging, out).await;
+        self.release_read_staging(bytes_len, staging);
+        result
+    }
+}
+
+impl Encoder<WebGpu> for WebGpuEncoder {
+    fn begin_pass(&mut self, label: &str, timestamps: Option<&mut WebGpuTimestamps>) -> WebGpuPass {
+        let mut desc = wgpu::ComputePassDescriptor {
+            label: (!label.is_empty()).then_some(label),
+            timestamp_writes: None,
+        };
+
+        let mut wants_timestamps = false;
+        if let Some(timestamps) = timestamps
+            && let Some((begin_idx, end_idx)) = timestamps.alloc_timestamp_pair(label.to_string())
+        {
+            desc.timestamp_writes = Some(wgpu::ComputePassTimestampWrites {
+                query_set: &timestamps.query_set,
+                beginning_of_pass_write_index: Some(begin_idx),
+                end_of_pass_write_index: Some(end_idx),
+            });
+            wants_timestamps = true;
+        }
+
+        // wasm pass-merging: reuse the cached open pass (per-pass timestamps
+        // force a dedicated pass, so those bypass the cache).
+        #[cfg(target_arch = "wasm32")]
+        if !wants_timestamps {
+            let cached = self.open_pass.borrow_mut().take();
+            let pass = cached.unwrap_or_else(|| {
+                perf_counters::PASSES.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+                self.encoder.begin_compute_pass(&desc).forget_lifetime()
+            });
+            return WebGpuPass {
+                pass: Some(pass),
+                device: self.device.clone(),
+                home: Some(self.open_pass.clone()),
+            };
+        }
+        #[cfg(target_arch = "wasm32")]
+        if wants_timestamps {
+            self.close_open_pass();
+        }
+        let _ = wants_timestamps;
+
+        WebGpuPass {
+            pass: Some(self.encoder.begin_compute_pass(&desc).forget_lifetime()),
+            device: self.device.clone(),
+            #[cfg(target_arch = "wasm32")]
+            home: None,
+        }
+    }
+
+    fn copy_buffer_to_buffer<T: DeviceValue + NoUninit>(
+        &mut self,
+        source: &<WebGpu as Backend>::Buffer<T>,
+        source_offset: usize,
+        target: &mut <WebGpu as Backend>::Buffer<T>,
+        target_offset: usize,
+        copy_len: usize,
+    ) -> Result<(), WebGpuBackendError> {
+        // Copies are encoder-level commands: the merged pass must end first.
+        #[cfg(target_arch = "wasm32")]
+        self.close_open_pass();
+        #[cfg(target_arch = "wasm32")]
+        perf_counters::COPIES.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        wgpu::CommandEncoder::copy_buffer_to_buffer(
+            &mut self.encoder,
+            source,
+            source_offset as BufferAddress * size_of::<T>() as BufferAddress,
+            target,
+            target_offset as BufferAddress * size_of::<T>() as BufferAddress,
+            copy_len as BufferAddress * size_of::<T>() as BufferAddress,
+        );
+        Ok(())
+    }
+}
+
+impl<'a> Dispatch<'a, WebGpu> for WebGpuDispatch<'a> {
+    #[cfg(feature = "push_constants")]
+    fn set_push_constants(&mut self, data: &[u8]) {
+        self.push_constants.clear();
+        self.push_constants.extend_from_slice(data);
+    }
+
+    // NOTE: the block_dim is configured in the shader…
+    fn launch<'b>(
+        self,
+        grid: impl Into<DispatchGrid<'b, WebGpu>>,
+        _block_dim: [u32; 3],
+    ) -> Result<(), WebGpuBackendError> {
+        if !self.launchable {
+            return Ok(());
+        }
+
+        self.pass.set_pipeline(&self.pipeline);
+
+        // Set push constants if enabled and data is present.
+        #[cfg(feature = "push_constants")]
+        if !self.push_constants.is_empty() {
+            self.pass.set_immediates(0, &self.push_constants);
+        }
+
+        // Group bindings by descriptor set (space) and create bind groups.
+        // Use pre-created layouts if available, otherwise query the pipeline.
+        if !self.bind_group_layouts.is_empty() {
+            // Use pre-created bind group layouts from ShaderArgs
+            for (space, layout) in self.bind_group_layouts.iter().enumerate() {
+                let entries: SmallVec<[_; 10]> = self
+                    .args
+                    .iter()
+                    .filter(|(binding, _)| binding.space == space as u32)
+                    .map(|(binding, input)| wgpu::BindGroupEntry {
+                        binding: binding.index,
+                        resource: (*input).into(),
+                    })
+                    .collect();
+
+                let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout,
+                    entries: &entries,
+                });
+                self.pass.set_bind_group(space as u32, &bind_group, &[]);
+            }
+        } else {
+            // Fallback: query bind group layouts from the pipeline (auto-generated)
+            let mut spaces: SmallVec<[u32; 4]> =
+                self.args.iter().map(|(binding, _)| binding.space).collect();
+            spaces.sort();
+            spaces.dedup();
+
+            for space in spaces {
+                let entries: SmallVec<[_; 10]> = self
+                    .args
+                    .iter()
+                    .filter(|(binding, _)| binding.space == space)
+                    .map(|(binding, input)| wgpu::BindGroupEntry {
+                        binding: binding.index,
+                        resource: (*input).into(),
+                    })
+                    .collect();
+
+                // Try to get the bind group layout from the pipeline.
+                let pipeline = &self.pipeline;
+                let layout_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    pipeline.get_bind_group_layout(space)
+                }));
+
+                if let Ok(layout) = layout_result {
+                    let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: None,
+                        layout: &layout,
+                        entries: &entries,
+                    });
+                    self.pass.set_bind_group(space, &bind_group, &[]);
+                }
+            }
+        }
+
+        // WebGPU caps each workgroup-grid dimension at 65535; wgpu's own
+        // validation error doesn't say WHICH dispatch — name it here.
+        let check_grid = |grid_dim: [u32; 3]| {
+            if grid_dim.iter().any(|&d| d > 65535) {
+                panic!(
+                    "dispatch grid {grid_dim:?} exceeds WebGPU's 65535 per-dimension \
+                     workgroup cap (a flattened dispatch that needs a 2D split?)"
+                );
+            }
+        };
+        match grid.into() {
+            DispatchGrid::Grid(grid_dim) => {
+                // NOTE: we don't need to queue if the workgroup is empty.
+                if grid_dim[0] * grid_dim[1] * grid_dim[2] > 0 {
+                    check_grid(grid_dim);
+                    self.pass
+                        .dispatch_workgroups(grid_dim[0], grid_dim[1], grid_dim[2]);
+                }
+            }
+            DispatchGrid::ThreadCount(threads) => {
+                let grid_dim = [
+                    threads[0].div_ceil(_block_dim[0]),
+                    threads[1].div_ceil(_block_dim[1]),
+                    threads[2].div_ceil(_block_dim[2]),
+                ];
+                if grid_dim[0] * grid_dim[1] * grid_dim[2] > 0 {
+                    check_grid(grid_dim);
+                    self.pass
+                        .dispatch_workgroups(grid_dim[0], grid_dim[1], grid_dim[2]);
+                }
+            }
+            DispatchGrid::Indirect(grid_indirect) => {
+                self.pass.dispatch_workgroups_indirect(grid_indirect, 0);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Collects bind group entries and launches a WebGPU compute dispatch.
+pub struct WebGpuDispatch<'a> {
+    // NOTE: keep up to 10 bindings on the stack. This number was chosen to match
+    //       the current (06/2025) max storage bindings on the browser.
+    device: Device,
+    pass: &'a mut ComputePass<'static>,
+    pipeline: ComputePipeline,
+    /// Pre-created bind group layouts from ShaderArgs. Empty means use auto-generated layouts.
+    bind_group_layouts: Arc<Vec<BindGroupLayout>>,
+    pub(crate) args: SmallVec<[(ShaderBinding, WebGpuBufferSlice<'a>); 10]>,
+    launchable: bool,
+    #[cfg(feature = "push_constants")]
+    push_constants: SmallVec<[u8; 128]>,
+}
+
+impl<'a> WebGpuDispatch<'a> {
+    fn new(
+        device: &Device,
+        pass: &'a mut ComputePass<'static>,
+        function: &WebGpuFunction,
+    ) -> WebGpuDispatch<'a> {
+        WebGpuDispatch {
+            device: device.clone(),
+            pass,
+            pipeline: function.pipeline.clone(),
+            bind_group_layouts: function.bind_group_layouts.clone(),
+            args: SmallVec::default(),
+            launchable: true,
+            #[cfg(feature = "push_constants")]
+            push_constants: SmallVec::default(),
+        }
+    }
+}
+
+/// Extension trait for creating labeled compute passes from a command encoder.
+#[allow(dead_code)]
+pub trait CommandEncoderExt {
+    /// Begins a labeled compute pass.
+    fn compute_pass<'encoder>(&'encoder mut self, label: &str) -> ComputePass<'encoder>;
+}
+
+impl CommandEncoderExt for CommandEncoder {
+    fn compute_pass<'encoder>(&'encoder mut self, label: &str) -> ComputePass<'encoder> {
+        let desc = ComputePassDescriptor {
+            label: Some(label),
+            timestamp_writes: None,
+        };
+        self.begin_compute_pass(&desc)
+    }
+}
+
+impl CommandEncoderExt for WebGpuEncoder {
+    fn compute_pass<'encoder>(&'encoder mut self, label: &str) -> ComputePass<'encoder> {
+        self.encoder.compute_pass(label)
+    }
+}
+
+async fn read_bytes(device: &Device, buffer: &Buffer) -> Result<BufferView, WebGpuBackendError> {
+    let buffer_slice = buffer.slice(..);
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let (sender, receiver) = async_channel::bounded(1);
+        #[cfg(target_arch = "wasm32")]
+        {
+            perf_counters::MAPS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        }
+        buffer_slice.map_async(wgpu::MapMode::Read, move |v| {
+            sender.send_blocking(v).unwrap()
+        });
+        device.poll(wgpu::PollType::wait_indefinitely())?;
+        receiver
+            .recv()
+            .await
+            .map_err(WebGpuBackendError::BufferRead)?
+            .unwrap();
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let (sender, receiver) = async_channel::bounded(1);
+        #[cfg(target_arch = "wasm32")]
+        {
+            perf_counters::MAPS.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+        }
+        buffer_slice.map_async(wgpu::MapMode::Read, move |v| {
+            let _ = sender.force_send(v).unwrap();
+        });
+        device.poll(wgpu::PollType::wait_indefinitely())?;
+        receiver.recv().await?.unwrap();
+    }
+
+    let data = buffer_slice.get_mapped_range()?;
+    Ok(data)
+}
+
+impl<T: DeviceValue> crate::backend::Buffer<WebGpu, T> for Buffer {
+    fn is_empty(&self) -> bool {
+        self.size() == 0
+    }
+
+    fn len(&self) -> usize
+    where
+        T: Sized,
+    {
+        self.size() as usize / std::mem::size_of::<T>()
+    }
+
+    fn slice(&self, range: impl RangeBounds<usize>) -> <WebGpu as Backend>::BufferSlice<'_, T> {
+        let elem_size = std::mem::size_of::<T>() as u64;
+        let start_bytes = match range.start_bound() {
+            std::ops::Bound::Included(&val) => val as u64 * elem_size,
+            std::ops::Bound::Unbounded => 0,
+            _ => unreachable!(),
+        };
+        let end_bytes = match range.end_bound() {
+            std::ops::Bound::Excluded(&val) => val as u64 * elem_size,
+            std::ops::Bound::Included(&val) => (val as u64 + 1) * elem_size,
+            std::ops::Bound::Unbounded => self.size(),
+        };
+        WebGpuBufferSlice {
+            inner: self.slice(start_bytes..end_bytes),
+            byte_len: end_bytes - start_bytes,
+        }
+    }
+
+    fn usage(&self) -> BufferUsages {
+        self.usage().into()
+    }
+}
+
+/// WebGPU timestamp query manager for profiling compute passes.
+/// State of a non-blocking timestamp readback initiated by
+/// [`WebGpuTimestamps::request_read`].
+enum TimestampReadState {
+    /// No readback in flight.
+    Idle,
+    /// A readback was requested for a frame that recorded no passes.
+    Empty,
+    /// A buffer map is in flight; `rx` fires once the GPU has finished and the
+    /// staging buffer is mapped.
+    Pending {
+        rx: async_channel::Receiver<Result<(), wgpu::BufferAsyncError>>,
+        query_count: u32,
+    },
+}
+
+pub struct WebGpuTimestamps {
+    query_set: wgpu::QuerySet,
+    resolve_buffer: wgpu::Buffer,
+    staging_buffer: wgpu::Buffer,
+    capacity: u32,
+    next_index: u32,
+    labels: Vec<String>,
+    timestamp_period: f32,
+    read_state: TimestampReadState,
+}
+
+impl WebGpuTimestamps {
+    /// Creates a new timestamp query manager with room for `capacity` timed passes.
+    /// Returns `None` if the device does not support timestamp queries.
+    pub fn new(backend: &WebGpu, capacity: u32) -> Option<Self> {
+        if !backend.timestamp_supported {
+            return None;
+        }
+        let query_count = capacity * 2; // begin + end per pass
+        let query_set = backend.device.create_query_set(&wgpu::QuerySetDescriptor {
+            label: Some("gpu_timestamps"),
+            ty: wgpu::QueryType::Timestamp,
+            count: query_count,
+        });
+        let resolve_buffer_size = (query_count as u64) * std::mem::size_of::<u64>() as u64;
+        let resolve_buffer = backend.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("gpu_timestamps_resolve"),
+            size: resolve_buffer_size,
+            usage: wgpu::BufferUsages::QUERY_RESOLVE | wgpu::BufferUsages::COPY_SRC,
+            mapped_at_creation: false,
+        });
+        let staging_buffer = backend.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("gpu_timestamps_staging"),
+            size: resolve_buffer_size,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let timestamp_period = backend.queue.get_timestamp_period();
+        Some(WebGpuTimestamps {
+            query_set,
+            resolve_buffer,
+            staging_buffer,
+            capacity,
+            next_index: 0,
+            labels: Vec::with_capacity(capacity as usize),
+            timestamp_period,
+            read_state: TimestampReadState::Idle,
+        })
+    }
+
+    /// Resets the query manager for a new frame.
+    pub fn reset(&mut self) {
+        self.next_index = 0;
+        self.labels.clear();
+        self.read_state = TimestampReadState::Idle;
+    }
+
+    /// Whether no non-blocking readback is in flight (safe to record + resolve a
+    /// new frame). While a [`request_read`](Self::request_read) is pending, the
+    /// staging buffer is mapped, so resolving into it again would be invalid.
+    pub fn is_idle(&self) -> bool {
+        matches!(self.read_state, TimestampReadState::Idle)
+    }
+
+    /// Resolves timestamp queries to a buffer and copies to staging for readback.
+    pub fn resolve(&self, encoder: &mut WebGpuEncoder) {
+        if self.next_index == 0 {
+            // Nothing to resolve.
+            return;
+        }
+
+        let query_count = self.next_index * 2;
+        encoder
+            .encoder
+            .resolve_query_set(&self.query_set, 0..query_count, &self.resolve_buffer, 0);
+        let copy_size = query_count as u64 * std::mem::size_of::<u64>() as u64;
+        encoder.encoder.copy_buffer_to_buffer(
+            &self.resolve_buffer,
+            0,
+            &self.staging_buffer,
+            0,
+            copy_size,
+        );
+    }
+
+    /// Reads back timestamp results after GPU synchronization.
+    pub async fn read(&self, backend: &WebGpu) -> Result<Vec<GpuTimestamp>, GpuBackendError> {
+        if self.next_index == 0 {
+            return Ok(Vec::new());
+        }
+        let query_count = self.next_index * 2;
+        let mut raw_timestamps = vec![0u64; query_count as usize];
+        // Map and read the staging buffer.
+        {
+            use crate::backend::webgpu::WebGpuBackendError;
+            let buffer_slice = self.staging_buffer.slice(..);
+            let (sender, receiver) = async_channel::bounded(1);
+            buffer_slice.map_async(wgpu::MapMode::Read, move |v| {
+                let _ = sender.force_send(v).unwrap();
+            });
+            backend
+                .device()
+                .poll(wgpu::PollType::wait_indefinitely())
+                .map_err(WebGpuBackendError::from)?;
+            receiver
+                .recv()
+                .await
+                .map_err(WebGpuBackendError::from)?
+                .unwrap();
+            let data = buffer_slice
+                .get_mapped_range()
+                .map_err(WebGpuBackendError::from)?;
+            let bytes = &*data;
+            // SAFETY: u64 is AnyBitPattern and we ensured the buffer is large enough.
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    bytes.as_ptr(),
+                    raw_timestamps.as_mut_ptr() as *mut u8,
+                    bytes
+                        .len()
+                        .min(raw_timestamps.len() * std::mem::size_of::<u64>()),
+                );
+            }
+            drop(data);
+            self.staging_buffer.unmap();
+        }
+
+        Ok(self.durations_from_raw(&raw_timestamps))
+    }
+
+    /// Initiates a non-blocking readback of the resolved timestamps.
+    ///
+    /// Call once after the frame's passes have been submitted (and after
+    /// [`resolve`](Self::resolve)). This issues an asynchronous buffer map and
+    /// returns immediately without blocking on the GPU. Poll for completion
+    /// with [`try_take`](Self::try_take).
+    pub fn request_read(&mut self) {
+        if self.next_index == 0 {
+            self.read_state = TimestampReadState::Empty;
+            return;
+        }
+        let query_count = self.next_index * 2;
+        let (sender, receiver) = async_channel::bounded(1);
+        self.staging_buffer
+            .slice(..)
+            .map_async(wgpu::MapMode::Read, move |v| {
+                let _ = sender.force_send(v);
+            });
+        self.read_state = TimestampReadState::Pending {
+            rx: receiver,
+            query_count,
+        };
+    }
+
+    /// Non-blocking poll of a readback started by [`request_read`](Self::request_read).
+    ///
+    /// Returns `Some(results)` once the GPU work has completed and the staging
+    /// buffer is mapped; `None` while still in flight. The caller must drive
+    /// completion by polling the device (see [`WebGpu::poll`]).
+    pub fn try_take(&mut self) -> Option<Vec<GpuTimestamp>> {
+        match std::mem::replace(&mut self.read_state, TimestampReadState::Idle) {
+            TimestampReadState::Idle => None,
+            TimestampReadState::Empty => Some(Vec::new()),
+            TimestampReadState::Pending { rx, query_count } => match rx.try_recv() {
+                Ok(Ok(())) => {
+                    let mut raw = vec![0u64; query_count as usize];
+                    let buffer_slice = self.staging_buffer.slice(..);
+                    let Ok(data) = buffer_slice.get_mapped_range() else {
+                        self.staging_buffer.unmap();
+                        return Some(Vec::new());
+                    };
+                    // SAFETY: u64 is AnyBitPattern; we copy at most the smaller
+                    // of the mapped range and our destination.
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(
+                            data.as_ptr(),
+                            raw.as_mut_ptr() as *mut u8,
+                            data.len().min(raw.len() * std::mem::size_of::<u64>()),
+                        );
+                    }
+                    drop(data);
+                    self.staging_buffer.unmap();
+                    Some(self.durations_from_raw(&raw))
+                }
+                // Map failed: report no results rather than stalling the caller.
+                Ok(Err(_)) | Err(async_channel::TryRecvError::Closed) => Some(Vec::new()),
+                // Not ready yet: keep the pending state and report back later.
+                Err(async_channel::TryRecvError::Empty) => {
+                    self.read_state = TimestampReadState::Pending { rx, query_count };
+                    None
+                }
+            },
+        }
+    }
+
+    /// Converts raw `(begin, end)` tick pairs into labeled millisecond durations.
+    fn durations_from_raw(&self, raw: &[u64]) -> Vec<GpuTimestamp> {
+        let period_ms = self.timestamp_period as f64 / 1_000_000.0;
+        self.labels
+            .iter()
+            .enumerate()
+            .map(|(i, label)| {
+                let begin = raw[i * 2];
+                let end = raw[i * 2 + 1];
+                let duration_ms = (end.wrapping_sub(begin)) as f64 * period_ms;
+                GpuTimestamp {
+                    label: label.clone(),
+                    duration_ms,
+                }
+            })
+            .collect()
+    }
+
+    /// Allocates a begin/end timestamp pair for a labeled pass.
+    /// Returns `None` if there is not enough room for the extra pair.
+    pub fn alloc_timestamp_pair(&mut self, label: String) -> Option<(u32, u32)> {
+        if self.next_index < self.capacity {
+            let begin_idx = self.next_index * 2;
+            let end_idx = begin_idx + 1;
+            self.next_index += 1;
+            self.labels.push(label);
+            Some((begin_idx, end_idx))
+        } else {
+            None
+        }
+    }
+}

@@ -1,0 +1,325 @@
+{
+  "version": 1,
+  "date": "2026-11-14",
+  "rubric": "visual-polish-rubric.json",
+  "score": 92,
+  "maximum": 100,
+  "target_exclusive": 90,
+  "passed": true,
+  "evaluator": "Model visual judgment from original rendered screenshots and instrumented interaction, not a human usability study.",
+  "scope": "Visual clarity of Robot setup, Operate, Record and Replay; preserve supported behavior.",
+  "previous_score_note": "The earlier 95/100 report emphasized functional workflow. Its visual assessment was rejected by the user; this separate rubric prioritizes rendered visual quality and text density.",
+  "dimensions": [
+    {
+      "id": "visual_hierarchy",
+      "score": 28,
+      "maximum": 30,
+      "evidence": "Selected source is a compact segment; primary task actions are blue, Stop is red. Sidebar and auxiliary actions are quieter.",
+      "deduction": "Replay still exposes several specialized controls in its toolbar."
+    },
+    {
+      "id": "text_density",
+      "score": 23,
+      "maximum": 25,
+      "evidence": "Default setup has no long guide paragraphs. Help and diagnostics are disclosures. Nano capability limits remain a single visible line.",
+      "deduction": "Physical rig configuration and calibration still contain technical terminology."
+    },
+    {
+      "id": "workspace_and_spacing",
+      "score": 18,
+      "maximum": 20,
+      "evidence": "Simulation uses the full model area; real setup has a narrower default inspector. Recording actions occupy a single 32 px row. Camera framing adapts to panel geometry.",
+      "deduction": "At minimum width the physical rig form occupies substantial vertical space; camera aspect ratios leave unused margins."
+    },
+    {
+      "id": "controls_and_typography",
+      "score": 14,
+      "maximum": 15,
+      "evidence": "PingFang retained; compact flat controls have centered labels and explicit focus/disabled states. Essential controls fit both sizes and themes.",
+      "deduction": "Some icon-only panel controls lack hover explanations."
+    },
+    {
+      "id": "interaction_continuity",
+      "score": 9,
+      "maximum": 10,
+      "evidence": "Actual-input simulation record/save/replay, real-device error handling, help, panel maximize/restore and an extra native replay window passed.",
+      "deduction": "A complete keyboard-only journey was not repeated in this visual pass."
+    }
+  ],
+  "hard_gates": [
+    {
+      "criterion": "Default setup has no repeated instructional paragraphs.",
+      "passed": true
+    },
+    {
+      "criterion": "A visually distinct primary action is present when applicable.",
+      "passed": true
+    },
+    {
+      "criterion": "Simulation has no permanent explanatory side panel.",
+      "passed": true
+    },
+    {
+      "criterion": "Real robot capability limits and actionable errors remain visible.",
+      "passed": true
+    },
+    {
+      "criterion": "Help and diagnostics can be expanded and dismissed.",
+      "passed": true
+    },
+    {
+      "criterion": "Primary controls fit 1024x768 and 1440x900 in both themes.",
+      "passed": true
+    },
+    {
+      "criterion": "Simulation record/save/replay and flexible layouts continue to work.",
+      "passed": true
+    }
+  ],
+  "rounds": [
+    {
+      "round": 1,
+      "score": 62,
+      "status": "baseline rejected",
+      "findings": [
+        "Duplicated top and side instructions",
+        "No clear primary action",
+        "Tall header and oversized navigation treatment"
+      ]
+    },
+    {
+      "round": 2,
+      "status": "repair required",
+      "findings": [
+        "Low contrast appearance label in light theme",
+        "Recording count wrapped below Stop",
+        "Narrow model view could crop after source/theme changes"
+      ]
+    },
+    {
+      "round": 3,
+      "score": 92,
+      "status": "pass",
+      "findings": [
+        "Text disclosures, compact actions and larger work area verified",
+        "Camera fit and zoom continuity repaired",
+        "Final original user window opened and captured"
+      ]
+    }
+  ],
+  "metrics": {
+    "same_window_size": [
+      1512,
+      902
+    ],
+    "viewport_before": [
+      216.0,
+      330.0,
+      945.9368286132812,
+      560.0
+    ],
+    "viewport_after": [
+      216.0,
+      264.5333251953125,
+      945.9368286132812,
+      625.4666748046875
+    ],
+    "viewport_height_increase_percent": 11.7,
+    "top_guidance_words_before": 45,
+    "top_guidance_words_after": 8,
+    "recording_toolbar_height": 32.0
+  },
+  "validation": {
+    "simulation": {
+      "passed": true,
+      "checks": [
+        {
+          "check": "Start simulation reaches Operate with 3 live cameras",
+          "passed": true
+        },
+        {
+          "check": "Setup preserves recording and blocks simulation shutdown",
+          "passed": true
+        },
+        {
+          "check": "Library navigation preserves recording",
+          "passed": true
+        },
+        {
+          "check": "Stop waits for every sensor frame",
+          "passed": true
+        },
+        {
+          "check": "Unsaved take survives navigation",
+          "passed": true
+        },
+        {
+          "check": "Save commits a discoverable dataset",
+          "passed": true
+        },
+        {
+          "check": "Replay loads all 17 measured joints",
+          "passed": true
+        },
+        {
+          "check": "Saved replay advances independently of the live source",
+          "passed": true
+        },
+        {
+          "check": "Discard removes only the new take and preserves saved data",
+          "passed": true
+        }
+      ],
+      "receipt": {
+        "file": "simulation/simulation-receipts.json",
+        "sha256": "8814b8bbd2907cbf37b100882b088b1d8fbf76b2560a29fcf4788f7ae32c5dfa"
+      }
+    },
+    "real_errors": {
+      "passed": true,
+      "checks": [
+        {
+          "check": "Invalid profile gives an actionable error",
+          "passed": true
+        },
+        {
+          "check": "Missing hardware is blocked before calibration",
+          "passed": true
+        },
+        {
+          "check": "Physical capture is gated by calibration",
+          "passed": true
+        },
+        {
+          "check": "Nano capabilities explicitly exclude arm calibration and cameras",
+          "passed": true
+        },
+        {
+          "check": "Nano mock base remains connected in Operate",
+          "passed": true
+        },
+        {
+          "check": "Leaving physical controls stops the base driver",
+          "passed": true
+        }
+      ],
+      "receipt": {
+        "file": "real-errors/real-errors-receipts.json",
+        "sha256": "f0e57a0e447baae2c723d7bf0f9686c449d5084c115a6fb48bd1e3055afd349d"
+      }
+    },
+    "disclosure": {
+      "passed": true,
+      "checks": [
+        "Help opens and closes without leaving setup",
+        "Advanced source and layout reset are available under More",
+        "Control help expands the full mapping while L1 release-to-stop stays visible by default"
+      ],
+      "receipt": {
+        "file": "disclosure-receipts.json",
+        "sha256": "74c9bccb521dad546047bae6a14dfae97309aa6eb4766737ecf0fe537b4ad0a7"
+      }
+    },
+    "layout": {
+      "passed": true,
+      "checks": [
+        "Simulation hides the unneeded inspector without overwriting the saved real robot layout",
+        "Replay camera maximization restores the original panel layout",
+        "Additional native replay window opens and closes while preserving the main dataset"
+      ],
+      "receipt": {
+        "file": "layout-receipts.json",
+        "sha256": "8554b356f8ecb66f4b94155ecb68c7f1bdad7f3c918c55f51c2fc0a2ef82d376"
+      }
+    },
+    "rust_tests": {
+      "passed": 55,
+      "failed": 0
+    },
+    "jit_check": {
+      "errors": 0,
+      "body_owners": 1394
+    },
+    "compile": {
+      "passed": true,
+      "note": "Existing warnings remain"
+    },
+    "dataset_audit": {
+      "passed": true,
+      "frames": 13,
+      "camera_decoded_frames": {
+        "head": 13,
+        "left_wrist": 13,
+        "right_wrist": 13
+      },
+      "joints": 17,
+      "raw_checksums_verified": 13,
+      "camera_poses_verified": 39,
+      "intrinsics": "nominal simulation values, preserved with provenance",
+      "source_clock": "continuous 200 ms steps",
+      "task_success": "not evaluated"
+    },
+    "matrices": [
+      {
+        "file": "sim-matrix-final/studio-receipts.json",
+        "sha256": "34c189b10679d6ede3fafad20efc865808dc2000a4430dfd5aca26397401ec65",
+        "captures": 16
+      },
+      {
+        "file": "real-matrix-final/studio-receipts.json",
+        "sha256": "87fb5c620935dcb473c8727b0428f5a0403430b290e028ebec29598a4e5938ed",
+        "captures": 24
+      },
+      {
+        "file": "setup-final/receipts.json",
+        "sha256": "8ffc574bc3c56425b5c65cc4ce0ed5216f123caa8ecdf51fa17f379208ea95e0",
+        "captures": 8
+      }
+    ],
+    "final_case_bounds": "All essential controls checked in both real Nano and editable arm forms at 1024x768 and 1440x900, light and dark.",
+    "screenshots": [
+      {
+        "file": "before.png",
+        "sha256": "52c17538a4d1a5ba5e91a19e45aa2b717460e491bdb61ab3a784de3ad2406b24"
+      },
+      {
+        "file": "after-user.png",
+        "sha256": "c48362d485ae2e7d08ecfbf1d39abe01af8ef34e0c4f1ca653d6b11974aac7fa"
+      },
+      {
+        "file": "record-compact-final.png",
+        "sha256": "a477448762b7f7cc6921bec05c425e5829585a39340c6dba19e51189d0ee05b4"
+      },
+      {
+        "file": "operate-final-1024.png",
+        "sha256": "516a504d418dce2fe8156814a7bd48b57c5bdd41761ed32101456610dae11c3c"
+      },
+      {
+        "file": "help-expanded.png",
+        "sha256": "c0a72090733d3c6d235638614321856e22558db2f3819f8bdf3d03feace3963c"
+      },
+      {
+        "file": "native-replay-final.png",
+        "sha256": "83642e9fbf6da81bb1c4b484501cab22d5f4a0799ad6cf26746565d9a5e35c3a"
+      },
+      {
+        "file": "setup-final/nano-1024x768-dark.png",
+        "sha256": "0bb9e9ddb1bf520a311d2cbe34f11d2f21946c28aff8a3cb40f7d2e8692b2220"
+      },
+      {
+        "file": "setup-final/nano-1024x768-light.png",
+        "sha256": "36db672fedad4f4b7e0629e7df0e93c01ce9f7137f571220141e46214a9df5ed"
+      },
+      {
+        "file": "setup-final/form-1024x768-dark.png",
+        "sha256": "f9b9c50f2798d37aec1fd2395e4acde5a1be32fb0a64609fa49f7093253335bc"
+      }
+    ]
+  },
+  "limitations": [
+    "This is a model-authored visual review, not independent user research.",
+    "Actual physical robot calibration was not performed. Existing real Nano base-only capability limits are unchanged.",
+    "The simulation dataset remains 5 fps in simulation time, not 30 fps real-time capture.",
+    "Review screenshots, telemetry and captured datasets are local artifacts kept outside tracked source. Only sanitized receipts and hashes are stored here."
+  ]
+}

@@ -1,0 +1,16 @@
+# Nano simulation, recording, Dora graph, controller, serial base and Hub transfer.
+# AISLE itself is copied from the exact source revision in release-config.json.
+dora-rs==1.0.1
+dora-rs-cli==1.0.1
+dimforge-nexus3d==0.2.1
+opencv-python-headless==5.0.0.93
+pygame==2.6.1
+pyserial==3.5
+pyyaml==6.0.3
+grpcio==1.83.1
+jsonschema==4.26.0
+numpy==2.4.6
+pillow==11.3.0
+protobuf==7.36.1
+pyarrow==23.0.1
+huggingface-hub==1.2.3

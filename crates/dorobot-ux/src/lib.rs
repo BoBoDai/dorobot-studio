@@ -40,11 +40,20 @@ use makepad_widgets::*;
 pub mod kit;
 pub mod tokens;
 
+fn ios_sheet(name: &str) -> desktop_style::StyleSheet {
+    let mut sheet = desktop_style::StyleSheet::named(name).unwrap();
+    // Install typography before framework controls inherit the theme. Keeping
+    // it in the sheet also preserves the font across appearance reloads.
+    sheet.theme.push_str(include_str!("pingfang.splash"));
+    sheet.widgets.push_str(include_str!("controls.splash"));
+    sheet
+}
+
 /// Select the iOS sheet before registering widgets, retaining an existing choice.
 pub fn install_ios(vm: &mut ScriptVm, light: bool) {
     if desktop_style::current(vm).is_none() {
         let name = if light { "ios" } else { "ios-dark" };
-        desktop_style::install(vm, desktop_style::StyleSheet::named(name).unwrap());
+        desktop_style::install(vm, ios_sheet(name));
     }
 }
 
@@ -52,10 +61,16 @@ pub fn install_ios(vm: &mut ScriptVm, light: bool) {
 pub fn sync_appearance(cx: &mut Cx, light: bool) {
     let name = if light { "ios" } else { "ios-dark" };
     let changed = cx.with_vm(|vm| {
-        if desktop_style::current(vm).is_some_and(|sheet| sheet.name == name) {
+        // Included styles can change under JIT while the appearance name stays
+        // the same. Reinstall only when their content or the appearance changes.
+        if desktop_style::current(vm).is_some_and(|sheet| {
+            sheet.name == name
+                && sheet.widgets.ends_with(include_str!("controls.splash"))
+                && sheet.theme.ends_with(include_str!("pingfang.splash"))
+        }) {
             return false;
         }
-        desktop_style::install(vm, desktop_style::StyleSheet::named(name).unwrap());
+        desktop_style::install(vm, ios_sheet(name));
         true
     });
     if changed {

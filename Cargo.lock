@@ -1910,7 +1910,7 @@ dependencies = [
 
 [[package]]
 name = "dorobot-dora-bridge"
-version = "0.1.0"
+version = "0.1.0-rc.2"
 dependencies = [
  "anyhow",
  "dorobot-types",
@@ -1921,7 +1921,47 @@ dependencies = [
 
 [[package]]
 name = "dorobot-flex"
-version = "0.1.0"
+version = "0.1.0-rc.2"
+dependencies = [
+ "dorobot-plugin-collection",
+ "dorobot-plugin-control",
+ "dorobot-studio-core",
+ "dorobot-studio-plugin",
+ "dorobot-ux",
+ "env_logger",
+ "log",
+ "makepad-urdf-player",
+ "makepad-widgets",
+ "serde_json",
+ "urdf-rs",
+]
+
+[[package]]
+name = "dorobot-plugin-collection"
+version = "0.1.0-rc.2"
+dependencies = [
+ "dorobot-studio-core",
+ "dorobot-studio-plugin",
+ "dorobot-ux",
+ "makepad-urdf-player",
+ "makepad-widgets",
+]
+
+[[package]]
+name = "dorobot-plugin-control"
+version = "0.1.0-rc.2"
+dependencies = [
+ "dorobot-studio-core",
+ "dorobot-studio-plugin",
+ "dorobot-ux",
+ "log",
+ "makepad-urdf-player",
+ "makepad-widgets",
+]
+
+[[package]]
+name = "dorobot-studio-core"
+version = "0.1.0-rc.2"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -1943,15 +1983,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "dorobot-studio-plugin"
+version = "0.1.0-rc.2"
+dependencies = [
+ "dorobot-studio-core",
+ "makepad-widgets",
+]
+
+[[package]]
 name = "dorobot-types"
-version = "0.1.0"
+version = "0.1.0-rc.2"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "dorobot-ux"
-version = "0.1.0"
+version = "0.1.0-rc.2"
 dependencies = [
  "makepad-widgets",
 ]
@@ -2103,9 +2151,9 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "ffmpeg-next"
-version = "8.1.0"
+version = "8.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7c4bd5ab1ac61f29c634df1175d350ded29cf74c3c6d4f7030431a5ae3c7d5d"
+checksum = "d658424d233cbd993a972dd73a66ca733acd12a494c68995c9ac32ae1fe65b40"
 dependencies = [
  "bitflags 2.13.1",
  "ffmpeg-sys-next",

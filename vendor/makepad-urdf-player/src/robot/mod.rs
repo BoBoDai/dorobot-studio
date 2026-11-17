@@ -23,3 +23,4 @@ pub use loader::{
     set_virtual_assets, validate_robot, LoadResult, ModelFile, ModelKind,
 };
 pub use kinematics::{ForwardKinematics, ForwardKinematicsMethods};
+pub(crate) use loader::visual_color;

@@ -30,9 +30,12 @@ def load_model(path):
     }
     if any(len(g) != 6 for g in groups.values()):
         raise ValueError("Expected five joints and one gripper per arm")
-    limits = {}
+    limits, velocities = {}, {}
     for j in joints:
         lim = j.find("limit")
+        velocities[j.get("name")] = (
+            float(lim.get("velocity", "inf")) if lim is not None else math.inf
+        )
         limits[j.get("name")] = (
             (-math.inf, math.inf)
             if j.get("type") == "continuous"
@@ -41,6 +44,7 @@ def load_model(path):
     return dict(
         names=names,
         limits=limits,
+        velocities=velocities,
         held=[n for n in names if n not in groups["left"] + groups["right"]],
         **groups,
     )
@@ -103,7 +107,28 @@ def collect(args, model):
     )
     robot = scene.add_urdf_robot(args.model, "adora_nano", True)
     scene.add_box("floor", [2, 2, 0.1], [0, 0, -0.0843], fixed=True)
-    camera = scene.add_camera((320, 240), 55, pos=(1.2, -1.2, 1.0), lookat=(0, 0, 0.35))
+    objects, object_bodies = [], []
+    if args.workspace:
+        from nano_workspace import add_workspace
+
+        objects, object_bodies = add_workspace(scene)
+    rig, camera_specs = {}, {}
+    if args.camera_rig == "nano":
+        from nano_cameras import create_rig
+
+        rig, camera_specs = create_rig(scene, robot)
+    else:
+        camera = scene.add_camera(
+            (320, 240), 55, pos=(1.2, -1.2, 1.0), lookat=(0, 0, 0.35)
+        )
+        camera_specs["front"] = dict(
+            video_key="observation.images.front",
+            source_directory="overhead",
+            resolution=[320, 240],
+            fps=10,
+            channels=["rgb"],
+            optical_calibration="external observer, not a Nano sensor",
+        )
     scene.build()
     by_offset = sorted((j.dofs_idx_local[0], j.name) for j in robot.joints if j.n_dofs)
     if any(j.n_dofs != 1 for j in robot.joints if j.n_dofs):
@@ -152,10 +177,19 @@ def collect(args, model):
         robot.set_qpos(np.zeros(17, dtype=np.float32))
         command(np.zeros(17, dtype=np.float32))
         record("nano_reset__reset_done", [1.0])
+        for spec, body in zip(objects, object_bodies):
+            body.set_pos(spec["position"])
+            body.set_quat([1, 0, 0, 0])
+            body.zero_all_dofs_velocity()
         peak_error, limit_excess = 0.0, 0.0
         measured, commanded = [], []
         for frame in range(args.frames):
-            target = motion_target(model, mode, frame / (args.frames - 1))
+            if args.workspace:
+                from nano_workspace import workspace_target
+
+                target = workspace_target(model, mode, frame / (args.frames - 1))
+            else:
+                target = motion_target(model, mode, frame / (args.frames - 1))
             step()
             if frame == 0:
                 record(
@@ -174,10 +208,33 @@ def collect(args, model):
             record("nano_limits__gripper_cmd_safe", [target[i] for i in grippers])
             step()
             q = state()
-            rgb = np.asarray(camera.render()[0], dtype=np.uint8)
-            if rgb.shape != (240, 320, 3):
-                raise ValueError(f"Unexpected rendered image shape: {rgb.shape}")
-            np.savez_compressed(frames_dir / f"{stamp():020d}.npz", rgb=rgb)
+            if objects:
+                from nano_workspace import capture_objects
+
+                record(
+                    "nano_scene__objects",
+                    text=json.dumps(capture_objects(objects, object_bodies, stamp())),
+                )
+            if rig:
+                from nano_cameras import capture_rig
+
+                capture_rig(rig, camera_specs, frames_dir.parent, stamp())
+                for name in rig:
+                    record(
+                        f"nano_camera__{name}",
+                        text=json.dumps(
+                            dict(
+                                camera=name,
+                                sim_time_ns=stamp(),
+                                world_from_camera_gl=rig[name].transform.tolist(),
+                            )
+                        ),
+                    )
+            else:
+                rgb = np.asarray(camera.render()[0], dtype=np.uint8)
+                if rgb.shape != (240, 320, 3):
+                    raise ValueError(f"Unexpected rendered image shape: {rgb.shape}")
+                np.savez_compressed(frames_dir / f"{stamp():020d}.npz", rgb=rgb)
             record("nano_camera__rgb_overhead")
             record("nano_state__joint_state", q.tolist())
             step()
@@ -245,6 +302,18 @@ def collect(args, model):
             units="radians",
             physics_dt_s=0.01,
             capture_fps=10,
+            cameras=camera_specs,
+            scene_objects=objects,
+            motion="multi-stage free-space arm sweep"
+            if args.workspace
+            else "small joint pulse",
+            segmentation_id_map={
+                str(k): v for k, v in scene.segmentation_idx_dict.items()
+            },
+            segmentation_entities=[e.name for e in scene.entities] + [robot.name],
+            segmentation_robot_links=[link.name for link in robot.links],
+            camera_rig=args.camera_rig,
+            capture_policy="every scheduled 10 Hz sensor frame, no frame subsampling",
             source_model=str(args.model),
             model_sha256=digest(args.model),
             nexus_version=importlib.metadata.version("dimforge-nexus3d"),
@@ -282,7 +351,7 @@ def collect(args, model):
     return source, contract, outcomes
 
 
-def to_lerobot(export, destination, model):
+def to_lerobot(export, destination, model, source_run):
     import cv2
     import numpy as np
     import pyarrow as pa
@@ -290,7 +359,17 @@ def to_lerobot(export, destination, model):
     from demo_dataset import read_dataset
 
     data = read_dataset(export)
-    camera_key = "observation.images.front"
+    source_manifest = json.loads((source_run / "manifest.json").read_text())
+    cameras = source_manifest["cameras"]
+    object_rows = {}
+    if source_manifest.get("scene_objects"):
+        with pa.memory_map(
+            str(source_run / "traces/nano_scene__objects.arrow"), "r"
+        ) as f:
+            object_rows = {
+                r["sim_time_ns"]: json.loads(r["text"])
+                for r in pa.ipc.open_stream(f).read_all().to_pylist()
+            }
     meta = destination / "meta"
     meta.mkdir(parents=True)
     episodes, tasks, mapping = [], [], []
@@ -331,42 +410,70 @@ def to_lerobot(export, destination, model):
         parquet = destination / f"data/chunk-000/episode_{index:06d}.parquet"
         parquet.parent.mkdir(parents=True, exist_ok=True)
         pq.write_table(table, parquet, compression="snappy")
-        video_path = (
-            destination / f"videos/chunk-000/{camera_key}/episode_{index:06d}.mp4"
-        )
-        video_path.parent.mkdir(parents=True, exist_ok=True)
-        video = cv2.VideoWriter(
-            str(video_path), cv2.VideoWriter_fourcc(*"mp4v"), 10, (320, 240)
-        )
-        if not video.isOpened():
-            raise ValueError("Video encoder unavailable")
-        try:
-            for frame, sample in enumerate(samples):
-                ts = sample["frame"]["sim_time_ns"]
-                source = export / f"source/traces/frames/overhead/{ts:020d}.npz"
-                with np.load(source, allow_pickle=False) as raw:
-                    video.write(cv2.cvtColor(raw["rgb"], cv2.COLOR_RGB2BGR))
-                mapping.append(
-                    dict(
-                        episode=index,
-                        frame=frame,
-                        observation_sim_time_ns=sample["state"]["sim_time_ns"],
-                        camera_sim_time_ns=ts,
-                        command_sim_time_ns=sample["forwarded"]["sim_time_ns"],
-                        source_frame_sha256=digest(source),
-                        source_command=sample["forwarded"]["source"],
-                        source_command_row=sample["forwarded"]["row"],
-                    )
+        episode_mapping = []
+        for frame, sample in enumerate(samples):
+            ts = sample["frame"]["sim_time_ns"]
+            episode_mapping.append(
+                dict(
+                    episode=index,
+                    frame=frame,
+                    observation_sim_time_ns=sample["state"]["sim_time_ns"],
+                    camera_sim_time_ns=ts,
+                    command_sim_time_ns=sample["forwarded"]["sim_time_ns"],
+                    source_frame_sha256=digest(
+                        export / f"source/traces/frames/overhead/{ts:020d}.npz"
+                    ),
+                    source_command=sample["forwarded"]["source"],
+                    source_command_row=sample["forwarded"]["row"],
+                    cameras={},
                 )
-        finally:
-            video.release()
-        decoder = cv2.VideoCapture(str(video_path))
-        decoded = 0
-        while decoder.read()[0]:
-            decoded += 1
-        decoder.release()
-        if decoded != len(samples):
-            raise ValueError("Video frame count disagrees with Parquet")
+            )
+        for name, spec in cameras.items():
+            key = spec["video_key"]
+            video_path = destination / f"videos/chunk-000/{key}/episode_{index:06d}.mp4"
+            video_path.parent.mkdir(parents=True, exist_ok=True)
+            video = cv2.VideoWriter(
+                str(video_path),
+                cv2.VideoWriter_fourcc(*"mp4v"),
+                10,
+                tuple(spec["resolution"]),
+            )
+            if not video.isOpened():
+                raise ValueError(f"Video encoder unavailable for {name}")
+            try:
+                for row in episode_mapping:
+                    ts = row["camera_sim_time_ns"]
+                    relative = f"traces/frames/{spec['source_directory']}/{ts:020d}.npz"
+                    source = source_run / relative
+                    with np.load(source, allow_pickle=False) as raw:
+                        if "sim_time_ns" in raw and int(raw["sim_time_ns"]) != ts:
+                            raise ValueError(f"Camera timestamp mismatch: {name}")
+                        video.write(cv2.cvtColor(raw["rgb"], cv2.COLOR_RGB2BGR))
+                    row["cameras"][name] = dict(
+                        sim_time_ns=ts, source=relative, sha256=digest(source)
+                    )
+            finally:
+                video.release()
+            decoder = cv2.VideoCapture(str(video_path))
+            decoded = 0
+            while decoder.read()[0]:
+                decoded += 1
+            decoder.release()
+            if decoded != len(samples):
+                raise ValueError(f"Video frame count disagrees with Parquet: {name}")
+        mapping.extend(episode_mapping)
+        if object_rows:
+            write_json(
+                meta / f"scene/episode_{index:06d}.json",
+                dict(
+                    version=1,
+                    objects=source_manifest["scene_objects"],
+                    frames=[
+                        dict(timestamp=t, **object_rows[row["camera_sim_time_ns"]])
+                        for t, row in zip(times, episode_mapping)
+                    ],
+                ),
+            )
         episodes.append(dict(episode_index=index, tasks=[task], length=len(samples)))
         tasks.append(dict(task_index=index, task=task))
         total += len(samples)
@@ -388,18 +495,20 @@ def to_lerobot(export, destination, model):
             )
         }
     )
-    features[camera_key] = dict(
-        dtype="video",
-        shape=[240, 320, 3],
-        names=["height", "width", "channel"],
-        info={
-            "video.fps": 10,
-            "video.codec": "mpeg4",
-            "video.pix_fmt": "yuv420p",
-            "video.is_depth_map": False,
-            "has_audio": False,
-        },
-    )
+    for spec in cameras.values():
+        width, height = spec["resolution"]
+        features[spec["video_key"]] = dict(
+            dtype="video",
+            shape=[height, width, 3],
+            names=["height", "width", "channel"],
+            info={
+                "video.fps": 10,
+                "video.codec": "mpeg4",
+                "video.pix_fmt": "yuv420p",
+                "video.is_depth_map": False,
+                "has_audio": False,
+            },
+        )
     write_json(
         meta / "info.json",
         dict(
@@ -409,7 +518,7 @@ def to_lerobot(export, destination, model):
             total_episodes=len(episodes),
             total_frames=total,
             total_tasks=len(tasks),
-            total_videos=len(episodes),
+            total_videos=len(episodes) * len(cameras),
             total_chunks=1,
             chunks_size=1000,
             splits={"train": f"0:{len(episodes)}"},
@@ -430,16 +539,26 @@ def to_lerobot(export, destination, model):
             source_manifest_sha256=digest(export / "manifest.json"),
             outcomes=[e["outcome"] for e in data["episodes"]],
             mapping=mapping,
+            cameras=cameras,
+            raw_recording="../aisle-run (retain alongside this dataset for lossless RGB, depth, segmentation and camera poses)",
+            raw_recording_sha256={
+                str(p.relative_to(source_run)): digest(p)
+                for p in sorted(source_run.rglob("*"))
+                if p.is_file()
+            },
+            aisle_export_scope="AISLE joins head/overhead RGB; wrist streams retained in raw recording and added to Studio with exact same-tick joins",
             limitations=[
                 "not a manipulation benchmark",
-                "one camera",
+                "nominal optical calibration; not measured hardware intrinsics",
                 "fixed base",
                 "nominal model dynamics",
                 "no hardware actuation",
             ],
         ),
     )
-    return dict(episodes=len(episodes), frames=total, channels=17, cameras=1, fps=10)
+    return dict(
+        episodes=len(episodes), frames=total, channels=17, cameras=len(cameras), fps=10
+    )
 
 
 def main():
@@ -459,6 +578,17 @@ def main():
         "--backend", choices=["metal", "webgpu", "cpu"], default="metal"
     )
     parser.add_argument("--frames", type=int, default=30)
+    parser.add_argument("--transport", choices=["dora", "direct"], default="dora")
+    parser.add_argument("--dora", help="Dora 1.0.1 executable (default: PATH)")
+    parser.add_argument(
+        "--timeout", type=int, default=600, help="Maximum Dora run wall time in seconds"
+    )
+    parser.add_argument("--camera-rig", choices=["observer", "nano"], default="nano")
+    parser.add_argument(
+        "--workspace",
+        action="store_true",
+        help="Six free cubes and a visible multi-stage arm sweep; not a grasp-success task",
+    )
     args = parser.parse_args()
     if args.frames < 3 or args.output.exists():
         parser.error("Use at least three frames and a new output directory")
@@ -469,13 +599,19 @@ def main():
     from demo_dataset import export_dataset
 
     model = load_model(args.model)
-    source, contract, outcomes = collect(args, model)
+    if args.transport == "dora":
+        from nano_dora import collect_dora
+
+        source, contract, outcomes = collect_dora(args, model)
+    else:
+        source, contract, outcomes = collect(args, model)
     export = args.output / "aisle-export"
     exported = export_dataset(source, export, contract=contract)
-    dataset = to_lerobot(export, args.output / "lerobot", model)
+    dataset = to_lerobot(export, args.output / "lerobot", model, source)
     result = dict(
         ok=all(o["status"] == "success" for o in outcomes),
         scope="external Nano/AISLE/Nexus/Studio integration probe",
+        transport=args.transport,
         output=str(args.output),
         dataset=dataset,
         aisle_export_coverage=exported["coverage"],

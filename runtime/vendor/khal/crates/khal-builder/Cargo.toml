@@ -1,0 +1,24 @@
+[package]
+name = "khal-builder"
+authors = ["Sébastien Crozet <sebcrozet@dimforge.com>"]
+description = "Build-time utilities for compiling khal shader crates to SPIR-V and CUDA PTX."
+repository = "https://github.com/dimforge/khal"
+version = { workspace = true }
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[features]
+# Build PTX for the CUDA backend with rust-cuda's `cargo cuda`.
+cuda = []
+# Build PTX for the CUDA backend with cuda-oxide's `cargo oxide` instead
+# (unified host-target interception; the shader crate must expose a
+# `cuda-oxide` feature forwarding to `khal-std/cuda-oxide`). Implies `cuda`.
+cuda-oxide = ["cuda"]
+unsafe_remove_boundchecks = []
+
+[dependencies]
+walkdir = "2.5.0"
+anyhow = "1.0.102"
+
+[lints]
+workspace = true

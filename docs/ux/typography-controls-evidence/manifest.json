@@ -1,0 +1,50 @@
+[
+  {
+    "file": "record-compact-dark.png",
+    "width": 1024,
+    "height": 768,
+    "sha256": "1133e1df54b245365a8318cdb73b9a092d33e58352cc50598f8cc85361fe2016"
+  },
+  {
+    "file": "record-compact-light.png",
+    "width": 1024,
+    "height": 768,
+    "sha256": "b0fb08932adbc73c99507c69a934494487dd0e808b614a80347acf5e9b58c7c7"
+  },
+  {
+    "file": "replay-light.png",
+    "width": 1440,
+    "height": 900,
+    "sha256": "0a3aad7eaffb8b668e6606e2fded43c2c7e7b935dc3b2f6c037aa81b10bec6f1"
+  },
+  {
+    "file": "replay-compact-dark.png",
+    "width": 1024,
+    "height": 768,
+    "sha256": "01ebefeb96aad25d753bf94867f75d2797081fccd0445fb5b75ccdf015ccd689"
+  },
+  {
+    "file": "library-compact-dark.png",
+    "width": 1024,
+    "height": 768,
+    "sha256": "1b595b7b0c703d6180f23240e7199a974b73fddfc11340dda7480783ca3a3ab0"
+  },
+  {
+    "file": "native-replay-window.png",
+    "width": 1280,
+    "height": 900,
+    "sha256": "395d8b85416b1df309493c038c8f3780b6115bca5e2378ec1e2b08dfdf4c4d50"
+  },
+  {
+    "file": "calibration-compact-dark.png",
+    "width": 1024,
+    "height": 768,
+    "sha256": "b7e0230e032bc3677d96cb0ac569093b488ffcf524fe01a06d2d8000cf720c78"
+  },
+  {
+    "file": "mixed-text-dark.png",
+    "width": 1440,
+    "height": 900,
+    "sha256": "e505f5019b085dec3abd5663d541db869478c6129e3eff585e4e3943001c2874"
+  }
+]
