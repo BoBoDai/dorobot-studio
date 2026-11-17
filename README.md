@@ -83,6 +83,10 @@ The [Nano room integration guide](tools/aisle-validation/README.md#mobile-nano-i
 retains the original AISLE validation experiments. The recording workflow currently
 captures at 5 Hz; the Live mode does not imply 30 fps throughput.
 
+### AISLE 与 Nexus 验证
+
+[Adora Nano／AISLE 验证指南](tools/aisle-validation/README.md)保留可复现的仿真、原始数据导出、LeRobot 转换及 Studio 回放／审阅验证流程。指南同时记录多相机与场景扩展、证据产物和适用范围；应用内的原生 Rust 运行时使用方式见 [运行时指南](runtime/README.md)。
+
 ## Rust 插件架构
 
 Studio 采用 **Rust 原生插件工作台**：宿主负责窗口、导航、面板挂载和事件分发；每个插件是独立的 Rust crate，通过共享 SDK 提供界面与操作。现有机器人控制和数据采集界面已迁入插件，插件不依赖宿主或彼此。
