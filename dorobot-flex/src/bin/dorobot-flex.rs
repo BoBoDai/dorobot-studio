@@ -519,7 +519,9 @@ impl App {
         if teleop {
             self.ui.button(cx, ids!(gamepad_setup)).set_text(cx, if self.backend.screen() == Screen::Record { "Robot setup" } else { "Record →" });
             let phase = &self.backend.playback().stats.task;
-            let mapping = if !self.workflow_help { "Hold L1 to move · Release to stop · R1 mode" } else if phase.contains("Left arm") || phase.contains("Right arm") {
+            let mapping = if phase.starts_with("AISLE autonomous") {
+                if self.language == Language::Chinese { "AISLE · 自主仿真" } else { "AISLE · Autonomous simulation" }
+            } else if !self.workflow_help { "Hold L1 to move · Release to stop · R1 mode" } else if phase.contains("Left arm") || phase.contains("Right arm") {
                 dorobot_flex::ui::play::ARM_CONTROL_MAP
             } else if phase.contains("Head") {
                 "L1: hold to move · R1: change mode · Left stick: head pan / tilt · Options: pause"
