@@ -1,0 +1,6 @@
+[submodule "examples/rerun-example"]
+	path = examples/rerun-example
+	url = https://github.com/rerun-io/rerun.git
+[submodule "examples/rerun-repo"]
+	path = examples/rerun-repo
+	url = https://github.com/rerun-io/rerun.git

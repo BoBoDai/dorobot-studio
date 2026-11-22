@@ -1,0 +1,65 @@
+name: Studio CI
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: studio-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-workspace:
+    name: Studio Linux workspace
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang libclang-dev cmake pkg-config libssl-dev libudev-dev \
+            libasound2-dev libpulse-dev libwayland-dev libx11-dev \
+            libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev \
+            libxrandr-dev libegl1-mesa-dev libgl1-mesa-dev libdrm-dev
+      - name: Install Rust
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Test Studio workspace without video
+        run: cargo test --locked --workspace --no-default-features
+
+  nexus-worker:
+    name: Studio Nexus worker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Test Nexus worker when present
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          if [[ -d tools/nexus_workflow ]]; then
+            test -f tools/nexus_workflow/test_worker.py
+            python3 -m unittest discover -s tools/nexus_workflow -p test_worker.py
+          else
+            echo "The Nexus worker is absent from this revision."
+          fi
