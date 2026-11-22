@@ -83,9 +83,10 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt_file: ${{ runner.temp }}/studio-review.md
+          # Claude can use a second turn to return the structured review.
           claude_args: >-
             --tools=
-            --max-turns 1
+            --max-turns 2
             --json-schema '{"type":"object","properties":{"review":{"type":"string"}},"required":["review"],"additionalProperties":false}'
 
       - name: Publish advisory review
