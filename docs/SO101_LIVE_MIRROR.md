@@ -53,5 +53,8 @@ The Linux no-video Studio build and SO-101 model load passed. The synthetic sour
 | Synthetic, TCP loopback | 195 | 9.3 ms | 17.6 ms |
 | Synthetic, same-host peer scouting | 193 | 10.4 ms | 17.7 ms |
 | Physical follower, read-only TCP loopback | 229 | 8.8 ms | 18.6 ms |
+| Physical follower, powered teleop TCP loopback | 945 | 9.6 ms | 18.2 ms |
 
-The physical run used measured positions from the calibrated follower with motor torque off. The powered motion and Linux-to-macOS tests are separate acceptance runs.
+The read-only run used measured positions from the calibrated follower with torque off.
+
+The 35-second powered Linux run used the stock Dorobot2 teleop loop and the Studio desktop window. Studio applied 945 measured follower poses. Elbow flex moved through 76° and wrist flex through 62°. The gripper moved only 0.1 percentage points, so this run does not establish its full travel. Dora stopped cleanly, and a read-back verified torque off on all 12 motors. Linux-to-macOS LAN acceptance is pending.
