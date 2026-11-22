@@ -143,6 +143,12 @@ pub struct TelemetryState {
 }
 
 impl TelemetryState {
+    pub fn can_select_source(&self) -> bool {
+        self.sources
+            .iter()
+            .any(|descriptor| Some(&descriptor.source) != self.selected.as_ref())
+    }
+
     pub fn select(&mut self, source: SourceId) {
         if self
             .sources
@@ -215,9 +221,16 @@ impl TelemetryState {
         };
     }
 
-    pub fn render_frame(&self, source: &SourceId, loaded_model: &str) -> Option<&PoseFrame> {
-        let frame = &self.latest.as_ref()?.frame;
+    pub fn render_frame(
+        &self,
+        source: &SourceId,
+        loaded_model: &str,
+        now: Instant,
+    ) -> Option<&PoseFrame> {
+        let pose = self.latest.as_ref()?;
+        let frame = &pose.frame;
         if self.phase == MirrorPhase::Live
+            && now.saturating_duration_since(pose.received_at) < STALE_AFTER
             && self.selected.as_ref() == Some(source)
             && frame.source == *source
             && frame.model_id == loaded_model

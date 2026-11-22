@@ -55,6 +55,8 @@ pub struct TelemetryModel {
 pub enum PoseError {
     #[error("telemetry profile and viewer joints differ")]
     ViewerOrder,
+    #[error("received joint count differs from the telemetry profile")]
+    JointSet,
     #[error("telemetry is missing position for {0}")]
     Missing(String),
     #[error("joint {0} has an incompatible telemetry unit or value")]
@@ -79,6 +81,9 @@ impl TelemetryModel {
         joints: &[JointValue],
         viewer_order: &[String],
     ) -> Result<Vec<f32>, PoseError> {
+        if joints.len() != self.axes.len() {
+            return Err(PoseError::JointSet);
+        }
         if viewer_order.len() != self.axes.len() {
             return Err(PoseError::ViewerOrder);
         }

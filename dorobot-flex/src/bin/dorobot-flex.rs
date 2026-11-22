@@ -434,6 +434,9 @@ impl App {
     }
 
     fn display_status(&self) -> &str {
+        if self.plugins.selected() == Some("hardware_live_mirror") {
+            return "";
+        }
         let status = self.backend.status().unwrap_or("Demo · no hardware connected");
         if status.starts_with("Simulation setup") { "Ready" }
         else if status.starts_with("Real robot setup") || status.starts_with("Choose a USB serial port") { "Not connected" }
@@ -581,11 +584,7 @@ impl App {
             .label(cx, ids!(main_window.body.workspace.page_header.status))
             .set_text(
                 cx,
-                if self.plugins.selected() == Some("hardware_live_mirror") {
-                    ""
-                } else {
-                    self.display_status()
-                },
+                self.display_status(),
             );
         self.ui
             .widget(cx, ids!(hub_form))

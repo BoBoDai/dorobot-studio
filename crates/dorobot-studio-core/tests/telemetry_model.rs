@@ -70,3 +70,31 @@ fn generic_units_support_prismatic_joint() {
         [0.2, 1.25]
     );
 }
+
+#[test]
+fn refuses_a_pose_with_extra_joints_for_an_installed_profile() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let model = TelemetryModel::resolve(MODEL, &root).unwrap();
+    let order = model
+        .axes
+        .iter()
+        .map(|(name, _)| (*name).into())
+        .collect::<Vec<String>>();
+    let mut values = model
+        .axes
+        .iter()
+        .map(|(name, axis)| {
+            joint(
+                name,
+                0.0,
+                if matches!(axis, Axis::Opening { .. }) {
+                    JointUnit::PercentOpen
+                } else {
+                    JointUnit::Deg
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    values.push(joint("extra_joint", 0.0, JointUnit::Deg));
+    assert!(model.viewer_angles(&values, &order).is_err());
+}

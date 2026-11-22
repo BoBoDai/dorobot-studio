@@ -90,7 +90,7 @@ impl LiveMirrorPanel {
         else {
             return;
         };
-        let Some(frame) = state.render_frame(selected, model_id) else {
+        let Some(frame) = state.render_frame(selected, model_id, std::time::Instant::now()) else {
             return;
         };
         if self
@@ -172,7 +172,7 @@ impl PluginPanel for LiveMirrorPanel {
         self.root.label(cx, ids!(stream)).set_text(cx, &text);
         self.root
             .button(cx, ids!(next_source))
-            .set_visible(cx, state.sources.len() > 1);
+            .set_visible(cx, state.can_select_source());
         let joint_text = if state.phase == MirrorPhase::UnsupportedModel {
             state
                 .latest

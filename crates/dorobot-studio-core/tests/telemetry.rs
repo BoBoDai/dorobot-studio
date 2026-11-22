@@ -116,7 +116,7 @@ fn mirror_selection_holds_pose_until_matching_model_is_ready() {
     mirror.update(&catalog, now, |_| true);
     assert_eq!(
         mirror
-            .render_frame(&first.source, &first.model_id)
+            .render_frame(&first.source, &first.model_id, now)
             .unwrap()
             .sequence,
         42
@@ -133,16 +133,63 @@ fn mirror_selection_holds_pose_until_matching_model_is_ready() {
     mirror.select(replacement.source.clone());
     mirror.update(&catalog, now, |_| true);
     assert!(mirror
-        .render_frame(&first.source, &first.model_id)
+        .render_frame(&first.source, &first.model_id, now)
         .is_none());
     assert!(mirror
-        .render_frame(&replacement.source, "wrong-model")
+        .render_frame(&replacement.source, "wrong-model", now)
         .is_none());
     assert_eq!(
         mirror
-            .render_frame(&replacement.source, &replacement.model_id)
+            .render_frame(&replacement.source, &replacement.model_id, now)
             .unwrap()
             .sequence,
         0
     );
+}
+
+#[test]
+fn mirror_can_select_one_available_robot_after_another_disappears() {
+    use dorobot_studio_core::api::telemetry::TelemetryState;
+    let now = Instant::now();
+    let mut catalog = SourceCatalog::default();
+    let first = descriptor(SESSION);
+    catalog.add_source(first.clone());
+    let mut mirror = TelemetryState::default();
+    mirror.update(&catalog, now, |_| true);
+    assert!(!mirror.can_select_source());
+    catalog.remove_source(&first.source);
+    let mut other = descriptor(NEXT);
+    other.source.robot_id = "another-bench".into();
+    assert!(catalog.add_source(other.clone()));
+    mirror.update(&catalog, now, |_| true);
+    assert_eq!(mirror.selected.as_ref(), Some(&first.source));
+    assert!(mirror.can_select_source());
+    mirror.select(other.source.clone());
+    assert_eq!(mirror.selected.as_ref(), Some(&other.source));
+}
+
+#[test]
+fn render_rechecks_frame_age_between_backend_polls() {
+    use dorobot_studio_core::api::telemetry::TelemetryState;
+    let captured = Instant::now();
+    let mut state = TelemetryState::default();
+    let mut catalog = SourceCatalog::default();
+    let frame = pose(SESSION, 1);
+    assert!(catalog.add_source(descriptor(SESSION)));
+    assert!(catalog.accept_pose(frame.clone(), captured));
+    state.update(&catalog, captured + Duration::from_millis(999), |_| true);
+    assert!(state
+        .render_frame(
+            &frame.source,
+            &frame.model_id,
+            captured + Duration::from_millis(999)
+        )
+        .is_some());
+    assert!(state
+        .render_frame(
+            &frame.source,
+            &frame.model_id,
+            captured + Duration::from_millis(1000)
+        )
+        .is_none());
 }
