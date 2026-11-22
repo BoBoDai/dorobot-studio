@@ -34,7 +34,7 @@ jobs:
             clang libclang-dev cmake pkg-config libssl-dev libudev-dev \
             libasound2-dev libpulse-dev libwayland-dev libx11-dev \
             libxcursor-dev libxi-dev libxinerama-dev libxkbcommon-dev \
-            libxrandr-dev libegl1-mesa-dev libgl1-mesa-dev
+            libxrandr-dev libegl1-mesa-dev libgl1-mesa-dev libdrm-dev
       - name: Install Rust
         run: |
           rustup toolchain install 1.95.0 --profile minimal
