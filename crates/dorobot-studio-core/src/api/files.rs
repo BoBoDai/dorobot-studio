@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::data::LeRobotDataset;
+use crate::data::{EpisodeFrame, LeRobotDataset, telemetry_model::{TelemetryModel, SO101_MODEL_ID}};
 
 use super::*;
 
@@ -44,6 +44,41 @@ fn urdf_for(robot_type: &str) -> Option<(PathBuf, PathBuf)> {
     };
     let urdf = assets.join(format!("{dir}.urdf"));
     urdf.exists().then_some((urdf, assets))
+}
+
+/// Only jobs exported by Nexus declare this convention. Older SO-101
+/// datasets use the existing robot-specific replay mappings below.
+fn nexus_replay_model(dataset: &LeRobotDataset) -> Option<TelemetryModel> {
+    if dataset.info.robot_type != "so101_follower" { return None; }
+    let bytes = fs::read(dataset.root_path.join("meta/dorobot_capture.json")).ok()?;
+    let provenance: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    if !matches!(provenance["source_mode"].as_str(), Some("synthetic" | "calibrated_leader"))
+        || provenance["sample_hz_simulated"].as_u64() != Some(20) { return None; }
+    TelemetryModel::resolve(SO101_MODEL_ID, &crate::runtime::root())
+}
+
+fn nexus_replay_poses(
+    profile: &TelemetryModel, names: &[String], frames: &[EpisodeFrame],
+) -> Result<Vec<Vec<f32>>, String> {
+    use telemetry::{JointUnit, JointValue};
+    use urdf_rs::JointType;
+    // RobotView uses movable joints in the order they occur in the URDF.
+    let urdf = urdf_rs::read_file(&profile.urdf).map_err(|e| e.to_string())?;
+    let order: Vec<_> = urdf.joints.into_iter()
+        .filter(|joint| matches!(joint.joint_type, JointType::Revolute | JointType::Continuous | JointType::Prismatic))
+        .map(|joint| joint.name).collect();
+    let mut joints: Vec<_> = names.iter().map(|key| {
+        let name = key.strip_suffix(".pos").unwrap_or(key);
+        JointValue {
+            name: name.to_owned(), position: 0.0,
+            unit: if name == "gripper" { JointUnit::PercentOpen } else { JointUnit::Deg },
+        }
+    }).collect();
+    frames.iter().map(|frame| {
+        if frame.state.len() != joints.len() { return Err("state dimensions differ from the named axes".into()); }
+        for (joint, &value) in joints.iter_mut().zip(&frame.state) { joint.position = value.into(); }
+        profile.viewer_angles(&joints, &order).map_err(|e| e.to_string())
+    }).collect()
 }
 
 /// Turn a recorded pose into URDF joint values.
@@ -198,6 +233,7 @@ fn dir_size(path: &Path) -> u64 {
 }
 
 pub struct FileBackend {
+    nexus: nexus::NexusRuntime,
     simulation: super::workflow::SimulationRuntime,
     nano_driver: super::supported::NanoRuntime,
     live_client: Option<super::live::LiveClient>,
@@ -223,6 +259,7 @@ pub struct FileBackend {
     eval: EvalState,
     /// Currently opened dataset, kept so episode selection avoids a reparse.
     open: Option<(String, LeRobotDataset)>,
+    replay_model: Option<TelemetryModel>,
 }
 
 impl FileBackend {
@@ -269,6 +306,7 @@ impl FileBackend {
     /// one found.
     pub fn with_open(root: impl AsRef<Path>, prefer: Option<&str>) -> Self {
         let mut b = Self {
+            nexus: nexus::NexusRuntime::default(),
             simulation: super::workflow::SimulationRuntime::default(),
             nano_driver: super::supported::NanoRuntime::default(),
             live_client: None,
@@ -293,6 +331,7 @@ impl FileBackend {
             record: RecordState::default(),
             eval: EvalState::default(),
             open: None,
+            replay_model: None,
         };
         b.rescan();
         // Open something immediately so Play is never blank.
@@ -389,6 +428,7 @@ impl FileBackend {
                 .unwrap_or_default()
         };
 
+        self.replay_model = nexus_replay_model(&ds);
         self.playback = PlaybackState {
             dataset_name: summary.name.clone(),
             selected: episodes.first().map(|e| e.index),
@@ -405,7 +445,8 @@ impl FileBackend {
             video_paths: BTreeMap::new(),
             video_frame_offset: 0,
             video_frame_offsets: BTreeMap::new(),
-            robot_urdf: urdf_for(&ds.info.robot_type),
+            robot_urdf: self.replay_model.as_ref().map(|model| (model.urdf.clone(), model.assets.clone()))
+                .or_else(|| urdf_for(&ds.info.robot_type)),
             joint_frames: Vec::new(),
             scene: None,
             live: None,
@@ -487,18 +528,18 @@ impl FileBackend {
             .collect();
         self.playback.video_frame_offset = data.video_frame_offset;
         self.playback.video_frame_offsets = data.video_frame_offsets.into_iter().collect();
-        let robot = ds.info.robot_type.to_lowercase();
-        let limits = self
-            .playback
-            .robot_urdf
-            .as_ref()
-            .map(|(u, _)| urdf_limits(u))
-            .unwrap_or_default();
-        self.playback.joint_frames = data
-            .frames
-            .iter()
-            .map(|f| to_urdf_pose(&robot, &f.state, &limits))
-            .collect();
+        let mut pose_error = None;
+        self.playback.joint_frames = if let Some(profile) = &self.replay_model {
+            match nexus_replay_poses(profile, &self.playback.state_names, &data.frames) {
+                Ok(poses) => poses,
+                Err(error) => { pose_error = Some(error); Vec::new() }
+            }
+        } else {
+            let robot = ds.info.robot_type.to_lowercase();
+            let limits = self.playback.robot_urdf.as_ref()
+                .map(|(urdf, _)| urdf_limits(urdf)).unwrap_or_default();
+            data.frames.iter().map(|frame| to_urdf_pose(&robot, &frame.state, &limits)).collect()
+        };
         self.playback.scene = match scene::SceneReplay::load(
             &ds.root_path,
             index,
@@ -529,6 +570,9 @@ impl FileBackend {
             "{} · episode {index} · {} frames",
             self.playback.dataset_name, self.playback.stats.frames
         );
+        if let Some(error) = pose_error {
+            self.status.push_str(&format!(" · Could not replay the SO-101 pose: {error}"));
+        }
     }
 
     /// Rebuild the setup wizard from what is actually attached.
@@ -817,6 +861,7 @@ impl Backend for FileBackend {
         if (self.screen == Screen::Live && self.hardware.nano.is_none()) || (self.screen == Screen::Record && self.simulation.state.simulation && self.simulation.state.active) { &self.live_preview } else { &self.playback }
     }
     fn replay(&self) -> &PlaybackState { &self.playback }
+    fn nexus(&self) -> Option<&nexus::NexusState> { Some(&self.nexus.state) }
     fn telemetry(&self) -> Option<&telemetry::TelemetryState> {
         Some(&self.telemetry_state)
     }
@@ -827,6 +872,11 @@ impl Backend for FileBackend {
     }
 
     fn dispatch(&mut self, intent: Intent) {
+        if self.nexus.state.busy && matches!(intent, Intent::StartSimulation | Intent::WizardAdvance
+            | Intent::RecordStart | Intent::ReRecord | Intent::ConnectNanoBase { .. } | Intent::SimulationCapture { .. }) {
+            self.status = "Finish the local Nexus job before starting another device or simulator.".into();
+            return;
+        }
         if self.playback().live.is_some() {
             match &intent {
                 Intent::Seek(_) | Intent::TogglePlay | Intent::StepFrames(_) | Intent::SelectEpisode(_)
@@ -837,6 +887,36 @@ impl Backend for FileBackend {
         }
 
         match intent {
+            Intent::Nexus(intent) => {
+                use nexus::NexusIntent::*;
+                if !self.nexus.state.allows(&intent) { return; }
+                match intent {
+                    UseOpenDataset => {
+                        if let Some((_, dataset)) = &self.open {
+                            match dataset.root_path.canonicalize() {
+                                Ok(path) => self.nexus.state.settings.dataset = path.display().to_string(),
+                                Err(error) => self.nexus.state.snapshot.message = error.to_string(),
+                            }
+                        } else {
+                            self.nexus.state.snapshot.message = "Open a dataset in Data Workspace first.".into();
+                        }
+                    }
+                    OpenSavedDataset => {
+                        if let Some(path) = self.nexus.state.snapshot.dataset.clone() {
+                            self.dispatch(Intent::OpenFolder(path));
+                        }
+                    }
+                    StartCapture | Train | Run if self.worker.is_some() || self.simulation.state.active
+                        || self.nano_driver.state.active || self.take.is_some() || self.save_rx.is_some() => {
+                        self.nexus.state.snapshot.message = "Finish the active robot or simulation session and review its take first.".into();
+                    }
+                    StartCapture => {
+                        self.nexus.dispatch(StartCapture);
+                        if self.nexus.state.busy { self.screen = Screen::Record; }
+                    }
+                    other => self.nexus.dispatch(other),
+                }
+            }
             Intent::SelectTelemetrySource(source) => self.telemetry_state.select(source),
             Intent::SetCapturePreferences { task, destination } => {
                 if !self.simulation.state.pending() || self.simulation.state.phase == "review" {
@@ -1034,6 +1114,7 @@ impl Backend for FileBackend {
     }
 
     fn poll(&mut self) {
+        self.nexus.poll();
         if let Some(receiver) = &mut self.telemetry_receiver {
             let now = std::time::Instant::now();
             let catalog = receiver.poll(now);
@@ -1422,6 +1503,40 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
     #[test]
+    fn nexus_saved_dataset_replays_named_degrees_on_the_official_model() {
+        use crate::data::lerobot_writer::{DatasetSpec, DatasetWriter, FrameRecord};
+        let root = std::env::temp_dir().join(format!("nexus-saved-replay-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let dataset = root.join("take");
+        let names = ["elbow_flex.pos", "gripper.pos", "wrist_roll.pos", "shoulder_lift.pos", "shoulder_pan.pos", "wrist_flex.pos"];
+        let mut writer = DatasetWriter::create(&dataset, DatasetSpec {
+            robot_type: "so101_follower".into(), fps: 20.0, camera_keys: vec![],
+            joint_names: names.map(String::from).to_vec(),
+        }).unwrap();
+        let mut episode = writer.begin_episode("place cube").unwrap();
+        episode.push(FrameRecord {state: vec![5., 100., 12., -2., 30., -8.], action: vec![0.; 6]}).unwrap();
+        writer.commit(episode).unwrap();
+        drop(writer);
+        fs::write(dataset.join("meta/dorobot_capture.json"), r#"{"source_mode":"synthetic","sample_hz_simulated":20}"#).unwrap();
+        let mut backend = FileBackend::new(root.join("empty"));
+        backend.nexus.state.snapshot.dataset = Some(dataset);
+        backend.dispatch(Intent::Nexus(nexus::NexusIntent::OpenSavedDataset));
+        assert_eq!(backend.screen(), Screen::Play);
+        let (urdf, _) = backend.replay().robot_urdf.as_ref().unwrap();
+        assert_eq!(urdf.file_name().unwrap(), "so101_new_calib.urdf");
+        let model = urdf_rs::read_file(urdf).unwrap();
+        let viewer_order: Vec<_> = model.joints.iter().filter(|j| j.joint_type == urdf_rs::JointType::Revolute).map(|j|j.name.as_str()).collect();
+        let angles = &backend.replay().joint_frames[0];
+        assert_eq!(angles.len(), viewer_order.len());
+        for (name, angle) in [("shoulder_pan", 30.0_f32.to_radians()), ("gripper", 1.74533),
+                              ("elbow_flex", 5.0_f32.to_radians()), ("wrist_flex", -8.0_f32.to_radians())] {
+            let index = viewer_order.iter().position(|&joint| joint==name).unwrap();
+            assert!((angles[index] - angle).abs() < 1e-5, "{name} angle");
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn dataset_root_tags_exclusion_undo_and_restart() {
         use crate::data::lerobot_writer::{DatasetSpec, DatasetWriter, FrameRecord};
         let root = std::env::temp_dir().join(format!("dorobot-curation-{}", std::process::id()));
@@ -1446,6 +1561,11 @@ mod tests {
         let mut b = FileBackend::new(&root);
         assert_eq!(b.library.datasets.len(), 1);
         assert_eq!(b.playback.stats.frames, 1);
+        b.dispatch(Intent::Nexus(nexus::NexusIntent::UseOpenDataset));
+        assert_eq!(Path::new(&b.nexus.state.settings.dataset), root.canonicalize().unwrap());
+        b.nexus.state.snapshot.dataset = Some(root.clone());
+        b.dispatch(Intent::Nexus(nexus::NexusIntent::OpenSavedDataset));
+        assert_eq!(b.screen(), Screen::Play);
         b.dispatch(Intent::TagEpisode {
             episode: 0,
             tag: Some(Tag::Good),

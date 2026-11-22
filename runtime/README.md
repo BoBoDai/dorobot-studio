@@ -1,6 +1,6 @@
 # Native Studio runtime
 
-Studio launches `dorobot-nano-runtime`. The executable supervises a native Dora
+Studio launches `dorobot-nano-runtime` for Nano. The executable supervises a native Dora
 1.0.1 graph; it does not invoke Python, uv, OpenCV or the AISLE Python package.
 
 Simulation graph:
@@ -18,10 +18,9 @@ media and keeps shader build dependencies consistent. Physics engine source is
 unchanged except for a read-only contact-plan buffer accessor used by the active
 contact audit; vendor workspace membership and local dependency patches are adjusted.
 
-All Studio application logic, runtime nodes, serial control, recording and Hub
-transfers are Rust. Video codecs still use dynamically linked FFmpeg, and the
-app uses the operating system's Metal/AVFoundation frameworks. “Rust runtime”
-does not mean every third-party library is implemented in Rust.
+Studio and the Nano runtime use Rust for the application, nodes, serial
+control and recording. Video codecs use dynamically linked FFmpeg. On macOS
+the app also uses Metal and AVFoundation.
 
 ## Build
 
@@ -43,6 +42,14 @@ Makepad's JIT dependency pins. Development Studio finds
 `runtime/target/release/dorobot-nano-runtime`; `DOROBOT_NATIVE_RUNTIME` overrides
 that location. Put native `dora` beside the executable, on PATH, or select it
 with `DOROBOT_DORA`. Installed Studio resolves both inside its relocated bundle.
+
+The SO-101 workflow uses the separate `dorobot-so101-session` binary from the
+same runtime workspace. It loads the SO-101 URDF and the cube-to-plate scene on
+Nexus. It samples the front RGB camera, joint targets and measured positions
+every five physics ticks. The Studio backend starts this runner via the local
+LeRobot worker in `tools/nexus_workflow/`. Development Studio looks in
+`runtime/target/release`; set `DOROBOT_SO101_RUNTIME` when using another target
+directory. See the [Studio workflow](../docs/PLUGINS.md#so-101-nexus-采集训练和推理).
 
 ```sh
 runtime/target/release/dorobot-nano-runtime sim \

@@ -2,6 +2,7 @@
 
 use dorobot_studio_plugin::{PanelContext, PanelDescriptor, PluginRegistry};
 use dorobot_flex::api::{files::FileBackend, mock::MockBackend, Backend, Intent, Screen};
+use dorobot_flex::api::nexus::{NexusIntent, NexusKind};
 use dorobot_flex::playback_controls::PlaybackAction;
 use dorobot_flex::preferences;
 use dorobot_flex::i18n::{self, Language, Localizer};
@@ -162,6 +163,7 @@ script_mod! {
                                 tab_library := mod.widgets.ux.WorkspaceTab{text: "Library"}
                                 tab_play := mod.widgets.ux.WorkspaceTab{text: "Replay"}
                                 tab_eval := mod.widgets.ux.WorkspaceTab{text: "Evaluate"}
+                                use_training := mod.widgets.ux.WorkspaceTab{text: "Use for training"}
                             }
                         }
                         hub_form := View{ visible: false width: Fill height: Fit flow: Right spacing: 8. padding: 12.
@@ -383,6 +385,11 @@ impl App {
         let light = frame::light_mode();
         frame::sync_nav_button(cx, &self.ui.widget(cx, ids!(data_workspace)), data, light);
         let data_tabs = self.ui.widget(cx, ids!(workspace_tabs.data_tabs));
+        let nexus = self.backend.nexus();
+        let use_training = data_tabs.button(cx, ids!(use_training));
+        use_training.set_visible(cx, nexus.is_some() && self.backend.dataset_id().is_some());
+        use_training.set_enabled(cx, nexus.is_some_and(|state| state.allows(&NexusIntent::UseOpenDataset)));
+        frame::sync_nav_button(cx, &data_tabs.widget(cx, ids!(use_training)), false, light);
         for (path, target) in [(ids!(tab_library) as &[LiveId], Screen::Library), (ids!(tab_play), Screen::Play), (ids!(tab_eval), Screen::Eval)] {
             frame::sync_nav_button(cx, &data_tabs.widget(cx, path), data && screen == target, light);
         }
@@ -434,7 +441,9 @@ impl App {
     }
 
     fn display_status(&self) -> &str {
-        if self.plugins.selected() == Some("hardware_live_mirror") {
+        if matches!(self.plugins.selected(), Some("hardware_live_mirror" | "nexus_setup" | "nexus_train" | "nexus_rollout"))
+            || (self.backend.screen() == Screen::Record && self.nexus_record())
+        {
             return "";
         }
         let status = self.backend.status().unwrap_or("Demo · no hardware connected");
@@ -447,7 +456,7 @@ impl App {
         let screen = self.backend.screen();
         let mirror = self.plugins.selected() == Some("hardware_live_mirror");
         let setup = screen == Screen::Hardware && !mirror;
-        let record = screen == Screen::Record && !mirror;
+        let record = screen == Screen::Record && !mirror && !self.nexus_record();
         let simulation = state.simulation;
         let pending = if simulation { state.pending() } else { self.backend.record().recording || self.backend.record().last_take.is_some() };
         let nano = self.backend.hardware().nano.is_some();
@@ -524,7 +533,16 @@ impl App {
             (ids!(wf_save),frame::Themed::Both),(ids!(wf_discard),frame::Themed::Both),(ids!(wf_replay),frame::Themed::Both),
         ],frame::light_mode());
     }
+    fn nexus_record(&self) -> bool {
+        self.backend.nexus().is_some_and(|state| state.kind == Some(NexusKind::Capture) && state.busy)
+    }
     fn sync_live_controls(&self, cx: &mut Cx) {
+        if self.plugins.selected().is_some() {
+            for path in [ids!(workflow), ids!(live_bar), ids!(gamepad_help)] {
+                self.ui.widget(cx, path).set_visible(cx, false);
+            }
+            return;
+        }
         self.sync_workflow(cx);
         let live = self.backend.screen() == Screen::Live;
         let teleop = matches!(self.backend.screen(), Screen::Live | Screen::Record) && self.backend.playback().live.is_some();
@@ -657,7 +675,9 @@ impl App {
         }
         // Overlay flow: exactly one page is visible at a time.
         let screen = self.backend.screen();
+        let nexus_record = self.nexus_record();
         let setup = match screen {
+            Screen::Record if nexus_record => false,
             Screen::Record => if self.backend.workflow().simulation { !self.backend.workflow().active } else { self.backend.record().profile_label.is_empty() || self.backend.hardware().nano.is_some() },
             Screen::Hardware => false,
             Screen::Live => !self.external_stream && self.backend.hardware().nano.is_none() && !self.backend.live_connection().is_some_and(|c|c.phase.active()),
@@ -713,8 +733,8 @@ impl App {
         ] {
             self.ui.widget(cx, path).set_visible(cx, s == screen || (s == Screen::Play && screen == Screen::Live));
         }
-        if screen == Screen::Record && (self.backend.workflow().simulation || self.backend.hardware().nano.is_some()) { self.ui.widget(cx, ids!(page_record)).set_visible(cx,false); }
-        let teleop = matches!(screen, Screen::Live | Screen::Record) && self.backend.playback().live.is_some();
+        if screen == Screen::Record && !nexus_record && (self.backend.workflow().simulation || self.backend.hardware().nano.is_some()) { self.ui.widget(cx, ids!(page_record)).set_visible(cx,false); }
+        let teleop = (screen == Screen::Live || (screen == Screen::Record && !nexus_record)) && self.backend.playback().live.is_some();
         self.ui.widget(cx, ids!(hardware_teleop)).set_visible(cx, teleop);
         if teleop { self.ui.widget(cx, ids!(page_play)).set_visible(cx, false); self.ui.widget(cx, ids!(page_record)).set_visible(cx, false); }
         if setup && screen == Screen::Live { self.ui.widget(cx, ids!(page_play)).set_visible(cx,false); self.ui.widget(cx, ids!(hardware_teleop)).set_visible(cx,false); }
@@ -836,6 +856,13 @@ impl MatchEvent for App {
                 };
                 if let Some(t) = target {
                     self.navigate(t);
+                } else if let Some(panel) = match name.as_str() {
+                    "nexus-setup" => Some("nexus_setup"),
+                    "nexus-training" => Some("nexus_train"),
+                    "nexus-inference" => Some("nexus_rollout"),
+                    _ => None,
+                } {
+                    if let Err(error) = self.plugins.select(panel) { ::log::warn!("{error}"); }
                 }
             }
         }
@@ -867,11 +894,33 @@ impl MatchEvent for App {
         let live_before=self.backend.playback().live.as_ref().map(|v|(v.sequence,v.connected,v.finished));
         let was_live=self.backend.playback().live.is_some();
         let screen_before = self.backend.screen();
+        let nexus_record_before = self.nexus_record();
+        let nexus_busy_before = self.backend.nexus().is_some_and(|state| state.busy);
         self.backend.poll();
-        if self.plugins.selected() == Some("hardware_live_mirror") {
-            self.sync_plugins(cx);
+        let nexus_finished = nexus_busy_before && !self.backend.nexus().is_some_and(|state| state.busy);
+        if nexus_record_before && !self.nexus_record() && self.backend.screen() == Screen::Record
+            && self.plugins.selected().is_none()
+        {
+            if let Err(error) = self.plugins.select("nexus_setup") { ::log::warn!("{error}"); }
         }
-        if screen_before != self.backend.screen() { self.sync(cx); }
+        if nexus_finished || screen_before != self.backend.screen() || nexus_record_before != self.nexus_record() {
+            self.sync(cx);
+        } else if self.plugins.selected() == Some("hardware_live_mirror") {
+            self.sync_plugins(cx);
+        } else {
+            let nexus_panel = match self.plugins.selected() {
+                Some(panel @ ("nexus_setup" | "nexus_train" | "nexus_rollout")) => Some(LiveId::from_str(panel)),
+                None if self.backend.screen() == Screen::Record && self.nexus_record() => Some(live_id!(page_record)),
+                _ => None,
+            };
+            if let Some(panel) = nexus_panel {
+                self.sync_plugins(cx);
+                if self.language == Language::Chinese {
+                    let panel = self.ui.widget(cx, &[panel]);
+                    self.localizer.apply_panel(cx, &panel, self.language);
+                }
+            }
+        }
         let live_after=self.backend.playback().live.as_ref().map(|v|(v.sequence,v.connected,v.finished));
         if live_before!=live_after || (was_live && live_after.is_none()) {
             self.ui.play_screen(cx, ids!(page_play)).sync(cx, self.backend.playback());
@@ -1230,7 +1279,27 @@ impl MatchEvent for App {
     }
 
     fn handle_actions(&mut self, cx: &mut Cx, actions: &Actions) {
+        let previous_screen = self.backend.screen();
+        let previous_job = self.backend.nexus().and_then(|state| state.job_dir.clone());
+        let opening_saved = self.plugins.selected() == Some("nexus_setup")
+            && self.ui.button(cx, ids!(nexus_setup.open_saved)).clicked(actions);
         let mut dirty = self.plugins.handle_actions(cx, actions, &mut *self.backend);
+        if dirty {
+            if self.backend.screen() != previous_screen || (opening_saved && self.backend.screen() == Screen::Play) {
+                self.plugins.follow_navigation();
+            }
+            if let Some(state) = self.backend.nexus() {
+                if state.job_dir != previous_job {
+                    match state.kind {
+                        Some(NexusKind::Capture) => self.plugins.follow_navigation(),
+                        Some(NexusKind::Rollout) => {
+                            if let Err(error) = self.plugins.select("nexus_rollout") { ::log::warn!("{error}"); }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
         if let Some(panel) = self.plugins.toolbox_selection(cx, actions).or_else(|| self.plugins.tab_selection(actions)) {
             self.open_panel(panel);
             dirty = true;
@@ -1421,6 +1490,11 @@ impl MatchEvent for App {
             dirty = true;
         }
         let data_tabs = self.ui.widget(cx, ids!(workspace_tabs.data_tabs));
+        if data_tabs.visible() && data_tabs.button(cx, ids!(use_training)).clicked(actions) {
+            self.backend.dispatch(Intent::Nexus(NexusIntent::UseOpenDataset));
+            if let Err(error) = self.plugins.select("nexus_train") { ::log::warn!("{error}"); }
+            dirty = true;
+        }
         for (path, screen) in [(ids!(tab_library) as &[LiveId], Screen::Library), (ids!(tab_play), Screen::Play), (ids!(tab_eval), Screen::Eval)] {
             if data_tabs.visible() && data_tabs.button(cx, path).clicked(actions) {
                 self.navigate(screen);

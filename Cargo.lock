@@ -2020,6 +2020,7 @@ version = "0.1.0-rc.2"
 dependencies = [
  "dorobot-plugin-collection",
  "dorobot-plugin-control",
+ "dorobot-plugin-policy",
  "dorobot-studio-core",
  "dorobot-studio-plugin",
  "dorobot-ux",
@@ -2052,6 +2053,15 @@ dependencies = [
  "log",
  "makepad-urdf-player",
  "makepad-widgets",
+]
+
+[[package]]
+name = "dorobot-plugin-policy"
+version = "0.1.0-rc.2"
+dependencies = [
+ "dorobot-studio-core",
+ "dorobot-studio-plugin",
+ "dorobot-ux",
 ]
 
 [[package]]

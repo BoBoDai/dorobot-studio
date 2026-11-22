@@ -9,6 +9,7 @@ members = [
     "crates/dorobot-studio-plugin",
     "plugins/collection",
     "plugins/control",
+    "plugins/policy",
 ]
 
 [workspace.package]

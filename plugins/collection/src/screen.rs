@@ -343,6 +343,31 @@ script_mod! {
             }
         }
 
+        nexus_capture := View{
+            visible: false width: Fill height: Fill flow: Down spacing: 10.0
+            View{width: Fill height: Fit flow: Right spacing: 14.0 align: Align{y: 0.5}
+                Label{text: "SO-101 · Nexus simulation · Local host"
+                    draw_text +: {text_style: mod.widgets.ux.TEXT_TITLE{}}}
+                source := Label{text: ""}
+                count := Label{text: ""}
+                Filler{}
+                stop := mod.widgets.ux.StopButton{text: "Stop session"}
+            }
+            stage := NexusStage{}
+            prompt := Label{width: Fill height: Fit max_lines: 2 text: ""}
+            detail := Label{width: Fill height: Fit max_lines: 2 text: ""}
+            View{width: Fill height: Fit flow: Flow.Right{wrap: true} spacing: 8.0
+                reset := mod.widgets.ux.ToolButton{text: "Reset scene"}
+                pause := mod.widgets.ux.ToolButton{text: "Pause"}
+                step := mod.widgets.ux.ToolButton{text: "Single step"}
+                record := mod.widgets.ux.PrimaryButton{text: "Start episode"}
+                finish := mod.widgets.ux.StopButton{text: "Finish episode"}
+                save := mod.widgets.ux.PrimaryButton{text: "Save episode"}
+                discard := mod.widgets.ux.ToolButton{text: "Discard take"}
+                replay := mod.widgets.ux.ToolButton{text: "Open saved episode"}
+            }
+        }
+
         // ---- transport ----
         transport := View{
             width: Fill height: 78

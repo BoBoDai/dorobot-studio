@@ -149,7 +149,7 @@ fn control_node(
             "wheel_3_joint".into(),
         ]
     } else {
-        Model::read(&config.model)?.names
+        Model::read_nano(&config.model)?.names
     };
     let mut mapper = Mapper::new(names.clone());
     let mut guard = Guard::new(names);

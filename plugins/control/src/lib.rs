@@ -1,6 +1,7 @@
 //! 机器人设置与实时操作插件。
 pub mod screen;
 mod live_mirror;
+mod nexus_setup;
 use dorobot_studio_core::api::{Backend, Screen};
 use dorobot_studio_core::ui::play::PlayScreenWidgetRefExt;
 use dorobot_studio_plugin::*;
@@ -23,6 +24,11 @@ impl StudioPlugin for ControlPlugin {
                     id: "hardware_teleop",
                     title: "Operate",
                     legacy_screen: Some(Screen::Live),
+                },
+                PanelDescriptor {
+                    id: "nexus_setup",
+                    title: "SO-101 Nexus",
+                    legacy_screen: None,
                 },
                 PanelDescriptor {
                     id: "hardware_live_mirror",
@@ -58,6 +64,7 @@ impl StudioPlugin for ControlPlugin {
                     root: WidgetRef::script_from_value(vm, value),
                 }))
             }
+            "nexus_setup" => Ok(Box::new(nexus_setup::NexusSetup::create(vm))),
             "hardware_live_mirror" => Ok(Box::new(live_mirror::LiveMirrorPanel::create(vm))),
             _ => Err(format!("未知控制面板：{panel}")),
         }

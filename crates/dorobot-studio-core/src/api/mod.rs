@@ -19,6 +19,7 @@ pub mod capture;
 pub mod files;
 pub mod live;
 pub mod mock;
+pub mod nexus;
 pub mod scene;
 pub mod supported;
 pub mod telemetry;
@@ -471,6 +472,7 @@ impl Screen {
 /// makes the whole app scriptable (and testable) without synthetic input.
 #[derive(Clone, Debug)]
 pub enum Intent {
+    Nexus(nexus::NexusIntent),
     Navigate(Screen),
     ConfigureRig(PathBuf),
     SelectSimulation(bool),
@@ -536,6 +538,7 @@ pub enum Intent {
 /// What every screen reads and writes. Implemented by [`mock::MockBackend`]
 /// today; real backends drop in per screen without UI changes.
 pub trait Backend {
+    fn nexus(&self) -> Option<&nexus::NexusState> { None }
     fn telemetry(&self) -> Option<&telemetry::TelemetryState> {
         None
     }

@@ -1,6 +1,9 @@
 //! Native adapter for the pinned Nexus engine. Robot motor/readback mapping follows
 //! dimforge/nexus ca2cc91 (MIT OR Apache-2.0), without its Python bindings.
-use crate::{control::Model, protocol::*};
+use crate::{
+    control::{Model, SO101_JOINTS},
+    protocol::*,
+};
 use anyhow::{Context, Result, ensure};
 use glamx::{Mat3, Pose3, Quat, Vec3};
 use khal::backend::Backend;
@@ -18,6 +21,8 @@ struct Spec {
     position: [f32; 3],
     color: [f32; 4],
     fixed: bool,
+    #[serde(default)]
+    round: bool,
 }
 struct Joint {
     link: usize,
@@ -28,6 +33,7 @@ struct Joint {
     force: f32,
 }
 struct Camera {
+    name: &'static str,
     id: usize,
     body: RigidBodyHandle,
     local: Pose3,
@@ -113,17 +119,74 @@ impl Simulation {
     }
     /// Experimental AISLE scene, supplied explicitly; the Studio default stays fixed.
     pub fn with_scene(path: &Path, scene: Option<&Path>) -> Result<Self> {
+        Self::with_model(path, scene, Model::read_nano(path)?)
+    }
+
+    pub fn with_so101_scene(path: &Path, scene: &Path) -> Result<Self> {
         let model = Model::read(path)?;
+        ensure!(
+            model.names.len() == SO101_JOINTS.len(),
+            "Expected a six-joint SO-101 URDF"
+        );
+        Self::with_model(path, Some(scene), model)
+    }
+
+    fn with_model(path: &Path, scene: Option<&Path>, model: Model) -> Result<Self> {
+        let so101 = model.names.len() == SO101_JOINTS.len();
+        let specs: Vec<Spec> = if let Some(scene) = scene {
+            serde_json::from_slice(&std::fs::read(scene)?)
+                .with_context(|| format!("Invalid scene {}", scene.display()))?
+        } else {
+            serde_json::from_str(include_str!("../assets/living-room.json"))?
+        };
+        ensure!(!specs.is_empty(), "Empty scene");
+        let mut names = std::collections::HashSet::new();
+        for spec in &specs {
+            ensure!(
+                !spec.name.is_empty()
+                    && names.insert(&spec.name)
+                    && spec.size.iter().all(|v| v.is_finite() && *v > 0.)
+                    && spec
+                        .position
+                        .iter()
+                        .chain(&spec.color)
+                        .all(|v| v.is_finite())
+                    && (!spec.round || spec.size[0] == spec.size[1]),
+                "Invalid scene object {}",
+                spec.name
+            );
+        }
+        if so101 {
+            for (name, fixed) in [("floor", true), ("cube_6", false), ("plate", true)] {
+                ensure!(
+                    specs
+                        .iter()
+                        .any(|spec| spec.name == name && spec.fixed == fixed),
+                    "SO-101 scene requires a {} object named {name}",
+                    if fixed { "fixed" } else { "dynamic" }
+                );
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        let backend = BackendType::Metal;
+        #[cfg(not(target_os = "macos"))]
+        let backend = BackendType::Gpu;
         let mut viewer = block_on(NexusViewer::new_headless_with_size(Vec::new(), 64, 64))
-            .with_backend(BackendType::Metal)
+            .with_backend(backend)
             .with_deterministic(true);
+        if so101 {
+            // Headless captures may return before rendering. Warm this lazy
+            // manager while Kiss3D's texture cache is still available.
+            kiss3d::resource::MaterialManager2d::get_global_manager(|_| ());
+        }
         viewer.init_backend();
         viewer.add_directional_light(Vec3::new(0.3, -0.4, -1.0));
         viewer.set_sensor_rendering(true);
-        viewer.set_sensor_antialiasing(4);
+        viewer.set_sensor_antialiasing(if so101 { 1 } else { 4 });
         viewer.set_sensor_shadow_softness(1.0);
         viewer.set_sensor_shadow_range(2.5, 20.0);
-        viewer.set_sensor_shadow_resolution(4096, 4);
+        viewer.set_sensor_shadow_resolution(if so101 { 1024 } else { 4096 }, 4);
         let mut state = NexusState::default();
         state.set_rbd_timestep(DT, 2);
         let mut params = state
@@ -138,22 +201,6 @@ impl Simulation {
         state.set_rbd_implicit_coriolis(viewer.backend(), false);
         state.set_rbd_substep_refresh(false, true);
         state.set_deterministic(viewer.backend(), true);
-        let specs: Vec<Spec> = if let Some(scene) = scene {
-            serde_json::from_slice(&std::fs::read(scene)?)?
-        } else {
-            serde_json::from_str(include_str!("../assets/living-room.json"))?
-        };
-        ensure!(!specs.is_empty(), "Empty scene");
-        let mut names = std::collections::HashSet::new();
-        for s in &specs {
-            ensure!(
-                names.insert(&s.name)
-                    && s.size.iter().all(|v| v.is_finite() && *v > 0.)
-                    && s.position.iter().chain(&s.color).all(|v| v.is_finite()),
-                "Invalid scene object {}",
-                s.name
-            );
-        }
         let mut bodies = Vec::new();
         let mut objects = Vec::new();
         for spec in &specs {
@@ -162,12 +209,18 @@ impl Simulation {
             } else {
                 RigidBodyBuilder::dynamic()
             };
-            let collider =
+            let shape = if spec.round {
+                ColliderBuilder::cylinder(spec.size[2] / 2.0, spec.size[0] / 2.0)
+                    .rotation(Vec3::new(std::f32::consts::FRAC_PI_2, 0.0, 0.0))
+            } else {
                 ColliderBuilder::cuboid(spec.size[0] / 2.0, spec.size[1] / 2.0, spec.size[2] / 2.0)
-                    .density(500.0)
-                    .friction(0.7)
-                    .friction_combine_rule(CoefficientCombineRule::Max)
-                    .build();
+            };
+            let pose = shape.position;
+            let collider = shape
+                .density(500.0)
+                .friction(if so101 { 0.9 } else { 0.7 })
+                .friction_combine_rule(CoefficientCombineRule::Max)
+                .build();
             let shape = collider.shared_shape().clone();
             let body = state.insert_rigid_body(
                 rb.translation(Vec3::from(spec.position)).build(),
@@ -178,7 +231,7 @@ impl Simulation {
                 0,
                 body,
                 &shape,
-                Pose3::IDENTITY,
+                pose,
                 spec.color,
                 None,
                 None,
@@ -193,7 +246,7 @@ impl Simulation {
             });
         }
         let options = rapier3d_urdf::UrdfLoaderOptions {
-            make_roots_fixed: false,
+            make_roots_fixed: so101,
             mesh_converter: Some(MeshConverter::ConvexHull),
             squeeze_empty_fixed_links: false,
             ..Default::default()
@@ -248,7 +301,7 @@ impl Simulation {
                 if free.is_empty() {
                     continue;
                 }
-                ensure!(free.len() == 1, "Nano joint must have one DoF");
+                ensure!(free.len() == 1, "Robot joint {name} must have one DoF");
                 let a = axis(free[0]);
                 let motor = link.joint().data.motor(a);
                 mapping.insert(
@@ -359,7 +412,7 @@ impl Simulation {
                         size[2] as f32 / 2.0,
                     ),
                     urdf_rs::Geometry::Sphere { radius } => SharedShape::ball(*radius as f32),
-                    _ => anyhow::bail!("Unsupported Nano visual geometry"),
+                    _ => anyhow::bail!("Unsupported robot visual geometry"),
                 };
                 viewer.insert_visual_mesh_textured(
                     0,
@@ -408,7 +461,7 @@ impl Simulation {
             .unwrap();
         let mut cameras = Vec::new();
         let mut camera_specs = serde_json::Map::new();
-        for (name, link, directory, local) in [
+        let nano_mounts = [
             (
                 "head",
                 "head_tilt",
@@ -427,7 +480,23 @@ impl Simulation {
                 "right_wrist",
                 mount([0.073, 0.0, 0.0], Vec3::new(1.0, 0.0, 1.0), -Vec3::Z),
             ),
-        ] {
+        ];
+        let so101_mount = [(
+            "front",
+            "base_link",
+            "front",
+            mount([0.50, -0.42, 0.49], Vec3::new(-0.34, 0.43, -0.39), Vec3::Z),
+        )];
+        let mounts = if so101 {
+            &so101_mount[..]
+        } else {
+            &nano_mounts[..]
+        };
+        let camera_fps = if so101 { 20 } else { FPS };
+        for &(name, link, directory, local) in mounts {
+            let body = *links
+                .get(link)
+                .with_context(|| format!("Missing camera mount {link}"))?;
             let id = block_on(viewer.add_sensor_camera(
                 WIDTH as u32,
                 HEIGHT as u32,
@@ -441,10 +510,11 @@ impl Simulation {
             sensor.set_background_color([0.07, 0.08, 0.12, 1.0]);
             viewer.attach_sensor_camera(id, 0, links[link], local, &state);
             let focal = HEIGHT as f64 / (2.0 * 35_f64.to_radians().tan());
-            camera_specs.insert(name.into(),json!({"video_key":format!("observation.images.{name}"),"source_directory":directory,"parent_link":link,"resolution":[WIDTH,HEIGHT],"fps":FPS,"vertical_fov_deg":70,"intrinsics":[[focal,0.0,320.0],[0.0,focal,240.0],[0.0,0.0,1.0]],"link_from_camera_gl":matrix(local),"camera_convention":"OpenGL: +X right, +Y up, -Z forward","optical_calibration":"nominal simulation assumption; not measured hardware calibration","channels":["rgb","depth","seg","world_from_camera_gl","world_from_mount_link"],"depth_units":"metres, axial camera depth; far plane for background","segmentation":"simulator entity IDs; -1 background; not a hardware sensor"}));
+            camera_specs.insert(name.into(),json!({"video_key":format!("observation.images.{name}"),"source_directory":directory,"parent_link":link,"resolution":[WIDTH,HEIGHT],"fps":camera_fps,"vertical_fov_deg":70,"intrinsics":[[focal,0.0,320.0],[0.0,focal,240.0],[0.0,0.0,1.0]],"link_from_camera_gl":matrix(local),"camera_convention":"OpenGL: +X right, +Y up, -Z forward","optical_calibration":"nominal simulation assumption; not measured hardware calibration","channels":["rgb","depth","seg","world_from_camera_gl","world_from_mount_link"],"depth_units":"metres, axial camera depth; far plane for background","segmentation":"simulator entity IDs; -1 background; not a hardware sensor"}));
             cameras.push(Camera {
+                name,
                 id,
-                body: links[link],
+                body,
                 local,
             });
         }
@@ -452,6 +522,7 @@ impl Simulation {
             .iter()
             .map(|(name, body)| (name.clone(), state.rigid_body_gpu_index(0, *body).unwrap()))
             .collect();
+        let joint_count = model.names.len();
         let mut out = Self {
             state,
             pipeline: NexusPipeline::default(),
@@ -465,7 +536,7 @@ impl Simulation {
             objects,
             camera_specs: Value::Object(camera_specs),
             initial_objects: Vec::new(),
-            targets: vec![0.0; 17],
+            targets: vec![0.0; joint_count],
             tick: 0,
             robot_ids,
             furniture_ids,
@@ -477,6 +548,7 @@ impl Simulation {
             .names
             .iter()
             .map(|n| match n.as_str() {
+                "gripper" if so101 => 0.6,
                 "head_pan_joint" => 1.5,
                 "head_tilt_joint" => -0.22,
                 "left_j1_yaw" | "right_j1_yaw" => 0.2,
@@ -506,6 +578,62 @@ impl Simulation {
             .collect();
         Ok(out)
     }
+
+    pub fn set_so101_joint_positions(&mut self, positions: [f64; 6]) -> Result<()> {
+        ensure!(
+            self.joints.len() == SO101_JOINTS.len() && positions.iter().all(|q| q.is_finite()),
+            "Expected six finite SO-101 joint positions"
+        );
+        let targets = positions
+            .iter()
+            .zip(&self.model.limits)
+            .map(|(position, [lo, hi])| position.clamp(*lo, *hi))
+            .collect::<Vec<_>>();
+        // Rapier consumes coordinates in assembly-link order, which need not
+        // match the named LeRobot command protocol.
+        let mut assembly = self
+            .joints
+            .iter()
+            .zip(&targets)
+            .map(|(joint, position)| (joint.link, *position as f32))
+            .collect::<Vec<_>>();
+        assembly.sort_unstable_by_key(|(link, _)| *link);
+        let coordinates = assembly
+            .into_iter()
+            .map(|(_, position)| position)
+            .collect::<Vec<_>>();
+        gpu(self.state.set_multibody_joint_positions(
+            self.viewer.backend(),
+            0,
+            self.root,
+            &coordinates,
+        ))?;
+        self.targets = targets;
+        Ok(())
+    }
+
+    pub fn reset_tabletop_cube(&mut self) -> Result<()> {
+        let index = self
+            .objects
+            .iter()
+            .position(|object| object.name == "cube_6")
+            .context("Cube is missing from the tabletop")?;
+        let cube = self.bodies[index];
+        let mut position = Vec3::from(self.initial_objects[index]);
+        position.z += 0.002;
+        let backend = self.viewer.backend();
+        gpu(self.state.set_rigid_body_pose(
+            backend,
+            0,
+            cube,
+            Pose3::translation(position.x, position.y, position.z),
+        ))?;
+        gpu(self
+            .state
+            .set_rigid_body_velocity(backend, 0, cube, Vec3::ZERO, Vec3::ZERO))?;
+        Ok(())
+    }
+
     pub fn step(&mut self, contacts: bool) -> Result<Vec<[i64; 3]>> {
         gpu(self
             .state
@@ -608,7 +736,7 @@ impl Simulation {
             })
             .collect::<Result<_>>()?;
         let mut cameras = Vec::new();
-        for (c, name) in self.cameras.iter().zip(CAMERAS) {
+        for c in &self.cameras {
             let rgb = block_on(self.viewer.render_sensor_rgb(c.id)).context("RGB render")?;
             let depth = if recorded {
                 self.viewer
@@ -635,7 +763,7 @@ impl Simulation {
                 .cached_body_pose(&self.state, 0, c.body)
                 .context("Camera mount readback")?;
             cameras.push(Sensor {
-                name: name.into(),
+                name: c.name.into(),
                 rgb,
                 depth,
                 seg,
@@ -673,7 +801,20 @@ impl Simulation {
             command_velocity: velocity,
             phase,
         };
-        frame.validate(recorded)?;
+        if self.joints.len() == SO101_JOINTS.len() {
+            ensure!(
+                frame.observation.len() == 19 && frame.observation.iter().all(|v| v.is_finite()),
+                "Invalid SO-101 observation"
+            );
+            ensure!(
+                frame.cameras.len() == 1
+                    && frame.cameras[0].name == "front"
+                    && frame.cameras[0].rgb.len() == WIDTH * HEIGHT * 3,
+                "Expected one 640×480 SO-101 front RGB frame"
+            );
+        } else {
+            frame.validate(recorded)?;
+        }
         Ok(frame)
     }
 }

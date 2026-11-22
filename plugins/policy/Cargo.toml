@@ -1,0 +1,10 @@
+[package]
+name = "dorobot-plugin-policy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+dorobot-studio-core = { path = "../../crates/dorobot-studio-core", default-features = false }
+dorobot-studio-plugin = { path = "../../crates/dorobot-studio-plugin" }
+dorobot-ux = { workspace = true }
