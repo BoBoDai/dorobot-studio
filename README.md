@@ -147,23 +147,34 @@ was also verified. A physical-leader run through this Studio workflow is pending
 
 ## Rust 插件架构
 
-Studio 采用 **Rust 原生插件工作台**：宿主负责窗口、导航、面板挂载和事件分发；机器人控制、数据采集、训练与推理插件均通过共享 SDK 提供界面与操作，各自位于独立的 Rust crate。
+本版本注册 **3 个内置 Rust 插件**，分别负责机器人控制、数据采集、训练与推理。数据工作区由 Studio 宿主管理。宿主通过共享 SDK 挂载插件面板并分发事件。
 
 ```mermaid
 flowchart TB
-    host["dorobot-flex · 宿主"] --> control["控制插件 · plugins/control"]
-    host --> collection["采集插件 · plugins/collection"]
-    host --> policy["训练与推理插件 · plugins/policy"]
-    host --> sdk["dorobot-studio-plugin · 插件 SDK"]
-    control --> sdk
-    collection --> sdk
-    policy --> sdk
-    host --> core["dorobot-studio-core · 共享服务"]
-    sdk --> core
-    control --> core
-    collection --> core
-    policy --> core
+    subgraph robot["SO-101 实机 · Dorobot2"]
+        leader["实体主臂"] -->|目标关节位置| teleop["Dorobot2 遥操作"]
+        teleop -->|电机命令| follower["实体从臂"]
+        follower -->|实测关节位置| publisher["Dorobot2 Zenoh 发布器"]
+    end
+
+    subgraph studio["DoRobot Studio · dorobot-flex"]
+        core["共享后端 · dorobot-studio-core<br/>Zenoh 订阅、会话和数据集"]
+        control["Robot control<br/>dorobot.control"]
+        collection["Data collection<br/>dorobot.collection"]
+        policy["Training &amp; inference<br/>dorobot.policy"]
+        workspace["Data workspace<br/>宿主内置回放与筛选"]
+        core <-->|连接与镜像状态| control
+        core <-->|录制操作与预览| collection
+        core <-->|训练与推理作业| policy
+        core <-->|数据集与片段排除| workspace
+    end
+
+    publisher -->|Zenoh 实测关节位置| core
+    core <-->|SO-101 Nexus 作业与状态| worker["本机 LeRobot 工作进程"]
+    worker <-->|关节目标、观测与 RGB| nexus["Nexus 仿真"]
 ```
+
+Dorobot2 管理真机串口并驱动实体从臂。Studio 的共享后端订阅 Zenoh，**Robot control → Live mirror** 用实测关节位置更新 URDF 模型。采集和策略插件通过共享后端运行本机 Nexus 工作流。数据工作区可以将所选 LeRobot v3 数据集和片段排除设置交给训练作业。
 
 - **插件 SDK**：`StudioPlugin` 描述插件并注册面板工厂；`PluginPanel` 管理实例、状态同步、事件和停用回调。插件与面板 ID、API 版本在注册时校验。
 - **共享核心**：集中提供 `Backend`、Dora 会话、数据格式、回放、控件、主题及国际化。模型解析在后台执行，缓存最近使用的模型；控件更新和 GPU 操作在界面线程执行。
