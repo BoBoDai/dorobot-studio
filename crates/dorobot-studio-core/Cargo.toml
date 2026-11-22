@@ -33,6 +33,7 @@ rfd = { workspace = true }
 # Error handling
 thiserror = { workspace = true }
 anyhow = { workspace = true }
+zenoh = { version = "=1.10.2", default-features = false, features = ["transport_tcp"] }
 
 # Video decoding (optional)
 ffmpeg-next = { workspace = true, optional = true }

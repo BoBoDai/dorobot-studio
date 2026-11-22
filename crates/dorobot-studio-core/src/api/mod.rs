@@ -21,6 +21,7 @@ pub mod live;
 pub mod mock;
 pub mod scene;
 pub mod supported;
+pub mod telemetry;
 pub mod workflow;
 
 use std::collections::BTreeMap;
