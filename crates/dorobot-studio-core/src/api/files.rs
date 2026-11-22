@@ -201,6 +201,8 @@ pub struct FileBackend {
     simulation: super::workflow::SimulationRuntime,
     nano_driver: super::supported::NanoRuntime,
     live_client: Option<super::live::LiveClient>,
+    telemetry_receiver: Option<telemetry::ZenohReceiver>,
+    telemetry_state: telemetry::TelemetryState,
     live_preview: PlaybackState,
     connection: super::live::ConnectionState,
     live_status: String,
@@ -224,6 +226,16 @@ pub struct FileBackend {
 }
 
 impl FileBackend {
+    pub fn configure_telemetry(&mut self, options: telemetry::ZenohOptions) {
+        match telemetry::ZenohReceiver::start(options) {
+            Ok(receiver) => self.telemetry_receiver = Some(receiver),
+            Err(error) => {
+                self.telemetry_state.error = Some(error.to_string());
+                self.telemetry_state.phase = telemetry::MirrorPhase::Error;
+            }
+        }
+    }
+
     pub fn connect_live(&mut self, socket: PathBuf) {
         self.nano_driver.stop();
         // Returning from the base-driver test must also release its page
@@ -260,6 +272,8 @@ impl FileBackend {
             simulation: super::workflow::SimulationRuntime::default(),
             nano_driver: super::supported::NanoRuntime::default(),
             live_client: None,
+            telemetry_receiver: None,
+            telemetry_state: telemetry::TelemetryState::default(),
             live_preview: super::live::empty_preview(),
             connection: super::live::ConnectionState::default(),
             live_status: super::live::ConnectionState::default().summary(),
@@ -803,6 +817,10 @@ impl Backend for FileBackend {
         if (self.screen == Screen::Live && self.hardware.nano.is_none()) || (self.screen == Screen::Record && self.simulation.state.simulation && self.simulation.state.active) { &self.live_preview } else { &self.playback }
     }
     fn replay(&self) -> &PlaybackState { &self.playback }
+    fn telemetry(&self) -> Option<&telemetry::TelemetryState> {
+        Some(&self.telemetry_state)
+    }
+
     fn live_connection(&self) -> Option<&super::live::ConnectionState> { Some(&self.connection) }
     fn eval(&self) -> &EvalState {
         &self.eval
@@ -819,6 +837,7 @@ impl Backend for FileBackend {
         }
 
         match intent {
+            Intent::SelectTelemetrySource(source) => self.telemetry_state.select(source),
             Intent::SetCapturePreferences { task, destination } => {
                 if !self.simulation.state.pending() || self.simulation.state.phase == "review" {
                     self.simulation.state.task = task; self.simulation.state.destination = destination;
@@ -1015,6 +1034,13 @@ impl Backend for FileBackend {
     }
 
     fn poll(&mut self) {
+        if let Some(receiver) = &mut self.telemetry_receiver {
+            let now = std::time::Instant::now();
+            let catalog = receiver.poll(now);
+            self.telemetry_state.update(catalog, now, |id| {
+                id == crate::data::telemetry_model::SO101_MODEL_ID
+            });
+        }
         let was_ready = self.simulation.state.ready;
         self.simulation.poll();
         if !was_ready && self.simulation.state.ready {

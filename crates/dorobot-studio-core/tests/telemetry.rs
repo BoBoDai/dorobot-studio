@@ -103,3 +103,46 @@ fn catalog_isolates_restarted_session() {
         0
     );
 }
+
+#[test]
+fn mirror_selection_holds_pose_until_matching_model_is_ready() {
+    use dorobot_studio_core::api::telemetry::TelemetryState;
+    let mut mirror = TelemetryState::default();
+    let mut catalog = SourceCatalog::default();
+    let now = Instant::now();
+    let first = pose(SESSION, 42);
+    catalog.add_source(descriptor(SESSION));
+    catalog.accept_pose(first.clone(), now);
+    mirror.update(&catalog, now, |_| true);
+    assert_eq!(
+        mirror
+            .render_frame(&first.source, &first.model_id)
+            .unwrap()
+            .sequence,
+        42
+    );
+
+    let replacement = pose(NEXT, 0);
+    catalog.add_source(descriptor(NEXT));
+    catalog.accept_pose(replacement.clone(), now);
+    mirror.update(&catalog, now, |_| true);
+    assert!(
+        mirror.selected.is_none(),
+        "two live sessions need an explicit choice"
+    );
+    mirror.select(replacement.source.clone());
+    mirror.update(&catalog, now, |_| true);
+    assert!(mirror
+        .render_frame(&first.source, &first.model_id)
+        .is_none());
+    assert!(mirror
+        .render_frame(&replacement.source, "wrong-model")
+        .is_none());
+    assert_eq!(
+        mirror
+            .render_frame(&replacement.source, &replacement.model_id)
+            .unwrap()
+            .sequence,
+        0
+    );
+}

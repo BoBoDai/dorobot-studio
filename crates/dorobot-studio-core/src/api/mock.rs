@@ -82,6 +82,7 @@ impl Backend for MockBackend {
             | Intent::ConnectLive(_)
             | Intent::DisconnectLive
             | Intent::OpenLiveRecording
+            | Intent::SelectTelemetrySource(_)
             | Intent::OpenFolder(_)
             | Intent::UndoExclude
             | Intent::HubTransfer { .. } => {}

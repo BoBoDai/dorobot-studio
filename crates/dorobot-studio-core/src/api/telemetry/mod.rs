@@ -117,3 +117,114 @@ impl SourceCatalog {
         self.generation += 1;
     }
 }
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum MirrorPhase {
+    #[default]
+    Searching,
+    ChooseSource,
+    Waiting,
+    Live,
+    Stale,
+    Disconnected,
+    UnsupportedModel,
+    Error,
+}
+
+#[derive(Debug, Default)]
+pub struct TelemetryState {
+    pub sources: Vec<Descriptor>,
+    pub selected: Option<SourceId>,
+    pub latest: Option<ReceivedPose>,
+    pub phase: MirrorPhase,
+    pub error: Option<String>,
+    pub rejected: u64,
+    explicit_selection: bool,
+}
+
+impl TelemetryState {
+    pub fn select(&mut self, source: SourceId) {
+        if self
+            .sources
+            .iter()
+            .any(|descriptor| descriptor.source == source)
+        {
+            if self.selected.as_ref() != Some(&source) {
+                self.latest = None;
+                self.phase = MirrorPhase::Waiting;
+            }
+            self.selected = Some(source);
+            self.explicit_selection = true;
+        }
+    }
+
+    pub fn update(
+        &mut self,
+        catalog: &SourceCatalog,
+        now: Instant,
+        supported: impl Fn(&str) -> bool,
+    ) {
+        self.error.clone_from(&catalog.error);
+        self.rejected = catalog.rejected;
+        self.sources = catalog
+            .sources()
+            .map(|(_, source)| source.descriptor.clone())
+            .collect();
+        if let Some(selected) = &self.selected {
+            let matching: Vec<_> = self
+                .sources
+                .iter()
+                .filter(|descriptor| descriptor.source.robot_id == selected.robot_id)
+                .collect();
+            let present = matching
+                .iter()
+                .any(|descriptor| &descriptor.source == selected);
+            if !present && matching.len() == 1 {
+                self.selected = Some(matching[0].source.clone());
+                self.latest = None;
+                self.explicit_selection = false;
+            } else if matching.len() > 1 && (!present || !self.explicit_selection) {
+                self.selected = None;
+                self.latest = None;
+                self.explicit_selection = false;
+            }
+        } else if self.sources.len() == 1 {
+            self.selected = Some(self.sources[0].source.clone());
+        }
+        let current = self
+            .selected
+            .as_ref()
+            .and_then(|selected| catalog.sources.get(selected));
+        self.phase = match current {
+            Some(source) => {
+                self.latest.clone_from(&source.latest);
+                if !supported(&source.descriptor.model_id) {
+                    MirrorPhase::UnsupportedModel
+                } else if self.latest.is_none() {
+                    MirrorPhase::Waiting
+                } else if catalog.is_stale(&source.descriptor.source, now) {
+                    MirrorPhase::Stale
+                } else {
+                    MirrorPhase::Live
+                }
+            }
+            None if self.error.is_some() => MirrorPhase::Error,
+            None if self.selected.is_some() => MirrorPhase::Disconnected,
+            None if self.sources.len() > 1 => MirrorPhase::ChooseSource,
+            None => MirrorPhase::Searching,
+        };
+    }
+
+    pub fn render_frame(&self, source: &SourceId, loaded_model: &str) -> Option<&PoseFrame> {
+        let frame = &self.latest.as_ref()?.frame;
+        if self.phase == MirrorPhase::Live
+            && self.selected.as_ref() == Some(source)
+            && frame.source == *source
+            && frame.model_id == loaded_model
+        {
+            Some(frame)
+        } else {
+            None
+        }
+    }
+}

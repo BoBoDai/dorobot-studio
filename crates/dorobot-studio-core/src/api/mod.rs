@@ -486,6 +486,7 @@ pub enum Intent {
     ConnectLive(PathBuf),
     DisconnectLive,
     OpenLiveRecording,
+    SelectTelemetrySource(telemetry::SourceId),
 
     // Library
     RescanDatasets,
@@ -535,6 +536,10 @@ pub enum Intent {
 /// What every screen reads and writes. Implemented by [`mock::MockBackend`]
 /// today; real backends drop in per screen without UI changes.
 pub trait Backend {
+    fn telemetry(&self) -> Option<&telemetry::TelemetryState> {
+        None
+    }
+
     fn dataset_id(&self) -> Option<&str> {
         None
     }
