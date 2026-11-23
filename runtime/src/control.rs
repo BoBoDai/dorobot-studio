@@ -4,6 +4,15 @@ use std::{collections::BTreeMap, path::Path};
 
 pub const TIMEOUT_NS: u64 = 250_000_000;
 pub const MODES: [&str; 4] = ["Drive", "Left arm", "Right arm", "Head"];
+pub const SO101_JOINTS: [&str; 6] = [
+    "shoulder_pan",
+    "shoulder_lift",
+    "elbow_flex",
+    "wrist_flex",
+    "wrist_roll",
+    "gripper",
+];
+
 #[derive(Clone, Debug)]
 pub struct Model {
     pub names: Vec<String>,
@@ -28,8 +37,36 @@ impl Model {
                 [j.limit.lower, j.limit.upper]
             });
         }
-        ensure!(names.len() == 17, "Nano must have 17 controllable joints");
+        if names.len() == SO101_JOINTS.len() {
+            limits = SO101_JOINTS
+                .iter()
+                .map(|name| {
+                    let index = names
+                        .iter()
+                        .position(|joint| joint == name)
+                        .ok_or_else(|| anyhow::anyhow!("Missing SO-101 joint {name}"))?;
+                    let [lower, upper] = limits[index];
+                    ensure!(
+                        lower.is_finite() && upper.is_finite() && lower < upper,
+                        "Invalid limits for SO-101 joint {name}"
+                    );
+                    Ok([lower, upper])
+                })
+                .collect::<Result<Vec<_>>>()?;
+            names = SO101_JOINTS.map(str::to_owned).to_vec();
+        } else {
+            ensure!(names.len() == 17, "Unsupported model joint count");
+        }
         Ok(Self { names, limits })
+    }
+
+    pub fn read_nano(path: &Path) -> Result<Self> {
+        let model = Self::read(path)?;
+        ensure!(
+            model.names.len() == 17,
+            "Nano must have 17 controllable joints"
+        );
+        Ok(model)
     }
 }
 pub fn axis(value: f64) -> Result<f64> {
@@ -291,6 +328,24 @@ mod tests {
             connected: true,
             ..Default::default()
         }
+    }
+    #[test]
+    fn so101_uses_leader_joint_order_with_its_own_limits() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/so101/so101_new_calib.urdf");
+        let model = Model::read(&path).unwrap();
+        assert_eq!(
+            model.names,
+            [
+                "shoulder_pan",
+                "shoulder_lift",
+                "elbow_flex",
+                "wrist_flex",
+                "wrist_roll",
+                "gripper"
+            ]
+        );
+        assert_eq!(model.limits[0], [-1.91986, 1.91986]);
+        assert_eq!(model.limits[5], [-0.174533, 1.74533]);
     }
     #[test]
     fn held_trigger_on_connect_cannot_move_until_release_and_neutral() {

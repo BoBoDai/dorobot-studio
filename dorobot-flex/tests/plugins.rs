@@ -220,9 +220,10 @@ fn toolbox_has_one_entry_per_plugin_instead_of_one_per_panel() {
     });
     registry.mount_toolbox(&mut cx, &container).unwrap();
     let children = container.borrow::<View>().unwrap().children.clone();
-    assert_eq!(children.len(), 2, "侧栏应按插件分组，不逐个展开面板");
+    assert_eq!(children.len(), 3, "侧栏应按插件分组，不逐个展开面板");
     assert_eq!(children[0].1.text(), "Robot control");
     assert_eq!(children[1].1.text(), "Data collection");
+    assert_eq!(children[2].1.text(), "Training & inference");
 }
 
 #[test]
@@ -612,4 +613,21 @@ fn live_mirror_registers_without_replacing_operate() {
     assert!(cx.with_vm(|vm| registry.create_instance("hardware_teleop", vm)).is_ok());
     let mirror = cx.with_vm(|vm| registry.create_instance("hardware_live_mirror", vm)).unwrap();
     assert!(!mirror.root().button(&mut cx, ids!(next_source)).is_empty());
+}
+
+#[test]
+fn one_policy_plugin_contains_training_and_rollout_with_native_actions() {
+    let (mut cx, registry) = setup();
+    let plugins = registry.descriptors();
+    let policy = plugins.iter().find(|descriptor| descriptor.id == "dorobot.policy")
+        .expect("policy toolbox is registered");
+    let tabs: Vec<_> = policy.panels.iter().map(|panel| panel.id).collect();
+    assert_eq!(tabs, ["nexus_train", "nexus_rollout"]);
+    for (id, action) in [
+        ("nexus_train", ids!(train) as &[LiveId]),
+        ("nexus_rollout", ids!(run)),
+    ] {
+        let panel = cx.with_vm(|vm| registry.create_instance(id, vm)).unwrap();
+        assert!(!panel.root().button(&mut cx, action).is_empty());
+    }
 }

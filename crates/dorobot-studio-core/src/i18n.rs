@@ -207,6 +207,10 @@ impl Localizer {
         self.entries.retain(|id, _| seen.contains(id));
     }
 
+    pub fn apply_panel(&mut self, cx: &mut Cx, panel: &WidgetRef, language: Language) {
+        self.visit(cx, panel, language, &HashSet::new(), &mut HashSet::new());
+    }
+
     fn visit(
         &mut self,
         cx: &mut Cx,

@@ -10,6 +10,7 @@ pub mod eval;
 pub mod flex_layout;
 pub mod frame;
 pub mod library;
+pub mod nexus;
 pub mod play;
 
 /// Register every UI module. Tokens must come first — screens reference them.
@@ -18,6 +19,7 @@ pub fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
     library::script_mod(vm);
     flex_layout::script_mod(vm);
     play::script_mod(vm);
+    nexus::script_mod(vm);
     eval::script_mod(vm)
 }
 

@@ -1,5 +1,5 @@
 //! Local UI continuity. Restoring a session never starts playback or hardware.
-use crate::api::{Backend, Intent, Screen};
+use crate::api::{nexus::{NexusIntent, NexusSettings}, Backend, Intent, Screen};
 use serde::{Deserialize, Serialize};
 use std::{
     io,
@@ -25,6 +25,7 @@ pub struct Session {
     pub capture_task: Option<String>,
     pub capture_destination: Option<String>,
     pub simulation_source: Option<bool>,
+    pub nexus: Option<NexusSettings>,
 }
 
 fn default_speed() -> f64 {
@@ -57,10 +58,23 @@ impl Session {
             capture_task: Some(backend.workflow().task),
             capture_destination: Some(backend.workflow().destination),
             simulation_source: Some(backend.workflow().simulation),
+            nexus: backend.nexus().map(|state| state.settings.clone()),
         }
     }
 
     pub fn restore(&self, backend: &mut dyn Backend, restore_dataset: bool) {
+        if let (Some(mut settings), Some(state)) = (self.nexus.clone(), backend.nexus()) {
+            if std::env::var_os("DOROBOT_LEROBOT_PYTHON").is_some() {
+                settings.python.clone_from(&state.settings.python);
+            }
+            if std::env::var_os("DOROBOT_SO101_LEADER").is_some() {
+                settings.leader_port.clone_from(&state.settings.leader_port);
+            }
+            if std::env::var_os("DOROBOT_SO101_CALIBRATION").is_some() {
+                settings.calibration_dir.clone_from(&state.settings.calibration_dir);
+            }
+            backend.dispatch(Intent::Nexus(NexusIntent::Configure(settings)));
+        }
         if let Some(path) = &self.rig_profile { if path.is_file() { backend.dispatch(Intent::ConfigureRig(path.clone())); } }
         if let Some(selected) = self.simulation_source { backend.dispatch(Intent::SelectSimulation(selected)); }
         let flow = backend.workflow();

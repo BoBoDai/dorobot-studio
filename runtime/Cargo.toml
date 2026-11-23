@@ -3,6 +3,12 @@ name = "dorobot-nano-runtime"
 version = "0.1.0-rc.2"
 edition = "2024"
 license = "MIT"
+default-run = "dorobot-nano-runtime"
+
+[[bin]]
+name = "dorobot-so101-session"
+path = "src/bin/dorobot-so101-session.rs"
+required-features = ["physics"]
 
 # Keep GPU/toolchain dependencies separate from Makepad's pinned JIT dependency set.
 [workspace]
@@ -39,10 +45,14 @@ ffmpeg-next = "=8.0.0"
 khal = { version = "0.4", optional = true }
 glamx = { version = "0.3", optional = true }
 pollster = { version = "1", optional = true }
-nexus3d = { path = "vendor/nexus/crates/nexus3d", features = ["rbd", "metal"], optional = true }
-nexus_viewer3d = { path = "vendor/nexus/crates/nexus_viewer3d", features = ["metal"], optional = true }
+nexus3d = { path = "vendor/nexus/crates/nexus3d", features = ["rbd"], optional = true }
+nexus_viewer3d = { path = "vendor/nexus/crates/nexus_viewer3d", optional = true }
 rapier3d-urdf = { version = "0.36.0", features = ["stl"], optional = true }
 kiss3d = { version = "0.47.0", optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+nexus3d = { path = "vendor/nexus/crates/nexus3d", features = ["metal"], optional = true }
+nexus_viewer3d = { path = "vendor/nexus/crates/nexus_viewer3d", features = ["metal"], optional = true }
 
 [patch.crates-io]
 khal = { path = "vendor/khal/crates/khal" }

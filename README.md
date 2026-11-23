@@ -3,6 +3,9 @@
 Adora Nano simulation, SO-100/SO-101 LeRobot data collection and dataset review
 with the **Makepad** UI framework.
 
+**SO-101 on Linux:** [live follower mirror](#physical-teleop-and-live-follower-mirror) ·
+[Nexus collection, training and inference](#leader-driven-nexus-collection-training-and-inference)
+
 **插件开发：[插件开发指南](docs/PLUGINS.md)** · [Rust 插件架构](#rust-插件架构)
 
 **Start here: [Detailed user guide](docs/USER_GUIDE.md)** — installation, first
@@ -14,11 +17,12 @@ sidebar. It shows the current language; click to switch **English / 简体中文
 It remembers your choice without stopping
 recording or playback. See [language support](docs/I18N.md).
 
-The standalone RC uses Rust for Studio, native Dora nodes, Nexus simulation,
-controller/serial control, three-camera recording and dataset transfer. It
-packages no Python runtime or bindings. See the [native runtime](runtime/README.md)
-and [macOS release guide](tools/release/README.md). FFmpeg remains a native codec
-dependency; Python is used only by development/build and acceptance scripts.
+The standalone Nano RC uses Rust for Studio, native Dora nodes, Nexus
+simulation, controller/serial control, three-camera recording and dataset
+transfer. Its bundle uses native FFmpeg for video. The SO-101 Nexus development
+workflow uses an external LeRobot Python environment for collection and policy
+jobs. See the [native runtime](runtime/README.md) and
+[macOS release guide](tools/release/README.md).
 
 For the current capture workflow, build requirements, verification results and remaining hardware checks, see [the functional review and setup guide](docs/FUNCTIONAL_REVIEW.md). Production mode is the default; use `--demo` for generated fixtures.
 
@@ -87,22 +91,90 @@ captures at 5 Hz; the Live mode does not imply 30 fps throughput.
 
 [Adora Nano／AISLE 验证指南](tools/aisle-validation/README.md)保留可复现的仿真、原始数据导出、LeRobot 转换及 Studio 回放／审阅验证流程。指南同时记录多相机与场景扩展、证据产物和适用范围；应用内的原生 Rust 运行时使用方式见 [运行时指南](runtime/README.md)。
 
+## SO-101 workflows
+
+### Physical teleop and live follower mirror
+
+```mermaid
+flowchart LR
+    leader["Physical leader"] -->|Joint targets| teleop["Dorobot2 teleop"]
+    teleop -->|Motor commands| follower["Physical follower"]
+    follower -->|Measured joint positions| publisher["Dorobot2 telemetry publisher"]
+    publisher -->|Zenoh joint state| mirror["Studio Live mirror<br/>SO-101 URDF viewer"]
+```
+
+The operator moves the physical follower with the leader while Studio mirrors
+the follower's measured motion in 3D. Dorobot2 owns both serial connections and
+the motor commands. Studio applies named joint readbacks to the URDF viewer as
+teleop runs. Use **Robot control → Live mirror** to see the virtual arm track the
+physical follower.
+
+**Status.** A 35-second powered teleop run on one Linux PC applied 945 measured
+follower poses in Studio over Zenoh TCP loopback. The p95 time from capture to
+pose application was 18.2 ms. Same-host peer discovery was verified with
+synthetic telemetry. Linux-to-macOS LAN validation is pending.
+[Setup and measurement details](docs/SO101_LIVE_MIRROR.md)
+
+### Leader-driven Nexus collection, training and inference
+
+```mermaid
+flowchart TD
+    leader["Calibrated physical leader"] -->|USB joint positions| worker["Local LeRobot worker"]
+    worker -->|Joint targets| capture["Nexus SO-101 follower<br/>Cube and plate scene"]
+    capture -->|Front RGB, measured joints and targets| dataset["LeRobot v3 episodes"]
+    dataset --> review["Studio Data workspace<br/>Replay and episode exclusions"]
+    review --> train["Local LeRobot ACT training"]
+    train -->|Checkpoint| policy["ACT policy inference"]
+    policy -->|Joint targets| rollout["Nexus SO-101 follower<br/>Same scene in a new run"]
+    rollout -->|Front RGB and measured joints| policy
+    rollout --> result["Studio evaluation<br/>Video, joint feedback and task result"]
+```
+
+Start in **Robot control → SO-101 Nexus** with a calibrated leader and your
+local LeRobot environment. In **Data collection → Record**, reset the scene,
+wait for confirmation, and record and save a take. The follower is simulated
+for both collection and inference. Stop the capture session, then choose
+**Robot control → SO-101 Nexus → Open saved episode**. Review the take in
+**Data workspace** and select **Use for training**. **Training & inference**
+runs ACT locally and loads the resulting checkpoint into a fresh Nexus run.
+
+**Status.** The native Linux desktop workflow was verified with synthetic
+leader input. It saved a 25-frame LeRobot v3 episode, trained and reloaded an
+ACT checkpoint, and completed 200 closed-loop actions with a saved H.264 video.
+Studio reported that the cube placement was incomplete. Desktop video replay
+was also verified. A physical-leader run through this Studio workflow is pending.
+[Build and workflow steps](docs/PLUGINS.md#so-101-nexus-采集训练和推理)
+
 ## Rust 插件架构
 
-Studio 采用 **Rust 原生插件工作台**：宿主负责窗口、导航、面板挂载和事件分发；每个插件是独立的 Rust crate，通过共享 SDK 提供界面与操作。现有机器人控制和数据采集界面已迁入插件，插件不依赖宿主或彼此。
+本版本注册 **3 个内置 Rust 插件**，分别负责机器人控制、数据采集、训练与推理。数据工作区由 Studio 宿主管理。宿主通过共享 SDK 挂载插件面板并分发事件。
 
 ```mermaid
 flowchart TB
-    host["dorobot-flex · 宿主"] --> control["控制插件 · plugins/control"]
-    host --> collection["采集插件 · plugins/collection"]
-    host --> sdk["dorobot-studio-plugin · 插件 SDK"]
-    control --> sdk
-    collection --> sdk
-    host --> core["dorobot-studio-core · 共享服务"]
-    sdk --> core
-    control --> core
-    collection --> core
+    subgraph robot["SO-101 实机 · Dorobot2"]
+        leader["实体主臂"] -->|目标关节位置| teleop["Dorobot2 遥操作"]
+        teleop -->|电机命令| follower["实体从臂"]
+        follower -->|实测关节位置| publisher["Dorobot2 Zenoh 发布器"]
+    end
+
+    subgraph studio["DoRobot Studio · dorobot-flex"]
+        core["共享后端 · dorobot-studio-core<br/>Zenoh 订阅、会话和数据集"]
+        control["Robot control<br/>dorobot.control"]
+        collection["Data collection<br/>dorobot.collection"]
+        policy["Training &amp; inference<br/>dorobot.policy"]
+        workspace["Data workspace<br/>宿主内置回放与筛选"]
+        core <-->|连接与镜像状态| control
+        core <-->|录制操作与预览| collection
+        core <-->|训练与推理作业| policy
+        core <-->|数据集与片段排除| workspace
+    end
+
+    publisher -->|Zenoh 实测关节位置| core
+    core <-->|SO-101 Nexus 作业与状态| worker["本机 LeRobot 工作进程"]
+    worker <-->|关节目标、观测与 RGB| nexus["Nexus 仿真"]
 ```
+
+Dorobot2 管理真机串口并驱动实体从臂。Studio 的共享后端订阅 Zenoh，**Robot control → Live mirror** 用实测关节位置更新 URDF 模型。采集和策略插件通过共享后端运行本机 Nexus 工作流。数据工作区可以将所选 LeRobot v3 数据集和片段排除设置交给训练作业。
 
 - **插件 SDK**：`StudioPlugin` 描述插件并注册面板工厂；`PluginPanel` 管理实例、状态同步、事件和停用回调。插件与面板 ID、API 版本在注册时校验。
 - **共享核心**：集中提供 `Backend`、Dora 会话、数据格式、回放、控件、主题及国际化。模型解析在后台执行，缓存最近使用的模型；控件更新和 GPU 操作在界面线程执行。
@@ -112,8 +184,9 @@ flowchart TB
 
 | 侧栏入口 | 顶部标签 | 提供方 |
 | --- | --- | --- |
-| 机器人控制 | 机器人设置、操作 | `dorobot-plugin-control` |
+| 机器人控制 | 机器人设置、操作、SO-101 Nexus、实时镜像 | `dorobot-plugin-control` |
 | 数据采集 | 录制 | `dorobot-plugin-collection` |
+| 训练与推理 | 训练、推理与评估 | `dorobot-plugin-policy` |
 | 数据工作区 | 数据集、回放、评估 | 宿主内置模块 |
 
 当前插件与宿主**一起编译、静态链接**，新增插件后需要重新构建；尚未提供动态库安装或热卸载。通用工作流工具栏、文件选择器和回放窗口仍由宿主管理。
@@ -134,7 +207,7 @@ cargo run --locked -p dorobot-flex --no-default-features -- --demo
 Dorobot provides tools for visualizing robotics datasets, with a focus on **LeRobot** format datasets:
 
 - **dorobot-flex/**：工作台宿主与插件组合入口。
-- **plugins/**：独立的机器人控制和数据采集插件。
+- **plugins/**：机器人控制、数据采集、训练与推理插件。
 - **crates/**：插件 SDK、共享核心、界面库和数据类型。
 - **runtime/**：原生 Dora 节点、仿真、硬件控制与录制，使用独立 Cargo 工作区。
 

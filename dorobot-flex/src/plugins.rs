@@ -9,4 +9,7 @@ pub fn builtin_plugins() -> PluginRegistry {
         .register(Box::new(dorobot_plugin_collection::CollectionPlugin))
         .expect("采集插件注册失败");
     registry
+        .register(Box::new(dorobot_plugin_policy::PolicyPlugin))
+        .expect("训练与推理插件注册失败");
+    registry
 }
