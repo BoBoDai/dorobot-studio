@@ -21,6 +21,7 @@ pub mod live;
 pub mod mock;
 pub mod scene;
 pub mod supported;
+pub mod telemetry;
 pub mod workflow;
 
 use std::collections::BTreeMap;
@@ -485,6 +486,7 @@ pub enum Intent {
     ConnectLive(PathBuf),
     DisconnectLive,
     OpenLiveRecording,
+    SelectTelemetrySource(telemetry::SourceId),
 
     // Library
     RescanDatasets,
@@ -534,6 +536,10 @@ pub enum Intent {
 /// What every screen reads and writes. Implemented by [`mock::MockBackend`]
 /// today; real backends drop in per screen without UI changes.
 pub trait Backend {
+    fn telemetry(&self) -> Option<&telemetry::TelemetryState> {
+        None
+    }
+
     fn dataset_id(&self) -> Option<&str> {
         None
     }

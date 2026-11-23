@@ -10,6 +10,7 @@
 pub mod lerobot_dataset;
 pub mod lerobot_writer;
 pub mod robot_model;
+pub mod telemetry_model;
 pub mod urdf_renderer;
 pub mod video_decoder;
 

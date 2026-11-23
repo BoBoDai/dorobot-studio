@@ -605,3 +605,11 @@ fn collection_submenu_loads_models_without_blocking_its_first_sync() {
 fn operate_and_replay_submenu_loads_models_without_blocking_its_first_sync() {
     check_submenu_model_loading("hardware_teleop");
 }
+
+#[test]
+fn live_mirror_registers_without_replacing_operate() {
+    let (mut cx, registry) = setup();
+    assert!(cx.with_vm(|vm| registry.create_instance("hardware_teleop", vm)).is_ok());
+    let mirror = cx.with_vm(|vm| registry.create_instance("hardware_live_mirror", vm)).unwrap();
+    assert!(!mirror.root().button(&mut cx, ids!(next_source)).is_empty());
+}

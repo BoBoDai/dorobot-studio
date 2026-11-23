@@ -41,6 +41,9 @@ fn focused_control(root: &WidgetRef, cx: &Cx) -> bool {
 
 /// `--dataset <dir>` opens a dataset or library. Fixtures require `--demo`.
 fn make_backend() -> Box<dyn Backend> {
+    if std::env::var_os("RUST_LOG").is_some() {
+        let _ = env_logger::try_init();
+    }
     let args: Vec<String> = std::env::args().collect();
     let demo = args.iter().any(|a| a == "--demo")
         || std::env::current_exe()
@@ -74,6 +77,15 @@ fn make_backend() -> Box<dyn Backend> {
     if let Some(socket)=args.iter().position(|a|a=="--live-socket").and_then(|i|args.get(i+1)) {
         backend.connect_live(socket.into());
     }
+    let mut zenoh = dorobot_flex::api::telemetry::ZenohOptions::default();
+    for pair in args.windows(2) {
+        match pair[0].as_str() {
+            "--zenoh-connect" => zenoh.connect_endpoints.push(pair[1].clone()),
+            "--zenoh-mode" => zenoh.mode.clone_from(&pair[1]),
+            _ => {}
+        }
+    }
+    backend.configure_telemetry(zenoh);
     Box::new(backend)
 }
 
@@ -422,6 +434,9 @@ impl App {
     }
 
     fn display_status(&self) -> &str {
+        if self.plugins.selected() == Some("hardware_live_mirror") {
+            return "";
+        }
         let status = self.backend.status().unwrap_or("Demo · no hardware connected");
         if status.starts_with("Simulation setup") { "Ready" }
         else if status.starts_with("Real robot setup") || status.starts_with("Choose a USB serial port") { "Not connected" }
@@ -430,8 +445,9 @@ impl App {
     fn sync_workflow(&self, cx: &mut Cx) {
         let state = self.backend.workflow();
         let screen = self.backend.screen();
-        let setup = screen == Screen::Hardware;
-        let record = screen == Screen::Record;
+        let mirror = self.plugins.selected() == Some("hardware_live_mirror");
+        let setup = screen == Screen::Hardware && !mirror;
+        let record = screen == Screen::Record && !mirror;
         let simulation = state.simulation;
         let pending = if simulation { state.pending() } else { self.backend.record().recording || self.backend.record().last_take.is_some() };
         let nano = self.backend.hardware().nano.is_some();
@@ -852,6 +868,9 @@ impl MatchEvent for App {
         let was_live=self.backend.playback().live.is_some();
         let screen_before = self.backend.screen();
         self.backend.poll();
+        if self.plugins.selected() == Some("hardware_live_mirror") {
+            self.sync_plugins(cx);
+        }
         if screen_before != self.backend.screen() { self.sync(cx); }
         let live_after=self.backend.playback().live.as_ref().map(|v|(v.sequence,v.connected,v.finished));
         if live_before!=live_after || (was_live && live_after.is_none()) {
