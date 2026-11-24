@@ -461,6 +461,8 @@ script_mod! {
             // only a whisper of a fade at the very rim of the quad, which sits
             // far enough out that its edge lands inside the horizon line
             let fade = 1.0 - smoothstep(self.extent * 0.75, self.extent * 0.98, r)
+            // No above-the-plane fade: the grid is drawn from both sides, so
+            // it still reads when the camera dips under the ground.
             // Pale #FFFFC5 soil with darker lines punching through it — the
             // ground is bright, so the grid reads as shadow, not glow.
             // Scalar arithmetic only: multiplying a let-bound vec3 by a float
