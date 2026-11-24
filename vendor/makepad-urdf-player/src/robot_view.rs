@@ -172,12 +172,6 @@ pub enum RobotViewAction {
     LoadFailed { path: String, error: String },
 }
 
-/// Offscreen supersampling factor for the 3D pass. 2.0 = 4 samples/pixel
-/// after the composite's bilinear downsample; the cost is 4x the fragment
-/// work on a pass that draws a few hundred thousand triangles, which is
-/// nothing next to having a readable silhouette.
-const SSAA_SCALE: f64 = 2.0;
-
 /// Shadow map resolution. 2048 is what MuJoCo's Filament backend defaults to
 /// and is ample for a box fitted to one robot.
 const SHADOW_MAP_SIZE: usize = 2048;
@@ -1619,9 +1613,9 @@ impl RobotView {
             0.0
         };
         self.draw_grid.depth_clip = 0.0;
-        // An external scene brings its own ground; the viewer's grid floor
-        // would z-fight it at y = 0.
-        if self.show_grid && self.external_items.is_empty() {
+        // External scenes provide their own ground. Show the viewer's floor
+        // only from above so its underside cannot wash out the model.
+        if self.show_grid && self.external_items.is_empty() && scene_state.camera_pos.y > self.grid_y {
             self.draw_grid.draw(cx, grid_geom);
             // Mirror floor: the robot reflected through the ground plane,
             // blended at the material reflectance — MuJoCo's reflectance look.
@@ -1968,12 +1962,6 @@ impl Widget for RobotView {
         self.ensure_initialized(cx.cx);
         self.ensure_geometries(cx.cx);
         self.camera.set_desktop_viewport_rect(rect);
-        // Supersample: makepad has no MSAA render targets (no sample count in
-        // TextureFormat), so the offscreen 3D pass is rendered at SSAA_SCALE x
-        // and the composite's bilinear fetch box-filters it back down. This is
-        // the only antialiasing the robot's silhouette gets — without it the
-        // STL edges crawl visibly while orbiting.
-        self.pass.set_size(cx, rect.size * SSAA_SCALE);
         self.pass.set_color_texture(
             cx,
             &self.color_texture,
@@ -1998,22 +1986,9 @@ impl Widget for RobotView {
         }
         cx.end_pass(&self.pass);
 
+        // DepthD32 is an attachment for depth testing. Only the color target
+        // can be sampled by this composite shader.
         self.draw_bg.set_scene_texture(&self.color_texture);
-        self.draw_bg.draw_vars.set_texture(1, &self.depth_texture);
-        // One texel of the SUPERSAMPLED target, which is what the depth
-        // buffer is: sampling at composite resolution would step over a
-        // whole SSAA block and read the wrong neighbour.
-        let dw = (rect.size.x * SSAA_SCALE).max(1.0) as f32;
-        let dh = (rect.size.y * SSAA_SCALE).max(1.0) as f32;
-        let ao = std::env::var("URDF_AO")
-            .ok()
-            .and_then(|v| v.parse::<f32>().ok())
-            .unwrap_or(0.35);
-        let edge = std::env::var("URDF_EDGE")
-            .ok()
-            .and_then(|v| v.parse::<f32>().ok())
-            .unwrap_or(0.30);
-        self.draw_bg.edge_ao = vec4(1.0 / dw, 1.0 / dh, ao, edge);
         // camera basis for the directional sky dome in the composite shader
         if let Some(scene_state) = self.camera.desktop_scene_state(rect, cx.time()) {
             let inv = scene_state.view.invert();

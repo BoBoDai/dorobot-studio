@@ -461,8 +461,6 @@ script_mod! {
             // only a whisper of a fade at the very rim of the quad, which sits
             // far enough out that its edge lands inside the horizon line
             let fade = 1.0 - smoothstep(self.extent * 0.75, self.extent * 0.98, r)
-            // No above-the-plane fade: the grid is drawn from both sides, so
-            // it still reads when the camera dips under the ground.
             // Pale #FFFFC5 soil with darker lines punching through it — the
             // ground is bright, so the grid reads as shadow, not glow.
             // Scalar arithmetic only: multiplying a let-bound vec3 by a float
@@ -575,7 +573,6 @@ script_mod! {
 pub mod composite_shader {
     use super::*;
 
-    #[cfg(not(target_arch = "wasm32"))]
     script_mod! {
         use mod.prelude.widgets.*
         use mod.shader.*
@@ -584,50 +581,9 @@ pub mod composite_shader {
         mod.draw.DrawSceneComposite = mod.std.set_type_default() do #(DrawSceneComposite::script_shader(vm)){
             ..mod.draw.DrawQuad
             scene_texture: texture_2d(float)
-            depth_texture: texture_2d(float)
 
             pixel: fn() {
                 let scene = self.scene_texture.sample(self.pos)
-                // ---- cavity AO + edges, from depth alone -------------------
-                // A Laplacian on the depth buffer: compare this pixel against
-                // the average of its four neighbours. On a flat surface —
-                // however steeply it is angled away — the centre sits on the
-                // plane its neighbours predict, so the response is ~0. It only
-                // departs where the SURFACE does, which is why this needs no
-                // near/far planes and no normal buffer: it is scale-free.
-                //
-                //   concave (centre further than predicted) -> a crevice, the
-                //     inside of a slot, where two parts meet. Darkened. This
-                //     is the contact shading that makes an assembly read as
-                //     parts touching rather than parts overlapping.
-                //   convex  (centre nearer) -> a ridge or a silhouette against
-                //     something behind it. Darkened as a line, which is the
-                //     outline a CAD viewer draws.
-                //
-                // Untextured STL gets both for free — no UVs, no maps, no
-                // change to any asset.
-                let ex = self.edge_ao.x
-                let ey = self.edge_ao.y
-                let dc = self.depth_texture.sample(self.pos).x
-                let dl = self.depth_texture.sample(vec2(self.pos.x - ex, self.pos.y)).x
-                let dr = self.depth_texture.sample(vec2(self.pos.x + ex, self.pos.y)).x
-                let du = self.depth_texture.sample(vec2(self.pos.x, self.pos.y - ey)).x
-                let dd = self.depth_texture.sample(vec2(self.pos.x, self.pos.y + ey)).x
-                let lap = (dl + dr + du + dd) * 0.25 - dc
-                // Perspective depth is wildly non-linear — the same millimetre
-                // is a huge delta near the camera and nothing far away. Divide
-                // by a local scale so one threshold works across the frame.
-                let dscale = max(1.0 - dc, 0.00002)
-                let curv = lap / dscale
-                // Nothing was drawn here (cleared depth): no geometry, no AO.
-                // The threshold is one f32 step under 1.0 — anything the
-                // depth buffer can actually hold short of the clear value is
-                // geometry, however far away; the previous 0.99999 wrote off
-                // a real band of far-plane fragments as background.
-                let onbody = step(dc, 0.9999999)
-                let cavity = clamp(0.0 - curv * self.edge_ao.z, 0.0, 1.0) * onbody
-                let ridge = clamp(curv * self.edge_ao.w, 0.0, 1.0) * onbody
-                let shade = clamp(1.0 - cavity - ridge, 0.0, 1.0)
                 let ndc_x = self.pos.x * 2.0 - 1.0
                 let ndc_y = 1.0 - self.pos.y * 2.0
                 let dir = normalize(
@@ -671,92 +627,9 @@ pub mod composite_shader {
                 let bg = bg0 + (vec3(1.0, 0.99, 0.94) * disc
                     + vec3(1.0, 0.88, 0.62) * halo) * self.light_dir.w
                 return vec4(
-                    scene.x * shade + bg.x * (1.0 - scene.w),
-                    scene.y * shade + bg.y * (1.0 - scene.w),
-                    scene.z * shade + bg.z * (1.0 - scene.w),
-                    1.0
-                )
-            }
-        }
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    script_mod! {
-        use mod.prelude.widgets.*
-        use mod.shader.*
-        use mod.draw
-
-        mod.draw.DrawSceneComposite = mod.std.set_type_default() do #(DrawSceneComposite::script_shader(vm)){
-            ..mod.draw.DrawQuad
-            scene_texture: texture_2d(float)
-            depth_texture: texture_2d(float)
-
-            pixel: fn() {
-                let s = self.scene_texture.sample(self.pos)
-                let scene = s
-                // Cavity AO + edges — the same depth Laplacian as the native
-                // variant; the review found this variant had been skipped, so
-                // wasm silently rendered without the effect.
-                let ex = self.edge_ao.x
-                let ey = self.edge_ao.y
-                let dc = self.depth_texture.sample(self.pos).x
-                let dl = self.depth_texture.sample(vec2(self.pos.x - ex, self.pos.y)).x
-                let dr = self.depth_texture.sample(vec2(self.pos.x + ex, self.pos.y)).x
-                let du = self.depth_texture.sample(vec2(self.pos.x, self.pos.y - ey)).x
-                let dd = self.depth_texture.sample(vec2(self.pos.x, self.pos.y + ey)).x
-                let lap = (dl + dr + du + dd) * 0.25 - dc
-                let dscale = max(1.0 - dc, 0.00002)
-                let curv = lap / dscale
-                let onbody = step(dc, 0.9999999)
-                let cavity = clamp(0.0 - curv * self.edge_ao.z, 0.0, 1.0) * onbody
-                let ridge = clamp(curv * self.edge_ao.w, 0.0, 1.0) * onbody
-                let shade = clamp(1.0 - cavity - ridge, 0.0, 1.0)
-                let ndc_x = self.pos.x * 2.0 - 1.0
-                let ndc_y = 1.0 - self.pos.y * 2.0
-                let dir = normalize(
-                    self.cam_fwd.xyz
-                    + self.cam_right.xyz * (ndc_x * self.cam_right.w)
-                    + self.cam_up.xyz * (ndc_y * self.cam_up.w)
-                )
-                let t = dir.y
-                let up = clamp(t, 0.0, 1.0)
-                // morning: near-white at the horizon, pale yellow just above,
-                // soft peach-pink towards the zenith
-                // the default framing only shows ~5 deg of sky, so the whole
-                // white -> pale yellow -> peach-pink ramp lives near the horizon
-                // host-themed: near-white at the horizon lifting to the zenith
-                // tint. The whole ramp lives low because the default framing
-                // only exposes a few degrees of sky.
-                let sky = mix(
-                    self.sky_horizon.xyz,
-                    self.sky_zenith.xyz,
-                    smoothstep(0.0, 0.10, up)
-                )
-                // the ground below, hazing into the sky as it approaches the
-                // horizon — without this the pale yellow meets the pink sky as
-                // a hard saturated band
-                let down = clamp(-t, 0.0, 1.0)
-                let earth0 = mix(
-                    self.ground_color.xyz,
-                    self.ground_color.xyz * 0.88,
-                    smoothstep(0.0, 0.75, down)
-                )
-                let ground_haze = 1.0 - smoothstep(0.006, 0.060, down)
-                let earth = mix(earth0, self.sky_horizon.xyz, ground_haze)
-                let glow = pow(1.0 - min(abs(t) * 26.0, 1.0), 3.0)
-                let bg0 = mix(earth, sky, smoothstep(-0.010, 0.010, t))
-                    + vec3(0.22, 0.20, 0.21) * glow * 0.07
-                // the lamp: a small ~0.5 degree disc with a tight halo
-                let sd = dot(dir, normalize(self.light_dir.xyz))
-                let ang = acos(clamp(sd, -1.0, 1.0))
-                let disc = 1.0 - smoothstep(0.0075, 0.0105, ang)
-                let halo = (1.0 - smoothstep(0.0, 0.075, ang)) * 0.30
-                let bg = bg0 + (vec3(1.0, 0.99, 0.94) * disc
-                    + vec3(1.0, 0.88, 0.62) * halo) * self.light_dir.w
-                return vec4(
-                    scene.x * shade + bg.x * (1.0 - scene.w),
-                    scene.y * shade + bg.y * (1.0 - scene.w),
-                    scene.z * shade + bg.z * (1.0 - scene.w),
+                    scene.x + bg.x * (1.0 - scene.w),
+                    scene.y + bg.y * (1.0 - scene.w),
+                    scene.z + bg.z * (1.0 - scene.w),
                     1.0
                 )
             }
@@ -849,10 +722,6 @@ pub struct DrawSceneComposite {
     /// xyz = direction towards the lamp, w = lamp switched on (0/1)
     #[live(vec4(-0.35, 0.84, 0.42, 0.0))]
     pub light_dir: Vec4f,
-    /// x,y = one texel of the scene target in uv; z = cavity strength;
-    /// w = edge strength. Zero z and w to switch the effect off entirely.
-    #[live(vec4(0.001, 0.001, 0.0, 0.0))]
-    pub edge_ao: Vec4f,
     /// sky colour at the horizon (also what the ground hazes into)
     #[live(vec4(1.0, 0.985, 0.985, 1.0))]
     pub sky_horizon: Vec4f,
